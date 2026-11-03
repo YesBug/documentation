@@ -1,0 +1,41 @@
+---
+title: "Create a unified video task"
+description: "Create an asynchronous video task from text or reference media, choose model-specific controls, and save the top-level task_id for subsequent retrieval."
+keywords: ["MaxAPI", "create video", "video generation", "images", "task_id"]
+openapi: "openapi/video-en.json POST /v2/videos/generations"
+---
+
+When you create a video task, MaxAPI returns a `task_id` for later retrieval. The shared required fields are `model` and `prompt`; reference images, video, and duration controls require model support. For a first integration, run the complete commands in the [unified video guide](/en/media/videos).
+
+## Choose an input branch
+
+| Goal | Request |
+| --- | --- |
+| Generate from text | Send `model` and `prompt`, omitting media inputs |
+| Generate using images | Choose an image-to-video model and supply `images` as it requires |
+| Generate using video | Supply a `videos` URL array only when the model supports it |
+
+The same `images` array can represent a first frame, first and last frames, or subject references for different models. Do not assume any two images form a frame pair or send every model's optional controls together.
+
+```json Minimal text-to-video shape
+{
+  "model": "YOUR_VIDEO_MODEL",
+  "prompt": "A paper boat floats slowly across a quiet pond, soft morning light, fixed camera."
+}
+```
+
+Replace `YOUR_VIDEO_MODEL` with a unified text-to-video model enabled for your account. A model name alone does not establish image input, generated audio, or every resolution capability.
+
+## Preserve the accepted result
+
+```json Illustrative accepted response
+{"task_id": "YOUR_VIDEO_TASK_ID"}
+```
+
+Store the complete string `task_id`, then [retrieve the task](/en/api-reference/videos/retrieve). Do not search `data.taskId`, `output.task_id`, or `id` for a fallback: those locations belong to other protocols or compatible responses that require their own confirmed contract.
+
+After HTTP success, still check for a valid `task_id`. Preserve error responses for diagnosis. If submission times out before a response arrives, investigate whether it was accepted before immediately resubmitting and creating a duplicate task.
+
+## Handle model differences
+
+Some branches accept a numeric `duration`; others use a numeric string. Formats and values for `size`, `resolution`, and `aspect_ratio` also depend on the model. The field reference describes possible inputs, not a guarantee that every model accepts every combination. Complete a minimal request first, then add supported parameters one at a time.

@@ -12,11 +12,22 @@ Suno 接口提供多种兼容格式。选择一个已开通的格式完成整条
 | --- | --- | --- |
 | 提交 | `POST /suno/v2/generate` | `POST /suno/submit/music` |
 | 查询 | `GET /suno/v2/feed?ids=...` | `GET /suno/fetch/{task_id}` |
-| 查询标识 | `clips[].id`，即歌曲片段 ID | `data.task_id`，即任务 ID |
-| 查询结果 | `clips[]` | 任务对象 `data` 及其歌曲列表 `data.data[]` |
+| 查询标识 | `clips[].id`，即歌曲片段 ID | 提交 `data` 字符串或 `data.task_id`，即任务 ID |
+| 查询结果 | `clips[]` | 任务对象 `data`；音乐结果在 `data.data[]` |
 | 进度判断 | 分别检查每个 clip | 检查任务状态，再读取歌曲结果 |
 
 两种格式是否可用由渠道决定。`feed` 的 `ids` 不能填生成请求顶层的 `id`，也不能填 NewAPI 的 `task_id`。
+
+## 开始前配置
+
+终端示例使用 Bash、`curl`、`jq` 和 Python 3。带请求的代码块启用失败即停止。将所选流程的 Bash 步骤放入同一个脚本按顺序运行，让 `TASK_ID` 等变量能在后续步骤使用；Python 代码另存为对应文件。失败后不要手动跳到后续步骤。先配置密钥与当前账户支持的音乐模型版本：
+
+```bash
+export MAXAPI_API_KEY="替换为你的 MaxAPI API Key"
+export MAXAPI_SUNO_MODEL="替换为已开通的 Suno mv 值"
+```
+
+Suno 路径从 `/suno` 开始，不额外拼接 `/v1`。选择接口、查看参数和在线调试见 [Suno API 总览](/zh/api-reference/suno/index)。本页使用已完成任务或有效输入示例；不要用文档占位符提交真实请求。
 
 ## Suno v2：生成并查询歌曲
 
@@ -39,6 +50,9 @@ GET  https://api.maxapi.ai/suno/v2/feed
 上传音频续写、纯音乐和其他高级模式可能有额外参数或版本要求。本例先演示自定义歌曲；不要将不同场景的全部参数一起发送。
 
 ```bash 生成自定义歌曲
+set -euo pipefail
+: > suno-generate.json
+: > suno-v2-ready.json
 : "${MAXAPI_SUNO_MODEL:?请设置已开通的 Suno mv 值}"
 jq -n --arg mv "$MAXAPI_SUNO_MODEL" '{
   mv: $mv,
@@ -72,11 +86,15 @@ jq -n --arg mv "$MAXAPI_SUNO_MODEL" '{
 顶层任务已受理或完成包装处理，不代表每个音频已完成。查询时使用歌曲片段 ID：
 
 ```bash 按 clip ID 查询
-CLIP_IDS="$(jq -er '[.clips[]?.id] | if length > 0 then join(",") else error("响应中没有 clip ID") end' suno-generate.json)"
+set -euo pipefail
+: > suno-v2-feed-response.json
+: > suno-v2-ready.json
+CLIP_IDS="$(jq -er '[.clips[]?.id] | if length > 0 then if all(.[]; type == "string" and length > 0) then join(",") else error("Invalid clip ID") end else error("响应中没有 clip ID") end' suno-generate.json)"
+: "${CLIP_IDS:?No clip IDs; stop before querying}"
 curl --fail-with-body --get https://api.maxapi.ai/suno/v2/feed \
   -H "Authorization: Bearer $MAXAPI_API_KEY" \
   --data-urlencode "ids=$CLIP_IDS" \
-  --output suno-clips.json
+  --output suno-v2-feed-response.json
 ```
 
 `ids` 可传多个英文逗号分隔的 clip ID。逐首检查 `clips[].status`；资料示例中 `submitted` 表示已提交，`complete` 表示片段完成。取得有效 `audio_url` 后再交付给用户，视频或封面链接需要单独检查。
@@ -85,10 +103,10 @@ curl --fail-with-body --get https://api.maxapi.ai/suno/v2/feed \
 
 ### 等待整批片段完成
 
-下面的脚本直接读取上一节的 `suno-generate.json`，查询其中所有 clip ID。它会检查返回集合是否包含全部预期 ID，避免“这次只返回一首已完成的歌”被误判为整批完成。
+下面的脚本直接读取上一节的 `suno-generate.json`，查询其中所有 clip ID。它会检查返回集合是否包含全部预期 ID，避免“这次只返回一首已完成的歌”被误判为整批完成。每次查询先将原始响应保存到 `suno-v2-feed-response.json`，只有本次全部预期片段完成后才写入 `suno-v2-ready.json`；重跑或失败不会保留旧的可下载记录。
 
 ```bash 安装依赖
-python -m pip install requests
+python3 -m pip install requests
 ```
 
 ```python wait_for_suno.py
@@ -101,36 +119,47 @@ import requests
 
 
 def wait_for_clips(clip_ids, timeout_seconds=600):
+    ready = Path("suno-v2-ready.json")
+    ready.unlink(missing_ok=True)
+    if not clip_ids or not all(isinstance(x, str) and x.strip() for x in clip_ids):
+        raise ValueError("Expected nonempty clip ID strings")
     expected = set(clip_ids)
-    if not expected:
-        raise ValueError("No clip IDs supplied")
     headers = {"Authorization": f"Bearer {os.environ['MAXAPI_API_KEY']}"}
     deadline = time.monotonic() + timeout_seconds
+    raw = Path("suno-v2-feed-response.json")
     while time.monotonic() < deadline:
+        raw.write_text("", encoding="utf-8")
         response = requests.get(
             "https://api.maxapi.ai/suno/v2/feed",
             params={"ids": ",".join(sorted(expected))},
             headers=headers,
             timeout=(10, 30),
         )
+        raw.write_text(response.text, encoding="utf-8")
         response.raise_for_status()
         payload = response.json()
-        Path("suno-clips.json").write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
-        by_id = {clip["id"]: clip for clip in payload.get("clips", []) if clip.get("id")}
+        clips = payload.get("clips") if isinstance(payload, dict) else None
+        if not isinstance(clips, list) or any(not isinstance(x, dict) for x in clips):
+            raise ValueError("Expected a clips array; inspect suno-v2-feed-response.json")
+        by_id = {clip["id"]: clip for clip in clips if isinstance(clip.get("id"), str)}
         for clip_id in expected:
             clip = by_id.get(clip_id, {})
             metadata = clip.get("metadata") or {}
+            if not isinstance(metadata, dict):
+                raise ValueError("Invalid clip metadata")
             if metadata.get("error_type") or metadata.get("error_message"):
                 raise RuntimeError(f"Clip {clip_id} failed: {metadata.get('error_message')}")
             print(f"{clip_id}: {clip.get('status', 'not returned yet')}")
         if expected.issubset(by_id) and all(
             by_id[clip_id].get("status") == "complete" for clip_id in expected
         ):
-            if not all(by_id[clip_id].get("audio_url") for clip_id in expected):
-                raise RuntimeError("A completed clip has no audio_url; inspect suno-clips.json")
-            return [by_id[clip_id] for clip_id in sorted(expected)]
+            songs = [by_id[clip_id] for clip_id in sorted(expected)]
+            if not all(song.get("audio_url") for song in songs):
+                raise RuntimeError("A completed clip has no audio_url")
+            ready.write_text(json.dumps({
+                "protocol": "v2", "requested_clip_ids": sorted(expected), "clips": songs
+            }, ensure_ascii=False, indent=2), encoding="utf-8")
+            return songs
         remaining = deadline - time.monotonic()
         if remaining > 0:
             time.sleep(min(5, remaining))
@@ -138,68 +167,303 @@ def wait_for_clips(clip_ids, timeout_seconds=600):
 
 
 if __name__ == "__main__":
+    Path("suno-v2-ready.json").unlink(missing_ok=True)
     submission = json.loads(Path("suno-generate.json").read_text(encoding="utf-8"))
-    ids = [clip["id"] for clip in submission.get("clips", []) if clip.get("id")]
-    clips = wait_for_clips(ids)
-    print(f"Completed {len(clips)} clips. Response saved to suno-clips.json.")
+    clips = submission.get("clips") if isinstance(submission, dict) else None
+    if not isinstance(clips, list) or any(not isinstance(x, dict) for x in clips):
+        raise ValueError("Invalid submission clips")
+    songs = wait_for_clips([clip.get("id") for clip in clips])
+    print(f"Completed {len(songs)} clips; saved to suno-v2-ready.json")
 ```
 
 ```bash 查询到全部片段完成
-python wait_for_suno.py
+python3 wait_for_suno.py
 ```
 
 5 秒查询间隔和 600 秒等待期限是示例的客户端策略。遇到 HTTP 错误时脚本退出，处理错误后可重跑，仍然查询原有片段。其他未识别状态不会被当成成功，脚本保留最近响应并最终超时。
 
 ### 保存完成的音频
 
-音频、封面和视频是独立结果。只需要音频时，根据 `audio_url` 下载，不必等待一个未使用的视频地址出现。下面的脚本不向媒体域名发送 MaxAPI 密钥：
+音频、封面和视频是独立结果。只需要音频时，根据 `audio_url` 下载，不必等待一个未使用的视频地址出现。下载脚本先核对当前提交的预期 clip 集合或任务 ID，再读取对应协议的已完成记录，不向媒体域名发送 MaxAPI 密钥：
 
 ```python save_suno_audio.py
 import json
 import mimetypes
+import sys
 from pathlib import Path
 from urllib.parse import urlparse
 
 import requests
 
 
-payload = json.loads(Path("suno-clips.json").read_text(encoding="utf-8"))
-for index, clip in enumerate(payload.get("clips", []), start=1):
-    if clip.get("status") != "complete" or not clip.get("audio_url"):
-        continue
-    url = clip["audio_url"]
-    if urlparse(url).scheme != "https":
-        raise RuntimeError("Expected an HTTPS audio URL")
-    with requests.get(url, stream=True, timeout=(10, 60)) as response:
-        response.raise_for_status()
-        media_type = response.headers.get("Content-Type", "").split(";", 1)[0]
-        if not media_type.startswith("audio/") and media_type != "application/octet-stream":
-            raise RuntimeError(f"Expected audio bytes, received {media_type!r}")
-        extension = mimetypes.guess_extension(media_type) or ".audio"
-        output = Path(f"suno-{index}{extension}")
-        partial = output.with_suffix(output.suffix + ".part")
-        with partial.open("wb") as file:
-            for chunk in response.iter_content(chunk_size=64 * 1024):
-                if chunk:
-                    file.write(chunk)
-        if partial.stat().st_size == 0:
-            raise RuntimeError("Downloaded audio is empty")
-        partial.replace(output)
-    print(f"Saved clip {clip['id']} to {output}")
+def read_json(name):
+    return json.loads(Path(name).read_text(encoding="utf-8"))
+
+
+def songs_for_current_request(mode):
+    if mode not in {"v2", "newapi"}:
+        raise ValueError("Choose v2 or newapi")
+    ready = read_json(f"suno-{mode}-ready.json")
+    if not isinstance(ready, dict) or ready.get("protocol") != mode:
+        raise ValueError("Wrong result protocol")
+    songs = ready.get("clips")
+    if not isinstance(songs, list) or not songs or any(not isinstance(x, dict) for x in songs):
+        raise ValueError("No validated song array")
+    if mode == "v2":
+        submission = read_json("suno-generate.json")
+        original = submission.get("clips") if isinstance(submission, dict) else None
+        if not isinstance(original, list) or not original or any(
+            not isinstance(x, dict) or not isinstance(x.get("id"), str) or not x["id"] for x in original
+        ):
+            raise ValueError("Invalid current v2 submission")
+        expected = {x["id"] for x in original}
+        if set(ready.get("requested_clip_ids", [])) != expected or {x.get("id") for x in songs} != expected:
+            raise ValueError("Ready clips do not match the current v2 submission")
+    else:
+        submission = read_json("suno-task.json")
+        if not isinstance(submission, dict) or submission.get("code") != "success":
+            raise ValueError("Invalid current NewAPI submission")
+        data = submission.get("data")
+        task_id = data if isinstance(data, str) else data.get("task_id") if isinstance(data, dict) else None
+        if not isinstance(task_id, str) or not task_id.strip() or ready.get("task_id") != task_id:
+            raise ValueError("Ready task does not match the current NewAPI submission")
+    for song in songs:
+        if not isinstance(song.get("id"), str) or not song["id"] or song.get("status") != "complete":
+            raise ValueError("Invalid or incomplete clip")
+        metadata = song.get("metadata") or {}
+        if not isinstance(metadata, dict) or metadata.get("error_type") or metadata.get("error_message"):
+            raise ValueError("Clip contains error information")
+        if not isinstance(song.get("audio_url"), str) or urlparse(song["audio_url"]).scheme != "https":
+            raise ValueError("Expected an HTTPS audio URL")
+    return songs
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        raise SystemExit("Usage: python3 save_suno_audio.py v2|newapi")
+    mode = sys.argv[1]
+    for index, clip in enumerate(songs_for_current_request(mode), start=1):
+        # No MaxAPI Authorization header is sent to the media host.
+        with requests.get(clip["audio_url"], stream=True, timeout=(10, 60)) as response:
+            response.raise_for_status()
+            media_type = response.headers.get("Content-Type", "").split(";", 1)[0]
+            if not media_type.startswith("audio/") and media_type != "application/octet-stream":
+                raise RuntimeError(f"Expected audio bytes, received {media_type!r}")
+            extension = mimetypes.guess_extension(media_type) or ".audio"
+            output = Path(f"suno-{mode}-{index}{extension}")
+            partial = output.with_suffix(output.suffix + ".part")
+            with partial.open("wb") as file:
+                for chunk in response.iter_content(chunk_size=64 * 1024):
+                    if chunk:
+                        file.write(chunk)
+            if partial.stat().st_size == 0:
+                raise RuntimeError("Downloaded audio is empty")
+            partial.replace(output)
+        print(f"Saved clip {clip['id']} to {output}")
 ```
 
 ```bash 下载完成的歌曲
-python save_suno_audio.py
+python3 save_suno_audio.py v2
 ```
 
 若下载服务返回 `application/octet-stream`，文件扩展名可能为 `.bin`。按实际文件格式确认扩展名，不要把所有返回内容一律命名成 `.mp3`。播放器能够读取音频后，再将自有存储地址交给前端。
 
-## NewAPI：提交并查询任务
+## NewAPI：先生成，再查询任务
 
-该格式使用任务包装层。以下演示已存在歌曲的续写：先设置 `MAXAPI_SUNO_CLIP_ID` 为当前渠道中可续写的 clip ID，并设置 `MAXAPI_CONTINUE_AT` 为你选择的秒数。它不是首次生成歌曲的最小请求。
+NewAPI 兼容接口将歌曲生成包装为任务。首先发送自定义歌曲的最小完整示例，不需要先有旧歌曲：
 
-```bash 续写已有歌曲
-: "${MAXAPI_SUNO_CLIP_ID:?请设置可续写的歌曲 clip ID}"
+```bash 首次生成歌曲
+set -euo pipefail
+: > suno-task.json
+: > suno-newapi-ready.json
+: "${MAXAPI_SUNO_MODEL:?请设置已开通的 Suno mv 值}"
+jq -n --arg mv "$MAXAPI_SUNO_MODEL" '{
+  mv: $mv,
+  prompt: "[Verse]\n晨光落在窗台\n新的旅程展开",
+  tags: "acoustic pop, warm vocals",
+  title: "新的旅程"
+}' | curl --fail-with-body https://api.maxapi.ai/suno/submit/music \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @- \
+  --output suno-task.json
+```
+
+自定义模式中 `prompt` 是歌词，`tags` 是风格。灵感模式使用 `gpt_description_prompt` 描述想要的歌曲；纯音乐可按渠道支持情况设置 `make_instrumental`。先跑通一种模式，再增加参数，具体字段见 [NewAPI 音乐提交](/zh/api-reference/suno/submit)。
+
+### 兼容两种提交响应
+
+成功业务码为 `code: "success"`。标准 NewAPI 的 `data` 是任务 ID 字符串；部分兼容渠道则返回含 `task_id` 的对象。两者都不代表歌曲已经完成。
+
+<CodeGroup>
+
+```json 任务 ID 字符串
+{"code": "success", "message": "", "data": "YOUR_TASK_ID"}
+```
+
+```json 任务对象
+{"code": "success", "message": "", "data": {"task_id": "YOUR_TASK_ID", "status": "SUBMITTED"}}
+```
+
+</CodeGroup>
+
+在上一条 `curl` 成功后执行。这里先检查业务码和类型，再提取字符串 ID，不固定读取 `data.task_id`：
+
+```bash 提取任务 ID
+set -euo pipefail
+TASK_ID="$(python3 - <<'PYCODE'
+import json
+from pathlib import Path
+
+response = json.loads(Path("suno-task.json").read_text(encoding="utf-8"))
+if not isinstance(response, dict) or response.get("code") != "success":
+    raise SystemExit("Submission failed; inspect suno-task.json")
+data = response.get("data")
+task_id = data if isinstance(data, str) else data.get("task_id") if isinstance(data, dict) else None
+if not isinstance(task_id, str) or not task_id.strip():
+    raise SystemExit("No valid task ID in the submission response")
+print(task_id)
+PYCODE
+)"
+: "${TASK_ID:?Submission did not return a valid task ID}"
+export TASK_ID
+```
+
+### 查询这个任务
+
+```bash 查询一次
+set -euo pipefail
+: > suno-task-status.json
+: > suno-newapi-ready.json
+TASK_ID_ESCAPED="$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["TASK_ID"], safe=""))')"
+curl --fail-with-body \
+  "https://api.maxapi.ai/suno/fetch/$TASK_ID_ESCAPED" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  --output suno-task-status.json
+```
+
+| 响应字段 | 读取方式 |
+| --- | --- |
+| `code`、`message` | 先判断本次查询的业务结果 |
+| `data.task_id` | 当前任务 ID |
+| `data.status` | 任务状态，例如 `SUBMITTED`、`IN_PROGRESS`、`SUCCESS`；失败版本可能返回 `FAIL` 或 `FAILURE` |
+| `data.fail_reason` | 任务失败详情 |
+| `data.data` | 音乐结果为歌曲数组；其他任务类型可能是对象 |
+| `data.data[].id` | 具体歌曲 clip ID，可用于后续续写 |
+| `data.data[].audio_url` | 歌曲的音频地址，仍需结合片段状态判断 |
+
+不要把 v2 的小写 clip 状态直接套到任务层，也不要把任意 `data.data` 都当作歌曲数组。解析时结合目标任务检查实际结果的类型和字段，不只依赖 `action` 标签。
+
+### 自动等待并准备下载
+
+保存以下脚本为 `wait_for_suno_task.py`。它查询原任务、识别失败状态，并在成功后核对歌曲数组；不会再次提交生成。
+
+```python wait_for_suno_task.py
+import json
+import os
+import sys
+import time
+from pathlib import Path
+from urllib.parse import quote
+
+import requests
+
+
+def wait_for_music(task_id, budget=600):
+    ready = Path("suno-newapi-ready.json")
+    ready.unlink(missing_ok=True)
+    if not isinstance(task_id, str) or not task_id.strip():
+        raise ValueError("A nonempty task ID string is required")
+    url = f"https://api.maxapi.ai/suno/fetch/{quote(task_id, safe='')}"
+    headers = {"Authorization": f"Bearer {os.environ['MAXAPI_API_KEY']}"}
+    deadline = time.monotonic() + budget
+    raw = Path("suno-task-status.json")
+    while time.monotonic() < deadline:
+        raw.write_text("", encoding="utf-8")
+        response = requests.get(url, headers=headers, timeout=(10, 30))
+        raw.write_text(response.text, encoding="utf-8")
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, dict) or payload.get("code") != "success":
+            raise RuntimeError("Task query failed; inspect suno-task-status.json")
+        task = payload.get("data")
+        if not isinstance(task, dict) or task.get("task_id") != task_id:
+            raise ValueError("Response task_id does not match the requested task")
+        status = task.get("status")
+        print(status, task.get("progress", ""))
+        if status in {"FAIL", "FAILURE"}:
+            raise RuntimeError(task.get("fail_reason") or "Music task failed")
+        if status == "SUCCESS":
+            songs = task.get("data")
+            if not isinstance(songs, list) or not songs:
+                raise ValueError("Expected a nonempty music result array")
+            for song in songs:
+                if not isinstance(song, dict) or not isinstance(song.get("id"), str) or not song["id"]:
+                    raise ValueError("Invalid song object or clip ID")
+                metadata = song.get("metadata") or {}
+                if not isinstance(metadata, dict):
+                    raise ValueError("Invalid song metadata")
+                if metadata.get("error_type") or metadata.get("error_message"):
+                    raise RuntimeError(metadata.get("error_message") or "Clip generation failed")
+                if song.get("status") != "complete" or not song.get("audio_url"):
+                    raise ValueError("Completed task contains an incomplete audio result")
+            ready.write_text(json.dumps({
+                "protocol": "newapi", "task_id": task_id, "clips": songs
+            }, ensure_ascii=False, indent=2), encoding="utf-8")
+            return songs
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            time.sleep(min(5, remaining))
+    raise TimeoutError("Task is not complete; retain the ID and resume retrieval later")
+
+
+if __name__ == "__main__":
+    Path("suno-newapi-ready.json").unlink(missing_ok=True)
+    if len(sys.argv) != 2:
+        raise SystemExit("Usage: python3 wait_for_suno_task.py TASK_ID")
+    songs = wait_for_music(sys.argv[1])
+    print(f"Completed {len(songs)} songs; saved to suno-newapi-ready.json")
+```
+
+```bash 等待现有任务完成
+python3 -m pip install requests
+python3 wait_for_suno_task.py "$TASK_ID"
+```
+
+脚本将每次收到的原始响应先保存为 `suno-task-status.json`，确认返回的 `task_id` 与本次查询一致，再写入 `suno-newapi-ready.json`。网络、HTTP 或 JSON 失败都会阻止生成已完成记录。下载时会再次与当前 `suno-task.json` 的任务 ID 核对：
+
+```bash 下载当前 NewAPI 任务的歌曲
+python3 save_suno_audio.py newapi
+```
+
+`*-ready.json` 是脚本生成的本地校验记录，不是 API 响应格式。v2 使用独立的 `suno-v2-ready.json`，两种协议不共用结果文件。
+
+5 秒查询间隔和 600 秒预算是客户端示例策略，单次请求还有独立超时。脚本遇到 HTTP 或业务错误会退出；修复问题后使用同一个任务 ID 重新查询。
+
+## 续写已有歌曲
+
+从已经完成的结果中选择一首歌曲的 clip ID，设置起点秒数。不要使用 NewAPI 的任务 ID 或 v2 顶层生成 ID 作为 `continue_clip_id`。
+
+### v2 续写
+
+在 [v2 生成请求](/zh/api-reference/suno/v2-generate) 中保留 `mv`、新歌词 `prompt`、风格等字段，再添加：
+
+```json 续写附加字段，合并到完整生成请求中
+{"continue_clip_id": "YOUR_SOURCE_CLIP_ID", "continue_at": 30}
+```
+
+仍提交到 `/suno/v2/generate`。响应中新的 `clips[].id` 才是这次要查询的片段 ID。
+
+### NewAPI 兼容续写
+
+下面演示使用 `task: "extend"` 的兼容续写请求。先设置源歌曲的 clip ID、起点秒数和已开通的模型：
+
+```bash 提交新的续写任务
+set -euo pipefail
+: > suno-task.json
+: > suno-newapi-ready.json
+: "${MAXAPI_SUNO_MODEL:?请设置已开通的 mv 值}"
+: "${MAXAPI_SUNO_CLIP_ID:?请设置已有歌曲的 clip ID}"
 : "${MAXAPI_CONTINUE_AT:?请设置续写起点秒数}"
 jq -n \
   --arg mv "$MAXAPI_SUNO_MODEL" \
@@ -219,31 +483,9 @@ jq -n \
   --output suno-task.json
 ```
 
-该格式的示例响应使用 `code: "success"`，任务 ID 位于 `data.task_id`。检查业务结果后再取 ID：
+部分兼容流程还需关联原 `task_id`，以当前渠道要求为准；它不代替源 clip ID。提交成功后重新执行“提取任务 ID”，然后运行 `wait_for_suno_task.py` 查询这次的新任务。
 
-```bash 查询 NewAPI 任务
-TASK_ID="$(jq -er '
-  if .code == "success" then (.data.task_id // empty)
-  else error(.message // "Suno 任务提交失败") end
-' suno-task.json)"
-: "${TASK_ID:?响应缺少任务 ID}"
-TASK_ID_ESCAPED="$(printf '%s' "$TASK_ID" | jq -sRr @uri)"
-curl --fail-with-body \
-  "https://api.maxapi.ai/suno/fetch/$TASK_ID_ESCAPED" \
-  -H "Authorization: Bearer $MAXAPI_API_KEY" \
-  --output suno-task-status.json
-```
-
-| 响应字段 | 作用 |
-| --- | --- |
-| `code`、`message` | 本次查询的业务结果 |
-| `data.task_id` | 任务 ID |
-| `data.status` | 任务状态；示例包含 `SUBMITTED`、`SUCCESS` |
-| `data.fail_reason` | 任务失败详情 |
-| `data.data[]` | 任务产生的歌曲或片段，内容取决于任务类型 |
-| `data.data[].audio_url` | 可用时返回的音频地址 |
-
-不要把 v2 的小写 clip 状态判断直接套到 NewAPI 的任务状态上。生成音乐、歌词和续写等任务也可能返回不同的结果内容。
+续写产物可能只是新增片段，并不保证已经合成为完整歌曲。上传音频的模型后缀与拼接方式属于其他协议流程，不直接套用到全部模型版本。
 
 ## 音乐任务排错
 
@@ -254,18 +496,10 @@ curl --fail-with-body \
 | 第一首完成，第二首还没完成 | 分别记录片段状态，按产品需求选择逐首展示或等待整批完成 |
 | 有 `audio_url`，但音频还未完整 | 等待该 clip 的 `status` 为 `complete`，不要只检查 URL 是否非空 |
 | 续写提示找不到原歌曲 | 检查 `continue_clip_id` 是歌曲片段 ID，并确认该片段属于当前可访问渠道 |
+| NewAPI 提交成功却取不到任务 ID | 检查 `data` 是字符串还是对象，不固定读取 `data.task_id` |
 | NewAPI 查询解析不到歌曲 | 歌曲数组在 `data.data[]`，不能直接套用 v2 的顶层 `clips[]` |
 | 下载内容不是音频 | 检查下载 HTTP 状态和内容类型，再查询最新链接；不要保存 JSON 错误为 MP3 |
 
 
-## 续写流程中的标识关系
-
-1. 通过生成或已支持的上传接口取得原歌曲的 clip ID。
-2. 提交续写，指定 `continue_clip_id` 和续写起点。
-3. 保存新任务 ID，以及新返回的 clip ID。
-4. 使用该格式对应的查询接口等待新片段完成。
-5. 如果需要整曲拼接，确认渠道支持的拼接动作，再处理完整音频。
-
-续写结果可能只是新增片段。不能假定续写一次就返回完整歌曲，也不能将某个版本的上传后缀规则套到所有 `mv` 值。
 
 上传、歌词和其他音乐操作见 [完整接口目录](/zh/api-reference/catalog)。后台轮询、结果存储与重复请求处理见 [异步任务与回调](/zh/guides/async-tasks)。

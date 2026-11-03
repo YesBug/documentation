@@ -1,0 +1,48 @@
+---
+title: "Retrieve a unified video task"
+description: "Retrieve a unified video task by its submitted task_id, distinguish pending and terminal states, and read confirmed fields for one or multiple result URLs."
+keywords: ["MaxAPI", "video task", "task status", "video_url", "data.output"]
+openapi: "openapi/video-en.json GET /v2/videos/generations/{task_id}"
+---
+
+Retrieval returns the unified video task object directly. Check top-level `status` before reading results from `data`. The `task_id` must come from [unified video submission](/en/api-reference/videos/create); an arbitrary ID from a provider-native endpoint is not interchangeable.
+
+## Decide what to do from the state
+
+| State | Action |
+| --- | --- |
+| `NOT_START`, `SUBMITTED`, `QUEUED` | Retain the ID and continue querying the pending task |
+| `IN_PROGRESS` | Show available progress and continue within your client waiting budget |
+| `SUCCESS` | Read returned result fields and download the files |
+| `FAILURE` | Stop polling and read `fail_reason` |
+| Unrecognized state or missing `status` | Preserve the response and check the protocol; do not assume success |
+
+Progress is display text, and previews may appear during generation. Confirm `SUCCESS` before downloading final files. The [unified video guide](/en/media/videos#wait-for-completion) includes a complete bounded polling example.
+
+## Choose the result field explicitly
+
+| Response shape | How to read it |
+| --- | --- |
+| `data.output` | One file URL, read as a string |
+| `data.outputs` | Multiple file URLs, process as an array |
+| `data.video_url` | Video URL used by some compatible branches |
+| Top-level `video_url` or `url` | Additional URL provided by some compatible branches; it may be absent |
+
+Confirm the shape used by your branch, then use that explicit extraction path. Do not recursively search the response for arbitrary URLs or expect all these fields to appear together. While pending, `data` can be `null`.
+
+```json Illustrative single-result response
+{
+  "task_id": "YOUR_VIDEO_TASK_ID",
+  "status": "SUCCESS",
+  "progress": "100%",
+  "data": {"output": "https://example.com/generated-video.mp4"}
+}
+```
+
+Do not forward MaxAPI authorization to a result-file domain. If downloading fails, retry the download or query the current URL again without creating another video task.
+
+## Resume the same task after a timeout
+
+An expired client waiting budget does not mean the task failed or was cancelled. Retain its ID and call this retrieval endpoint later. For query failures, preserve the HTTP status and response, then check credentials, identifiers, and protocol selection.
+
+The unified video contract does not define a general cancellation endpoint. Stopping local polling does not establish that generation stopped; do not substitute operation routes from `/v1/videos` or provider-native protocols.

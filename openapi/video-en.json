@@ -1,0 +1,409 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MaxAPI unified video API",
+    "version": "1.0.0",
+    "description": "Submission and retrieval for unified video tasks. This reference covers two defined operations; capabilities and optional fields depend on the selected channel. Examples do not imply access to every model or guarantee cancellation or deletion."
+  },
+  "servers": [
+    {
+      "url": "https://api.maxapi.ai",
+      "description": "MaxAPI API endpoint"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Unified video"
+    }
+  ],
+  "paths": {
+    "/v2/videos/generations": {
+      "post": {
+        "operationId": "createUnifiedVideo",
+        "summary": "Create a unified video task",
+        "tags": [
+          "Unified video"
+        ],
+        "description": "Submit text or supported reference media as JSON. The shared required fields are model and prompt; images, videos, duration, ratio, and other controls depend on the model. After receiving the top-level task_id, use the matching query endpoint to wait for results.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VideoCreateRequest"
+              },
+              "examples": {
+                "text": {
+                  "summary": "Minimal text-to-video request",
+                  "value": {
+                    "model": "YOUR_VIDEO_MODEL",
+                    "prompt": "A paper boat floats slowly across a quiet pond, soft morning light, fixed camera."
+                  }
+                },
+                "image": {
+                  "summary": "One reference image, where supported",
+                  "value": {
+                    "model": "YOUR_IMAGE_TO_VIDEO_MODEL",
+                    "prompt": "Keep the subject consistent. A gentle breeze moves through the scene.",
+                    "images": [
+                      "https://example.com/reference.png"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Task accepted. This is not the final video.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoSubmission"
+                },
+                "examples": {
+                  "accepted": {
+                    "summary": "Task identifier",
+                    "value": {
+                      "task_id": "YOUR_VIDEO_TASK_ID"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "HTTP or business error response. Inspect the status and response body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/videos/generations/{task_id}": {
+      "get": {
+        "operationId": "retrieveUnifiedVideo",
+        "summary": "Retrieve a unified video task",
+        "tags": [
+          "Unified video"
+        ],
+        "description": "Retrieve a task using the complete task_id from its submission response. The state is top-level status, with results in data. Results may be absent before success; resume queries with the same ID after a local timeout. Do not send task objects from provider-native protocols to this route.",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "description": "Complete string ID returned by unified video submission.",
+            "schema": {
+              "type": "string",
+              "example": "YOUR_VIDEO_TASK_ID"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current task state and any generated results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoTask"
+                },
+                "examples": {
+                  "pending": {
+                    "summary": "Queued",
+                    "value": {
+                      "task_id": "YOUR_VIDEO_TASK_ID",
+                      "status": "QUEUED",
+                      "progress": "0%",
+                      "fail_reason": "",
+                      "data": null
+                    }
+                  },
+                  "success": {
+                    "summary": "Succeeded with one output URL",
+                    "value": {
+                      "task_id": "YOUR_VIDEO_TASK_ID",
+                      "status": "SUCCESS",
+                      "progress": "100%",
+                      "fail_reason": "",
+                      "data": {
+                        "output": "https://example.com/generated-video.mp4"
+                      }
+                    }
+                  },
+                  "multiple": {
+                    "summary": "Succeeded with multiple output URLs",
+                    "value": {
+                      "task_id": "YOUR_VIDEO_TASK_ID",
+                      "status": "SUCCESS",
+                      "progress": "100%",
+                      "data": {
+                        "outputs": [
+                          "https://example.com/generated-video-1.mp4",
+                          "https://example.com/generated-video-2.mp4"
+                        ]
+                      }
+                    }
+                  },
+                  "compatible": {
+                    "summary": "Compatible branch using video_url",
+                    "value": {
+                      "task_id": "YOUR_VIDEO_TASK_ID",
+                      "status": "SUCCESS",
+                      "progress": "100%",
+                      "data": {
+                        "video_url": "https://example.com/generated-video.mp4"
+                      }
+                    }
+                  },
+                  "failure": {
+                    "summary": "Task failed",
+                    "value": {
+                      "task_id": "YOUR_VIDEO_TASK_ID",
+                      "status": "FAILURE",
+                      "fail_reason": "Example: the input image could not be accessed.",
+                      "data": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "HTTP or business error response. Inspect the status and response body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Use a MaxAPI API key created in the console."
+      }
+    },
+    "schemas": {
+      "VideoCreateRequest": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "Model ID enabled for your account and supporting the unified video format. Availability and input capabilities depend on your account.",
+            "example": "YOUR_VIDEO_MODEL"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "Description of the video, including subject, motion, setting, and camera.",
+            "example": "A paper boat floats slowly across a quiet pond, soft morning light, fixed camera."
+          },
+          "images": {
+            "type": "array",
+            "description": "Reference images for image-to-video. Omit for text-to-video. First/last frames, subject references, and allowed counts depend on the model.",
+            "items": {
+              "type": "string",
+              "description": "Image URL or Base64 input accepted by the model. Image roles, count, and encoding requirements depend on that model.",
+              "example": "https://example.com/reference.png"
+            }
+          },
+          "videos": {
+            "type": "array",
+            "description": "Video URLs for models that support video input. This field takes URLs rather than Base64.",
+            "items": {
+              "type": "string",
+              "description": "Accessible video URL.",
+              "example": "https://example.com/reference.mp4"
+            }
+          },
+          "aspect_ratio": {
+            "type": "string",
+            "description": "Aspect ratio supported by the model, such as 16:9 or 9:16. Supported ratios differ by model."
+          },
+          "duration": {
+            "description": "Video duration. Some models accept a number while some compatible branches use a numeric string. Follow the selected model’s format and allowed values rather than converting automatically.",
+            "oneOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "size": {
+            "type": "string",
+            "description": "Size field supported by the selected model. Do not assume the format used by another image or video protocol applies."
+          },
+          "resolution": {
+            "type": "string",
+            "description": "Resolution supported by the selected model. Spelling, case, and allowed values depend on the model."
+          },
+          "watermark": {
+            "type": "boolean",
+            "description": "Watermark control where supported by the model. This field does not imply that every model can remove a watermark."
+          },
+          "enhance_prompt": {
+            "type": "boolean",
+            "description": "Prompt-enhancement option for supported Veo branches. Set it only when supported by the selected model."
+          },
+          "enable_upsample": {
+            "type": "boolean",
+            "description": "Upsampling option for supported Veo branches. Availability and output specifications depend on the model."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "model",
+          "prompt"
+        ]
+      },
+      "VideoSubmission": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "Unified video task identifier from the top-level task_id in the submission response. Preserve the entire value, including characters such as colons. Do not substitute id or output.task_id from another protocol.",
+            "example": "YOUR_VIDEO_TASK_ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "task_id"
+        ]
+      },
+      "VideoTask": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "Unified video task identifier from the top-level task_id in the submission response. Preserve the entire value, including characters such as colons. Do not substitute id or output.task_id from another protocol.",
+            "example": "YOUR_VIDEO_TASK_ID"
+          },
+          "status": {
+            "type": "string",
+            "description": "Unified task state. NOT_START, SUBMITTED, QUEUED, and IN_PROGRESS are pending; SUCCESS indicates completion and FAILURE indicates failure. Preserve unfamiliar responses and check the protocol rather than treating them as success.",
+            "enum": [
+              "NOT_START",
+              "SUBMITTED",
+              "QUEUED",
+              "IN_PROGRESS",
+              "SUCCESS",
+              "FAILURE"
+            ]
+          },
+          "fail_reason": {
+            "type": "string",
+            "description": "Failure reason, which may be an empty string when the task has not failed."
+          },
+          "progress": {
+            "type": "string",
+            "description": "Display progress, such as 100%. Determine success from status rather than progress alone."
+          },
+          "submit_time": {
+            "type": "integer",
+            "description": "Task submission timestamp.",
+            "format": "int64"
+          },
+          "start_time": {
+            "type": "integer",
+            "description": "Task start timestamp, which may be 0 when not yet available.",
+            "format": "int64"
+          },
+          "finish_time": {
+            "type": "integer",
+            "description": "Task completion timestamp, which may be 0 before completion.",
+            "format": "int64"
+          },
+          "platform": {
+            "type": "string",
+            "description": "Platform identifier for the task. It is not a completion condition."
+          },
+          "action": {
+            "type": "string",
+            "description": "Task operation type, which may vary by model and channel."
+          },
+          "data": {
+            "$ref": "#/components/schemas/VideoResult",
+            "description": "Generation result, which may be null while pending. After success, read output, outputs, or video_url according to the response shape used by your branch."
+          },
+          "search_item": {
+            "type": "string",
+            "description": "Search metadata included in some compatible responses."
+          },
+          "video_url": {
+            "type": "string",
+            "description": "Top-level video URL returned by some compatible branches. It may be absent."
+          },
+          "url": {
+            "type": "string",
+            "description": "Top-level result URL returned by some compatible branches. It may be absent."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "task_id",
+          "status"
+        ]
+      },
+      "VideoResult": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "output": {
+            "type": "string",
+            "description": "Generated file URL. Download only after confirming SUCCESS, and do not attach the MaxAPI Bearer key to the file request.",
+            "example": "https://example.com/generated-video.mp4"
+          },
+          "outputs": {
+            "type": "array",
+            "description": "Array of generated file URLs. Read it as an array when returned rather than treating it as one string.",
+            "items": {
+              "type": "string",
+              "description": "Generated file URL. Download only after confirming SUCCESS, and do not attach the MaxAPI Bearer key to the file request.",
+              "example": "https://example.com/generated-video.mp4"
+            }
+          },
+          "video_url": {
+            "type": "string",
+            "description": "Video URL field returned by some compatible branches. Read it only when using that response shape; it is not guaranteed to accompany output."
+          },
+          "actual_prompt": {
+            "type": "string",
+            "description": "Actual generation prompt returned by some models."
+          },
+          "orig_prompt": {
+            "type": "string",
+            "description": "Original prompt returned by some models."
+          }
+        },
+        "additionalProperties": true
+      },
+      "VideoError": {
+        "type": "object",
+        "description": "Error bodies may come from the gateway or individual channel. Preserve the original response without assuming universal error fields or business codes.",
+        "additionalProperties": true
+      }
+    }
+  }
+}

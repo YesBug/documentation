@@ -38,7 +38,7 @@ Return your business record ID to the frontend. Repeatedly opening the result vi
 | --- | --- | --- |
 | Unified video | `task_id` | `GET /v2/videos/generations/{task_id}` |
 | Midjourney | `result` | `GET /mj/task/{id}/fetch` |
-| Suno NewAPI-compatible | `data.task_id` | `GET /suno/fetch/{task_id}` |
+| Suno NewAPI-compatible | `data.task_id` or string `data`, depending on response shape | `GET /suno/fetch/{task_id}` |
 | Suno v2 | `clips[].id`, possibly several | `GET /suno/v2/feed?ids=...` |
 | Native Hailuo-compatible | `task_id` | `GET /hailuo/v1/query/video_generation?task_id=...` |
 | Veo long-running operation | Operation `name` | POST `operationName` to the matching `fetchPredictOperation` route |

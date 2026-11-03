@@ -1,0 +1,409 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MaxAPI 统一视频 API",
+    "version": "1.0.0",
+    "description": "统一视频任务的提交与查询。只收录已定义的两条操作；模型能力和可选字段按所选渠道使用。示例不代表账户已开通所有模型，也不提供取消或删除任务的保证。"
+  },
+  "servers": [
+    {
+      "url": "https://api.maxapi.ai",
+      "description": "MaxAPI 接口地址"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "统一视频"
+    }
+  ],
+  "paths": {
+    "/v2/videos/generations": {
+      "post": {
+        "operationId": "createUnifiedVideo",
+        "summary": "创建统一视频任务",
+        "tags": [
+          "统一视频"
+        ],
+        "description": "以 JSON 提交文本或模型支持的参考媒体。通用必填项为 model 与 prompt；图片、视频、时长、比例和其他可选字段取决于模型。返回顶层 task_id 后，调用同一格式的查询接口等待结果。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VideoCreateRequest"
+              },
+              "examples": {
+                "text": {
+                  "summary": "最小文生视频请求",
+                  "value": {
+                    "model": "YOUR_VIDEO_MODEL",
+                    "prompt": "A paper boat floats slowly across a quiet pond, soft morning light, fixed camera."
+                  }
+                },
+                "image": {
+                  "summary": "一张参考图，需模型支持",
+                  "value": {
+                    "model": "YOUR_IMAGE_TO_VIDEO_MODEL",
+                    "prompt": "Keep the subject consistent. A gentle breeze moves through the scene.",
+                    "images": [
+                      "https://example.com/reference.png"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "任务已受理；这不是最终视频。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoSubmission"
+                },
+                "examples": {
+                  "accepted": {
+                    "summary": "任务标识",
+                    "value": {
+                      "task_id": "YOUR_VIDEO_TASK_ID"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "HTTP 或业务错误响应；先检查状态和响应体。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/videos/generations/{task_id}": {
+      "get": {
+        "operationId": "retrieveUnifiedVideo",
+        "summary": "查询统一视频任务",
+        "tags": [
+          "统一视频"
+        ],
+        "description": "使用提交响应的完整 task_id 查询任务。响应状态在顶层 status；结果在 data。任务成功前可能没有结果，超时后仍可用同一标识继续查询。不要把厂商专用协议的任务对象直接送入此路由。",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "description": "统一视频提交返回的完整字符串 ID。",
+            "schema": {
+              "type": "string",
+              "example": "YOUR_VIDEO_TASK_ID"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "任务当前状态与已生成结果。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoTask"
+                },
+                "examples": {
+                  "pending": {
+                    "summary": "排队中",
+                    "value": {
+                      "task_id": "YOUR_VIDEO_TASK_ID",
+                      "status": "QUEUED",
+                      "progress": "0%",
+                      "fail_reason": "",
+                      "data": null
+                    }
+                  },
+                  "success": {
+                    "summary": "成功，单个结果地址",
+                    "value": {
+                      "task_id": "YOUR_VIDEO_TASK_ID",
+                      "status": "SUCCESS",
+                      "progress": "100%",
+                      "fail_reason": "",
+                      "data": {
+                        "output": "https://example.com/generated-video.mp4"
+                      }
+                    }
+                  },
+                  "multiple": {
+                    "summary": "成功，多个结果地址",
+                    "value": {
+                      "task_id": "YOUR_VIDEO_TASK_ID",
+                      "status": "SUCCESS",
+                      "progress": "100%",
+                      "data": {
+                        "outputs": [
+                          "https://example.com/generated-video-1.mp4",
+                          "https://example.com/generated-video-2.mp4"
+                        ]
+                      }
+                    }
+                  },
+                  "compatible": {
+                    "summary": "兼容分支的 video_url",
+                    "value": {
+                      "task_id": "YOUR_VIDEO_TASK_ID",
+                      "status": "SUCCESS",
+                      "progress": "100%",
+                      "data": {
+                        "video_url": "https://example.com/generated-video.mp4"
+                      }
+                    }
+                  },
+                  "failure": {
+                    "summary": "任务失败",
+                    "value": {
+                      "task_id": "YOUR_VIDEO_TASK_ID",
+                      "status": "FAILURE",
+                      "fail_reason": "示例：输入图片无法访问。",
+                      "data": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "HTTP 或业务错误响应；先检查状态和响应体。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "使用控制台创建的 MaxAPI API Key。"
+      }
+    },
+    "schemas": {
+      "VideoCreateRequest": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "已开通且支持统一视频格式的模型 ID。可用性及输入能力以当前账户为准。",
+            "example": "YOUR_VIDEO_MODEL"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "视频内容描述，包括主体、动作、场景和镜头。",
+            "example": "A paper boat floats slowly across a quiet pond, soft morning light, fixed camera."
+          },
+          "images": {
+            "type": "array",
+            "description": "图生视频使用的参考图片。纯文生视频省略；首尾帧与主体参考的语义由模型决定，不同模型的数量限制不同。",
+            "items": {
+              "type": "string",
+              "description": "模型支持的图片 URL 或 Base64 输入。具体图片角色、数量和编码要求以该模型为准。",
+              "example": "https://example.com/reference.png"
+            }
+          },
+          "videos": {
+            "type": "array",
+            "description": "仅在模型支持视频输入时使用的视频 URL 数组；此字段的输入是 URL，不是 Base64。",
+            "items": {
+              "type": "string",
+              "description": "可访问的视频 URL。",
+              "example": "https://example.com/reference.mp4"
+            }
+          },
+          "aspect_ratio": {
+            "type": "string",
+            "description": "模型支持的宽高比，例如 16:9 或 9:16。不是所有模型都支持相同的比例。"
+          },
+          "duration": {
+            "description": "视频时长。部分模型接受数字，部分兼容分支使用数字字符串；按所选模型的格式与允许值填写，不自动转换。",
+            "oneOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "size": {
+            "type": "string",
+            "description": "所选模型支持的尺寸字段。不要将其他图像或视频协议的尺寸格式直接移用。"
+          },
+          "resolution": {
+            "type": "string",
+            "description": "所选模型支持的分辨率。拼写、大小写和允许值由模型决定。"
+          },
+          "watermark": {
+            "type": "boolean",
+            "description": "仅在所选模型支持时控制水印；字段存在不代表所有模型都可以移除水印。"
+          },
+          "enhance_prompt": {
+            "type": "boolean",
+            "description": "部分 Veo 分支的提示词增强选项。仅在确认模型支持时填写。"
+          },
+          "enable_upsample": {
+            "type": "boolean",
+            "description": "部分 Veo 分支的上采样选项，能力和输出规格由模型决定。"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "model",
+          "prompt"
+        ]
+      },
+      "VideoSubmission": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "统一视频任务标识，来自提交响应的顶层 task_id。保留完整内容，包括冒号等字符；不要从其他协议的 id 或 output.task_id 猜测替代值。",
+            "example": "YOUR_VIDEO_TASK_ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "task_id"
+        ]
+      },
+      "VideoTask": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "统一视频任务标识，来自提交响应的顶层 task_id。保留完整内容，包括冒号等字符；不要从其他协议的 id 或 output.task_id 猜测替代值。",
+            "example": "YOUR_VIDEO_TASK_ID"
+          },
+          "status": {
+            "type": "string",
+            "description": "统一任务状态。NOT_START、SUBMITTED、QUEUED、IN_PROGRESS 表示仍需等待；SUCCESS 成功；FAILURE 失败。遇到未识别状态应保存原始响应并检查协议，不自动当作成功。",
+            "enum": [
+              "NOT_START",
+              "SUBMITTED",
+              "QUEUED",
+              "IN_PROGRESS",
+              "SUCCESS",
+              "FAILURE"
+            ]
+          },
+          "fail_reason": {
+            "type": "string",
+            "description": "任务失败原因，未失败时可能为空字符串。"
+          },
+          "progress": {
+            "type": "string",
+            "description": "用于展示的进度文本，例如 100%。判断成功必须读取 status，而不是只看进度。"
+          },
+          "submit_time": {
+            "type": "integer",
+            "description": "任务提交时间戳。",
+            "format": "int64"
+          },
+          "start_time": {
+            "type": "integer",
+            "description": "任务开始时间戳，尚无时间信息时可能为 0。",
+            "format": "int64"
+          },
+          "finish_time": {
+            "type": "integer",
+            "description": "任务结束时间戳，尚未完成时可能为 0。",
+            "format": "int64"
+          },
+          "platform": {
+            "type": "string",
+            "description": "任务使用的平台标识，不作为判断成功的条件。"
+          },
+          "action": {
+            "type": "string",
+            "description": "任务操作类型，可能随模型和渠道变化。"
+          },
+          "data": {
+            "$ref": "#/components/schemas/VideoResult",
+            "description": "生成结果；等待期间可能为 null。成功后按所用分支明确读取 output、outputs 或 video_url。"
+          },
+          "search_item": {
+            "type": "string",
+            "description": "部分兼容响应附带的检索信息。"
+          },
+          "video_url": {
+            "type": "string",
+            "description": "部分兼容分支返回的顶层视频地址；不是所有响应都有。"
+          },
+          "url": {
+            "type": "string",
+            "description": "部分兼容分支返回的顶层结果地址；不是所有响应都有。"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "task_id",
+          "status"
+        ]
+      },
+      "VideoResult": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "output": {
+            "type": "string",
+            "description": "生成文件的地址。确认任务 SUCCESS 后再下载；下载请求不附加 MaxAPI 的 Bearer 密钥。",
+            "example": "https://example.com/generated-video.mp4"
+          },
+          "outputs": {
+            "type": "array",
+            "description": "多个生成文件的地址数组。只有响应实际返回该字段时按数组读取，不把它当作单个字符串。",
+            "items": {
+              "type": "string",
+              "description": "生成文件的地址。确认任务 SUCCESS 后再下载；下载请求不附加 MaxAPI 的 Bearer 密钥。",
+              "example": "https://example.com/generated-video.mp4"
+            }
+          },
+          "video_url": {
+            "type": "string",
+            "description": "部分兼容分支提供的视频地址字段。只有已明确使用这种响应结构时才读取，不假定它总与 output 同时出现。"
+          },
+          "actual_prompt": {
+            "type": "string",
+            "description": "部分模型返回的实际生成提示词。"
+          },
+          "orig_prompt": {
+            "type": "string",
+            "description": "部分模型返回的原始提示词。"
+          }
+        },
+        "additionalProperties": true
+      },
+      "VideoError": {
+        "type": "object",
+        "description": "错误体可能由网关或具体渠道返回。保留原始响应，不假定统一错误字段或业务码。",
+        "additionalProperties": true
+      }
+    }
+  }
+}

@@ -39,6 +39,35 @@ curl --silent --show-error \
 - 该命令没有使用 `--fail`，所以 HTTP `401` 等错误仍可能以正常的命令退出状态结束；以输出的 HTTP 状态为准。
 - 分享文件前检查响应头、错误体是否包含账户信息、个人数据或敏感输入。不要改用会直接展示鉴权头的日志来收集公开排查材料。
 
+## 保存失败接口的响应
+
+模型列表成功后，仍需保留实际失败接口的响应。下面复用 [快速开始](/zh/quickstart) 的 `request.json`，向 Chat Completions 重发一次原请求，将响应头和正文分别保存。运行前确认当前目录存在该文件，且终端已设置 `MAXAPI_API_KEY`。
+
+```bash 保存聊天请求的响应
+: "${MAXAPI_API_KEY:?请先设置 MAXAPI_API_KEY}"
+curl --silent --show-error \
+  --connect-timeout 10 \
+  --max-time 60 \
+  --dump-header failed-response-headers.txt \
+  --output failed-response-body.txt \
+  --write-out 'HTTP %{http_code}\n' \
+  https://api.maxapi.ai/v1/chat/completions \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @request.json
+diagnostic_exit=$?
+printf 'cURL exit %s\n' "$diagnostic_exit"
+```
+
+此命令会重新提交生成请求，可能产生用量。如果此前只是超时且结果不确定，先检查已有任务或控制台记录。60 秒是示例客户端超时，可按排查需要调整。
+
+1. 记录 HTTP 状态与 `cURL exit`。命令没有 `--fail`，退出码为 `0` 仍需检查 HTTP 状态；退出码非 `0` 时先处理 cURL 错误。超时或连接中断可能留下不完整的正文，即使已经收到 HTTP `200`。
+2. 在 `failed-response-headers.txt` 中查看响应的 `Content-Type`，以及实际返回的请求标识。
+3. 在 `failed-response-body.txt` 中保留原始错误正文。JSON 错误可能包含 `error.message`、`error.type` 或 `error.code`；字段不存在时保留实际结构，不要只转存 SDK 的异常名称。
+4. 分享前制作脱敏副本，移除响应中的敏感输入、账户信息及个人数据。不要附上 API Key 或完整鉴权头。
+
+`--data-binary @request.json` 读取文件中的原始内容；不要为收集响应擅自改动模型或参数。如果原请求启用 `stream: true`，保存的正文可能是 SSE，按 [流式格式](/zh/guides/streaming) 阅读，不能直接当作一个 JSON。其他 JSON 端点应使用对应 URL 和请求文件；multipart 上传按下面的格式说明保留原有文件字段。
+
 ## 常见 HTTP 状态
 
 下面按通用 HTTP 语义提供排查方向，并非所有 MaxAPI 模型的完整错误码规范。具体原因以实际响应为准。
@@ -114,9 +143,16 @@ SDK 的 Base URL 和原始 HTTP 的完整端点用途不同：
 
 ## 上传或下载格式不正确
 
-文件上传使用 `multipart/form-data`，由 HTTP 客户端自动生成 boundary。图片 URL 应能被处理任务的服务端读取；本地路径仅适用于客户端上传，不能直接当作远程 URL。
+先区分接口要求的输入格式与结果下载方式。同一张图片在不同接口中可能需要不同的编码，不能把一种上传方式套用到所有接口。
 
-语音生成和文件下载可能返回二进制数据。若出现 JSON 解析错误，请先检查响应的 `Content-Type`、HTTP 状态以及接口的返回格式；不要把错误 JSON 当成有效音频保存。
+| 场景 | 正确处理方式 | 优先检查 |
+| --- | --- | --- |
+| 音频转录、音频翻译等 multipart 接口 | 用 cURL `-F 'file=@audio.mp3'` 或 SDK 文件参数发送真实文件，由客户端生成 `multipart/form-data` boundary | 文件在应用运行环境中存在；没有手写 `application/json` 或缺少 boundary 的 Content-Type。见 [音频转录](/zh/api-reference/audio-transcriptions) |
+| Midjourney 的 Imagine 参考图、Blend、Describe | 在 JSON 内发送 `data:image/png;base64,...` 等图片 Data URI；Imagine / Blend 使用 `base64Array`，Describe 使用单个 `base64` | 编码的是图片字节；MIME 与真实格式一致；没有把路径、URL 或 `@文件名` 填进 Base64 字段。见 [Midjourney 输入](/zh/media/midjourney/inputs) |
+| 视觉理解的远程图片 URL | 将可读取的图片直链放进 `image_url.url`，请求体仍为 JSON | 处理图片的服务能够访问链接，不依赖你的浏览器登录；链接返回图片而非 HTML 页面。本地路径不是远程 URL。见 [视觉理解](/zh/guides/vision) |
+| 语音生成或结果文件下载 | 先确认 HTTP 成功及预期的 `Content-Type`，再按字节保存文件 | 不把错误 JSON 或 HTML 当成音频、图片；下载第三方结果 URL 时不附带 MaxAPI 密钥。见 [语音生成](/zh/api-reference/audio-speech) 与 [异步任务](/zh/guides/async-tasks) |
+
+JSON 的 Data URI、远程 URL 和 multipart 的文件字段不能互换。字段名与允许的输入格式以当前接口说明为准。
 
 ## 根据请求类型缩小问题范围
 
@@ -128,9 +164,9 @@ SDK 的 Base URL 和原始 HTTP 的完整端点用途不同：
 `content` 为空时先检查工具调用；文本被截断时检查 `finish_reason`。不要仅凭一个 SDK 属性为空就认定整个请求失败。
 
 </Tab>
-<Tab title="文件上传">
+<Tab title="图片与文件输入">
 
-从一个已知能正常打开的短音频或小图片开始。确认文件在应用运行环境中真实存在，以二进制方式打开；cURL 使用 `@` 上传内容。让客户端设置 multipart boundary，删除手写的 JSON Content-Type。
+从一个已知能正常打开的短音频或小图片开始，先按 [格式对照](#上传或下载格式不正确) 选择 multipart、Data URI 或远程 URL。文件上传要确认文件位于应用运行环境；Base64 输入要检查前缀与编码完整性；URL 输入要排除登录、过期和访问限制。
 
 如果短文件成功而原文件失败，再比较真实编码、尺寸、时长与模型限制。改变扩展名不会改变文件编码。
 

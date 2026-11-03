@@ -1,0 +1,49 @@
+---
+title: "Suno NewAPI：查询音乐任务"
+description: "使用任务 ID 查询 Suno 的状态与歌曲结果，区分任务级状态、片段状态和非音乐结果对象。"
+keywords: ["MaxAPI", "Suno", "fetch"]
+openapi: "openapi/suno-zh.json GET /suno/fetch/{task_id}"
+---
+
+这个接口按 NewAPI 任务 ID 返回任务记录。查询音乐任务时，响应外层 `data` 是任务，里面的 `data` 才是歌曲数组。它不使用 Suno v2 的顶层 `clips`。
+
+## 三层检查
+
+| 层级 | 要检查的内容 |
+| --- | --- |
+| 请求结果 | HTTP 状态，以及顶层 `code` 是否为 `success` |
+| 任务记录 | `data` 是否为对象，`data.status` 是否完成，失败时读取 `data.fail_reason` |
+| 歌曲结果 | 音乐任务的 `data.data` 是否为数组，各片段的状态与 `audio_url` 是否可用 |
+
+`SUBMITTED` 和 `IN_PROGRESS` 表示尚需等待，`SUCCESS` 表示任务完成。兼容版本的失败状态可能为 `FAIL` 或 `FAILURE`。保留未知状态并设置总等待期限，不把未识别值当作成功。
+
+## 从完成任务读取歌曲
+
+```python 读取已保存的查询结果
+import json
+from pathlib import Path
+
+response = json.loads(Path("suno-task-status.json").read_text(encoding="utf-8"))
+if not isinstance(response, dict) or response.get("code") != "success":
+    raise ValueError("Task query failed; inspect the original response")
+task = response.get("data")
+if not isinstance(task, dict):
+    raise ValueError("Expected a task object")
+if task.get("status") != "SUCCESS":
+    raise ValueError(f"Task is not complete: {task.get('status')!r}")
+songs = task.get("data")
+if not isinstance(songs, list) or not songs:
+    raise ValueError("Expected a nonempty music result array")
+for song in songs:
+    if not isinstance(song, dict):
+        raise ValueError("Invalid song entry")
+    print(song.get("id"), song.get("status"), song.get("audio_url"))
+```
+
+此脚本展示结果结构，最终交付音频前还需检查每首片段是否 `complete`、是否有错误信息，以及下载是否成功。[音乐指南](/zh/media/music) 提供完整等待和下载流程。
+
+## 不同任务类型的结果
+
+相同查询路径可能返回其他任务类型，例如歌词对象。先检查 `data.data` 的类型与实际字段，不能无条件将它当作歌曲数组。结合目标任务核对实际结果，不要仅凭 `action` 字符串猜测输出。
+
+查询下一次续写结果时使用新提交返回的任务 ID。原歌曲 clip ID 则作为续写请求的 `continue_clip_id`，两者不能互换。

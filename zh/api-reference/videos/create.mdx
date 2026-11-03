@@ -1,0 +1,41 @@
+---
+title: "创建统一视频任务"
+description: "使用文字或参考媒体创建异步视频任务，正确选择模型可选参数并保存顶层 task_id，随后通过查询接口读取生成结果。"
+keywords: ["MaxAPI", "创建视频", "视频生成", "images", "task_id"]
+openapi: "openapi/video-zh.json POST /v2/videos/generations"
+---
+
+创建视频任务后，MaxAPI 返回供后续查询使用的 `task_id`。通用必填字段是 `model` 和 `prompt`；参考图、视频、时长等输入需要所选模型支持。首次接入可直接运行 [统一视频指南](/zh/media/videos) 中的完整命令。
+
+## 选择输入分支
+
+| 目标 | 请求方式 |
+| --- | --- |
+| 文字生成视频 | 发送 `model`、`prompt`，省略媒体输入 |
+| 参考图片生成视频 | 使用支持图生视频的模型，并按要求发送 `images` |
+| 参考视频生成视频 | 仅在模型支持时发送 `videos` URL 数组 |
+
+同一个 `images` 数组在不同模型下可能表示首帧、首尾帧或主体参考。不要自动把任意两张图认作首尾帧，也不要同时发送所有模型的可选控制项。
+
+```json 最小文生视频结构
+{
+  "model": "YOUR_VIDEO_MODEL",
+  "prompt": "A paper boat floats slowly across a quiet pond, soft morning light, fixed camera."
+}
+```
+
+将 `YOUR_VIDEO_MODEL` 替换为当前账户支持统一文生视频的模型 ID。模型名称不能证明图片输入、音频生成或所有分辨率都可用。
+
+## 保存受理结果
+
+```json 已受理的结构示意
+{"task_id": "YOUR_VIDEO_TASK_ID"}
+```
+
+保存完整字符串 `task_id`，再调用 [查询任务](/zh/api-reference/videos/retrieve)。不要去 `data.taskId`、`output.task_id` 或 `id` 中寻找备用值；这些位置属于其他协议或需要单独确认的兼容响应。
+
+HTTP 成功后仍要确认存在有效 `task_id`。如果响应是错误对象，保存原始信息用于排错；如果提交超时且没有响应，先核对请求是否受理，避免立即重发造成重复任务。
+
+## 处理模型参数差异
+
+`duration` 在部分分支是数字，在另一些分支是数字字符串。`size`、`resolution`、`aspect_ratio` 的格式和允许值也由模型决定。接口字段表描述可出现的输入，不代表每个模型都接受每种字段组合。先完成最小请求，再逐个增加模型已支持的参数。

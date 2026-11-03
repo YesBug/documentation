@@ -24,7 +24,7 @@ Requests sent from the playground use your MaxAPI account. Generation requests c
     Replace placeholder model IDs with values available to your account. Use the form controls or JSON editor for JSON requests. Start with required fields before adding optional model-specific settings.
   </Step>
   <Step title="Send and inspect">
-    Use **Try it** to send the request. Inspect the HTTP status and response body, and compare generated code examples when moving the request into your application.
+    Open **Try it**, then click **Send** in the panel. Inspect the HTTP status and response body, and compare generated code examples when moving the request into your application.
   </Step>
 </Steps>
 
@@ -63,16 +63,62 @@ Use this body in the JSON view of [Chat Completions](/en/api-reference/chat-comp
 
 Check three things: the HTTP request succeeds, `choices` contains a reply, and its `finish_reason` is appropriate. Then add streaming, longer input or tool definitions, changing one factor at a time.
 
+## Choose a workflow for the protocol
+
+| Goal | Submission endpoint | What to read next |
+| --- | --- | --- |
+| Chat, embeddings, standard images or audio | The corresponding `/v1` endpoint | Text, vectors, image data or audio bytes |
+| Midjourney images | [Imagine](/en/api-reference/midjourney/imagine) | Save `result` and query the task with [Fetch](/en/api-reference/midjourney/fetch) |
+| Unified video | [Create a video task](/en/api-reference/videos/create) | Save the task ID and [retrieve the task](/en/api-reference/videos/retrieve) for progress and output |
+| Suno v2 music | [Generate](/en/api-reference/suno/v2-generate) | Save each `clips[].id` and query the songs with [Feed](/en/api-reference/suno/v2-feed) |
+| Suno NewAPI-compatible music | [Submit a music task](/en/api-reference/suno/submit) | Extract the task ID from the documented response shape and query it with [Fetch](/en/api-reference/suno/fetch) |
+
+The last four workflows are asynchronous. If submission has not returned a final file, open its query endpoint. **Do not send another generation request to refresh progress.** Keep authentication, protocol and identifier sources consistent.
+
+### Midjourney: choose a mode and retain the task ID
+
+1. Open Imagine and select a server enabled for your account in the address area. Check the generated full URL against the table below.
+2. Enter `prompt` in the form or JSON view. For reference images, use a [Data URI](/en/media/midjourney/inputs), not a local file path.
+3. After sending, inspect `code` and `description`. When accepted, save `result` and enter it as the path parameter `id` on the Fetch page.
+4. When the task reaches `SUCCESS`, read its image and `buttons`. Use [Action](/en/api-reference/midjourney/action) with the current task ID and the actual `customId` to continue.
+
+| Selected mode | Full Imagine request URL |
+| --- | --- |
+| Fast | `https://api.maxapi.ai/mj/submit/imagine` |
+| Turbo | `https://api.maxapi.ai/mj-turbo/mj/submit/imagine` |
+| Relax | `https://api.maxapi.ai/mj-relax/mj/submit/imagine` |
+
+When opening another query or action page, check its selected mode again to avoid returning to the default address. If Action requests input or the task has `MODAL` status, complete the [Modal interaction](/en/media/midjourney/actions) instead of polling indefinitely.
+
+### Video and music: distinguish task IDs from song IDs
+
+Video queries use the task ID from the corresponding video submission. Suno v2 Feed uses song clip IDs from `clips[].id`, separated by commas when querying multiple clips. NewAPI Fetch uses a music task ID. See the [Suno protocol comparison](/en/api-reference/suno/index) for response shapes.
+
+A media URL in a query result is a download address, not an identifier for the next task query. HTTP `200`, a progress field or an early preview URL does not replace the protocol's completion status.
+
+## An image field is not always a file upload
+
+| Endpoint | What to enter in the panel |
+| --- | --- |
+| Multipart image editing or audio transcription | Select a local file using the file field |
+| Midjourney Imagine / Blend | Image Data URIs in the `base64Array` array |
+| Midjourney Describe | One image Data URI in the singular `base64` field |
+| Unified video reference images | The model's supported format in `images`; a URL must be accessible to the generation service |
+
+Use file upload controls only for endpoints defined as multipart. JSON image fields still use `application/json`; pasting `C:\images\photo.png` into a text field does not upload that file.
+
 ## Move a working test into code
 
 | Playground configuration | Application equivalent |
 | --- | --- |
 | Bearer authentication | A server-side environment variable and Authorization header, or SDK `api_key` |
-| Full request URL | Full HTTP endpoint; SDK base URL `https://api.maxapi.ai/v1` |
+| `/v1` compatible endpoint URL | Full HTTP endpoint; OpenAI SDK base URL `https://api.maxapi.ai/v1` |
+| Midjourney, video or music URL | Full path in an HTTP client, preserving mode and protocol prefixes |
 | Model ID in JSON | `MAXAPI_MODEL` or a task-specific model setting |
 | JSON form | An application object without the form's display labels |
 | Uploaded local file | File bytes available in the application's runtime environment |
 | Streamed response view | SDK stream iteration or SSE event parsing |
+| Identifier from an asynchronous submission | Persist the task or clip ID and schedule the corresponding query |
 
 After copying code, check for remaining placeholders, accidentally embedded keys and the intended model. Continue with [Python](/en/guides/python), [Node.js](/en/guides/nodejs) or the endpoint's result-saving examples.
 

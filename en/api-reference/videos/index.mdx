@@ -1,0 +1,40 @@
+---
+title: "Unified video API overview"
+description: "Submit unified video tasks, preserve their identifiers, follow six task states, retrieve generated files, and distinguish provider-native video protocols."
+keywords: ["MaxAPI", "video generation", "unified video", "task_id", "Veo", "Wan", "Seedance"]
+---
+
+The unified video API shares submission and retrieval routes across models supporting this format. Create a task, then query it using the returned `task_id`; the submission request does not return a completed video synchronously. Follow the [unified video guide](/en/media/videos) for a complete integration.
+
+<Columns cols={2}>
+  <Card title="Create a video task" icon="video" href="/en/api-reference/videos/create">Submit text or supported reference media and receive a task ID.</Card>
+  <Card title="Retrieve a video task" icon="clock" href="/en/api-reference/videos/retrieve">Inspect progress, failure reasons, and completed file URLs.</Card>
+</Columns>
+
+## Complete one generation
+
+| Step | Request or check | What to retain |
+| --- | --- | --- |
+| Submit | `POST /v2/videos/generations` | Original response, top-level `task_id`, and model ID |
+| Wait | `GET /v2/videos/generations/{task_id}` | Top-level `status` and progress |
+| Complete | Confirm `status` is `SUCCESS` | Result URLs actually returned in `data` |
+| Download | Download from the result URL | Your stored file URL and download state |
+
+`NOT_START`, `SUBMITTED`, `QUEUED`, and `IN_PROGRESS` mean the task is still pending. Read `fail_reason` on `FAILURE`. The presence of a media URL or progress reaching `100%` does not replace the successful status check.
+
+## Keep protocols separate
+
+| Format | Example identifier location | Retrieval |
+| --- | --- | --- |
+| Unified video in this reference | Top-level `task_id` in submission response | `/v2/videos/generations/{task_id}` |
+| Wan native protocol | `output.task_id` | `/wan/api/v1/tasks/{task_id}` |
+| Veo long-running operations | `name` | The matching `fetchPredictOperation` prefix |
+| OpenAI-compatible video format | `id` | The corresponding `/v1/videos/...` route |
+
+Use each identifier with its matching protocol. Do not choose a value with `task_id ?? id ?? output.task_id` and send every result to one retrieval route. Existing native integrations should use the [video protocol guide](/en/media/video-providers).
+
+## Use the playground
+
+Enter your console API key in Bearer authentication. Creation requires a valid model and real media inputs; sending the request starts a real generation. To retrieve an existing task, provide your complete task ID.
+
+Optional fields depend on the model. Start text-to-video with `model` and `prompt`, then add images, duration, or ratio as needed. Image-to-video models can require `images`; that condition does not apply to every text-only request.

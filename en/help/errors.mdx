@@ -40,6 +40,35 @@ curl --silent --show-error \
 - This command omits `--fail`, so an HTTP `401` can still have a successful process exit code. Use the printed HTTP status.
 - Inspect files for account information, personal data and sensitive inputs before sharing. Avoid collecting public diagnostic material with logging that exposes authentication headers.
 
+## Capture a failed API response
+
+Even if model listing succeeds, retain the response from the endpoint that actually fails. This example reuses `request.json` from the [quickstart](/en/quickstart) to resend the Chat Completions request and save headers and body separately. Confirm the file exists in your current directory and `MAXAPI_API_KEY` is set in your terminal.
+
+```bash Save the chat response
+: "${MAXAPI_API_KEY:?Set MAXAPI_API_KEY first}"
+curl --silent --show-error \
+  --connect-timeout 10 \
+  --max-time 60 \
+  --dump-header failed-response-headers.txt \
+  --output failed-response-body.txt \
+  --write-out 'HTTP %{http_code}\n' \
+  https://api.maxapi.ai/v1/chat/completions \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @request.json
+diagnostic_exit=$?
+printf 'cURL exit %s\n' "$diagnostic_exit"
+```
+
+This submits a new generation request and may incur usage. If the previous attempt only timed out and its outcome is unknown, check existing tasks or console records first. The 60-second client timeout is an example you can adjust for diagnosis.
+
+1. Record the HTTP status and `cURL exit`. This command omits `--fail`, so an exit code of `0` still requires checking the HTTP status. Resolve cURL errors when the exit code is nonzero; a timeout or interrupted connection can leave a partial body even after HTTP `200` arrives.
+2. Inspect `failed-response-headers.txt` for the response `Content-Type` and any request identifier actually returned.
+3. Keep the original error body in `failed-response-body.txt`. JSON errors may contain `error.message`, `error.type` or `error.code`; retain the actual structure when these fields are absent instead of saving only an SDK exception name.
+4. Make a redacted copy before sharing. Remove sensitive inputs, account information and personal data. Do not include API keys or full authorization headers.
+
+`--data-binary @request.json` reads the file's original contents. Do not change the model or parameters just to capture a response. If the original request uses `stream: true`, the saved body may be SSE; read it using the [streaming format](/en/guides/streaming), not as one JSON object. Use the corresponding URL and request file for other JSON endpoints. For multipart uploads, preserve the file fields described below.
+
 ## Interpret HTTP status codes
 
 This table gives general HTTP troubleshooting directions, not a complete MaxAPI error specification. Use the actual response to identify the cause.
@@ -111,9 +140,16 @@ Match the query protocol to the source of the ID. Do not mix `clips[].id`, `oper
 
 ## Upload or download format errors
 
-Upload files as multipart data and let the client generate a boundary. Remote image URLs must be accessible to the processing service; local paths only identify files to upload from your client.
+Distinguish the endpoint's input format from its result download format. The same image may need different encoding for different endpoints.
 
-Speech and file downloads can return bytes. If JSON parsing fails, check status and `Content-Type`. Do not treat an error JSON body as valid audio or image data.
+| Scenario | Correct handling | Check first |
+| --- | --- | --- |
+| Multipart endpoints such as audio transcription and translation | Send the actual file with cURL `-F 'file=@audio.mp3'` or an SDK file parameter; let the client generate the `multipart/form-data` boundary | The file exists in the application environment; no manually set `application/json` or Content-Type missing a boundary. See [transcription](/en/api-reference/audio-transcriptions) |
+| Midjourney Imagine reference images, Blend and Describe | Send image Data URIs such as `data:image/png;base64,...` in JSON; Imagine / Blend use `base64Array`, while Describe uses one `base64` value | Encode image bytes with the correct MIME type; do not place a path, URL or `@filename` in a Base64 field. See [Midjourney inputs](/en/media/midjourney/inputs) |
+| Remote image URLs for vision | Put an accessible direct image link in `image_url.url`; the request body remains JSON | The processing service can access the URL without your browser login; it returns an image, not HTML. A local path is not a remote URL. See [vision](/en/guides/vision) |
+| Speech generation or result downloads | Confirm HTTP success and the expected `Content-Type`, then save the response as bytes | Do not save error JSON or HTML as audio or images; do not attach the MaxAPI key when downloading from a third-party result URL. See [speech](/en/api-reference/audio-speech) and [asynchronous tasks](/en/guides/async-tasks) |
+
+JSON Data URIs, remote URLs and multipart file fields are not interchangeable. Use the field names and input formats documented for the endpoint.
 
 ## Narrow the failure by request type
 
@@ -125,9 +161,9 @@ Begin with one short user message, no streaming and only `model` and `messages`.
 Check tool calls when `content` is empty and `finish_reason` when output is truncated. An empty SDK property does not by itself establish that the whole request failed.
 
 </Tab>
-<Tab title="File uploads">
+<Tab title="Images and files">
 
-Start with a small image or short recording you can open locally. Confirm the file exists in the application's runtime environment and open it as bytes; use `@` with cURL. Let the client create the multipart boundary and remove a manually set JSON Content-Type.
+Start with a small image or short recording you can open locally. Choose multipart, a Data URI or a remote URL using the [format comparison](#upload-or-download-format-errors). For uploads, check that the file exists in the application environment. For Base64, check the prefix and complete encoded data. For URLs, check login requirements, expiry and access restrictions.
 
 If the small file works, compare the original file's actual encoding, dimensions or duration with the model requirements. Renaming an extension does not convert encoding.
 

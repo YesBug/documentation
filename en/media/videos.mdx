@@ -12,6 +12,8 @@ POST https://api.maxapi.ai/v2/videos/generations
 GET  https://api.maxapi.ai/v2/videos/generations/{task_id}
 ```
 
+For fields and interactive testing, see [create a video task](/en/api-reference/videos/create) and [retrieve a video task](/en/api-reference/videos/retrieve). Submission starts a real generation; retrieval uses a saved task ID.
+
 For existing native integrations, see [video protocols](/en/media/video-providers). `/v2/videos/generations` and `/v1/videos` are different formats; changing the path alone does not translate parameters.
 
 ## Define the input and expected output
@@ -37,25 +39,34 @@ Use Bearer authentication and a JSON body.
 | `prompt` | `string` | Required | Subject, motion, setting and camera description |
 | `images` | `string[]` | Model-dependent for image-to-video | Reference URLs or Base64; first/last frame and subject semantics depend on the model |
 | `aspect_ratio` | `string` | Model-dependent | A supported ratio, such as `16:9` or `9:16` |
-| `duration` | `number` | Model-dependent | Duration in seconds with model-specific allowed values |
+| `duration` | `number` or `string` | Model-dependent | Use a number or numeric string as required by the model, with its allowed values |
 | `enhance_prompt` | `boolean` | Some Veo channels | Prompt enhancement |
 
 Do not send every model's optional fields together. Image-to-video may require `images` where text-to-video does not, and no one duration/resolution combination applies to every model.
 
 ## Submit text-to-video
 
-Set `MAXAPI_VIDEO_MODEL` to a confirmed unified text-to-video model. These examples require `jq`:
+Set `MAXAPI_API_KEY` using the [authentication guide](/en/authentication), then set `MAXAPI_VIDEO_MODEL` to a confirmed unified text-to-video model. These terminal examples use Bash and `jq`. Each attempt stores its request and response in a new `video-submit.*` directory and sets `TASK_ID` only after both the current HTTP request and ID validation succeed. A failure clears `TASK_ID` in the current shell without deleting previous files. Run either the text-to-video or image-to-video example for one submission.
 
 ```bash Submit and save the response
+unset TASK_ID
 : "${MAXAPI_VIDEO_MODEL:?Set a model supporting unified text-to-video}"
+VIDEO_ATTEMPT_DIR="$(mktemp -d ./video-submit.XXXXXX)" &&
 jq -n --arg model "$MAXAPI_VIDEO_MODEL" '{
   model: $model,
   prompt: "A paper boat floats slowly across a quiet pond, soft morning light, fixed camera."
-}' | curl --fail-with-body https://api.maxapi.ai/v2/videos/generations \
+}' > "$VIDEO_ATTEMPT_DIR/request.json" &&
+curl --fail-with-body https://api.maxapi.ai/v2/videos/generations \
   -H "Authorization: Bearer $MAXAPI_API_KEY" \
   -H "Content-Type: application/json" \
-  --data-binary @- \
-  --output video-submit.json
+  --data-binary "@$VIDEO_ATTEMPT_DIR/request.json" \
+  --output "$VIDEO_ATTEMPT_DIR/response.json" &&
+TASK_ID="$(jq -er '.task_id | select(type == "string" and length > 0)' "$VIDEO_ATTEMPT_DIR/response.json")" &&
+printf 'TASK_ID=%s\nResponse: %s\n' "$TASK_ID" "$VIDEO_ATTEMPT_DIR/response.json" || {
+  unset TASK_ID
+  printf 'Submission was not confirmed. Inspect attempt directory %s; do not automatically resubmit.\n' "${VIDEO_ATTEMPT_DIR:-unavailable}" >&2
+  false
+}
 ```
 
 ## Submit image-to-video
@@ -63,29 +74,41 @@ jq -n --arg model "$MAXAPI_VIDEO_MODEL" '{
 Set `MAXAPI_IMAGE_URL` to a reference image you may use and that the generation service can access. Confirm the model's image count and semantics:
 
 ```bash Include one reference image
+unset TASK_ID
+: "${MAXAPI_VIDEO_MODEL:?Set a model supporting unified image-to-video}"
 : "${MAXAPI_IMAGE_URL:?Set an accessible reference image URL}"
+VIDEO_ATTEMPT_DIR="$(mktemp -d ./video-submit.XXXXXX)" &&
 jq -n --arg model "$MAXAPI_VIDEO_MODEL" --arg image "$MAXAPI_IMAGE_URL" '{
   model: $model,
   prompt: "Keep the main subject consistent. A gentle breeze moves through the scene.",
   images: [$image]
-}' | curl --fail-with-body https://api.maxapi.ai/v2/videos/generations \
+}' > "$VIDEO_ATTEMPT_DIR/request.json" &&
+curl --fail-with-body https://api.maxapi.ai/v2/videos/generations \
   -H "Authorization: Bearer $MAXAPI_API_KEY" \
   -H "Content-Type: application/json" \
-  --data-binary @- \
-  --output video-submit.json
+  --data-binary "@$VIDEO_ATTEMPT_DIR/request.json" \
+  --output "$VIDEO_ATTEMPT_DIR/response.json" &&
+TASK_ID="$(jq -er '.task_id | select(type == "string" and length > 0)' "$VIDEO_ATTEMPT_DIR/response.json")" &&
+printf 'TASK_ID=%s\nResponse: %s\n' "$TASK_ID" "$VIDEO_ATTEMPT_DIR/response.json" || {
+  unset TASK_ID
+  printf 'Submission was not confirmed. Inspect attempt directory %s; do not automatically resubmit.\n' "${VIDEO_ATTEMPT_DIR:-unavailable}" >&2
+  false
+}
 ```
 
 ## Save the task identifier
 
-This example handles a unified branch returning top-level `task_id`. Some Wan examples use `id` and `output.task_id`; confirm their relationship to the query endpoint and adapt your parser explicitly. Do not send an arbitrary ID from another protocol to this query route.
+Unified video submission returns its identifier in top-level `task_id`. Wan native `output.task_id`, Veo operation `name`, and `id` from other video formats belong to their respective protocols. Do not search those fields for a fallback identifier: submission route, ID location, and retrieval route must match.
 
 ```json Illustrative submission identifier
 {"task_id": "your-task-id"}
 ```
 
-```bash Validate the task ID
-TASK_ID="$(jq -er '.task_id // empty' video-submit.json)"
-: "${TASK_ID:?No task ID in response; inspect error details}"
+The submission examples already extract and validate the ID within the same success chain. Retain the printed response path, `$VIDEO_ATTEMPT_DIR/response.json`. Do not extract an ID from an older response file after submission fails.
+
+```bash Confirm this submission obtained a task ID
+: "${TASK_ID:?This submission has no confirmed task ID; inspect its response without automatically resubmitting}"
+printf '%s\n' "$TASK_ID"
 ```
 
 Store model, protocol, original response and task ID together. HTTP 200 may only indicate acceptance; inspect business-level errors as well.
@@ -95,6 +118,7 @@ Store model, protocol, original response and task ID together. HTTP 200 may only
 Encode the identifier as a path segment to handle special characters:
 
 ```bash Query once
+: "${TASK_ID:?Confirm the saved task ID first}"
 TASK_ID_ESCAPED="$(printf '%s' "$TASK_ID" | jq -sRr @uri)"
 curl --fail-with-body \
   "https://api.maxapi.ai/v2/videos/generations/$TASK_ID_ESCAPED" \
@@ -102,26 +126,87 @@ curl --fail-with-body \
   --output video-status.json
 ```
 
-| State seen in reference examples | Common meaning | Action |
+| Unified state | Meaning | Action |
 | --- | --- | --- |
 | `NOT_START`, `QUEUED`, `SUBMITTED` | Waiting | Retain the task and query later |
 | `IN_PROGRESS` | Generating | Continue and show available progress |
 | `SUCCESS` | Succeeded | Inspect result fields |
 | `FAILURE` | Failed | Read `fail_reason` or other error details |
-| Other values | Channel-specific state or shape | Retain the original response and query within a deadline |
+| Unknown or missing value | Unrecognized state or a different protocol shape | Preserve the response and check the protocol; do not assume success or wait indefinitely |
 
-These values span different examples; they are not one fixed enum returned by every model. State can be top-level or wrapped. Build rules from the actual channel response.
+The unified format defines six states, but a task need not pass through every pending state. This format uses **top-level `status`**. A response using `data.task_status`, `output.task_status`, or another wrapper requires checking whether you selected a provider-native protocol before using this parser.
+
+## Wait for completion
+
+This script only retrieves an existing task. After receiving an HTTP response, it saves the raw body before checking the HTTP status or parsing JSON, preserving error responses and non-JSON bodies as well. It stops on failure, an unknown state, or an unexpected task object. Run the download step only after the script exits successfully.
+
+```bash Install the dependency
+python3 -m pip install requests
+```
+
+```python wait_for_video.py
+import os
+import sys
+import time
+from pathlib import Path
+from urllib.parse import quote
+
+import requests
+
+
+def wait_for_video(task_id, budget=600, interval=5):
+    if not isinstance(task_id, str) or not task_id:
+        raise ValueError("task_id must be a non-empty string from unified submission")
+    if budget <= 0 or interval <= 0:
+        raise ValueError("budget and interval must be positive")
+    url = "https://api.maxapi.ai/v2/videos/generations/" + quote(task_id, safe="")
+    headers = {"Authorization": f"Bearer {os.environ['MAXAPI_API_KEY']}"}
+    deadline = time.monotonic() + budget
+    pending = {"NOT_START", "SUBMITTED", "QUEUED", "IN_PROGRESS"}
+    while time.monotonic() < deadline:
+        response = requests.get(url, headers=headers, timeout=(10, 30))
+        Path("video-status.json").write_bytes(response.content)
+        response.raise_for_status()
+        task = response.json()
+        if not isinstance(task, dict) or task.get("task_id") != task_id:
+            raise RuntimeError("Unexpected task wrapper or task_id; inspect video-status.json")
+        status = task.get("status")
+        print(status, task.get("progress", ""))
+        if status == "SUCCESS":
+            return task
+        if status == "FAILURE":
+            raise RuntimeError(task.get("fail_reason") or "Video generation failed")
+        if status not in pending:
+            raise RuntimeError(f"Unknown status {status!r}; inspect video-status.json")
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            time.sleep(min(interval, remaining))
+    raise TimeoutError("Waiting budget expired; retain task_id and query again later")
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        raise SystemExit("Usage: python3 wait_for_video.py TASK_ID")
+    result = wait_for_video(sys.argv[1])
+    print("Task succeeded; inspect result fields in video-status.json")
+```
+
+```bash Wait for the saved task
+python3 wait_for_video.py "$TASK_ID"
+```
+
+The 5-second interval and 600-second waiting budget are example client policies, not generation-time guarantees. Each HTTP request has separate connection and read timeouts, so the budget is not a strict total elapsed-time limit. After a network failure or expired budget, rerun with the same `TASK_ID` instead of creating a new task. A network failure with no HTTP response leaves an existing result file intact, so the file’s existence does not prove that this query succeeded. Before downloading, also verify that its task ID matches your current `TASK_ID`.
 
 ## Retrieve the video
 
-Common result locations include `data.video_url`, `data.output`, top-level `video_url` or `url`. This illustrates only one possible shape:
+The unified format commonly returns one result in `data.output` or multiple results in `data.outputs`. Some compatible branches use `data.video_url`, top-level `video_url`, or `url`. Confirm your branch’s shape and use an explicit field path; these fields are not guaranteed to appear together. This example uses `data.output`:
 
 ```json Illustrative completed task
 {
   "task_id": "your-task-id",
   "status": "SUCCESS",
   "progress": "100%",
-  "data": {"video_url": "https://your-storage.example/generated-video.mp4"}
+  "data": {"output": "https://example.com/generated-video.mp4"}
 }
 ```
 
@@ -129,12 +214,14 @@ Confirm the successful state and result URL, then download and persist it from y
 
 ### Save the video file
 
-The following command targets the `status` and `data.video_url` shape shown above. If your channel uses another wrapper, adjust the extraction path from its actual response. It rejects unfinished tasks and empty URLs instead of guessing a URL from arbitrary fields.
+The following command targets top-level `status` and `data.output` as shown above. If your confirmed branch uses `data.video_url`, explicitly change the extraction path to that field. Process `data.outputs` one item at a time. Run it only after the waiting script above exits successfully. It rejects mismatched task IDs, unfinished tasks, and empty URLs instead of guessing a URL from arbitrary fields.
 
 ```bash Extract a URL only from a completed task
-VIDEO_URL="$(jq -er '
-  if .status != "SUCCESS" then error("Task has not succeeded")
-  else (.data.video_url | select(type == "string" and startswith("https://")))
+: "${TASK_ID:?Set TASK_ID to the current task first}"
+VIDEO_URL="$(jq -er --arg task_id "$TASK_ID" '
+  if .task_id != $task_id then error("Response task ID does not match the current task")
+  elif .status != "SUCCESS" then error("Task has not succeeded")
+  else (.data.output | select(type == "string" and startswith("https://")))
   end
 ' video-status.json)"
 : "${VIDEO_URL:?Successful response has no usable video URL}"
@@ -148,7 +235,7 @@ curl --fail --location --proto '=https' --proto-redir '=https' \
 
 ### Resume after interruption
 
-Keep `video-submit.json` or the original task ID in your business record, then run the status query again. There is no need to submit a task you already have an ID for. Poll only the GET endpoint, explicitly mapping the channel's pending, successful and failed states. Follow the [async task guide](/en/guides/async-tasks) for bounded waiting and background scheduling.
+Keep `response.json` from the attempt directory or the original task ID in your business record, then run the status query again. There is no need to submit a task you already have an ID for. Poll only the GET endpoint, explicitly mapping the channel's pending, successful and failed states. Follow the [async task guide](/en/guides/async-tasks) for bounded waiting and background scheduling.
 
 ## Troubleshoot video integration
 
@@ -157,7 +244,7 @@ Keep `video-submit.json` or the original task ID in your business record, then r
 | `images` is rejected or images are required | Model branch, expected image count and image roles |
 | An ID exists but no video appears | Submission only confirms acceptance; use the matching query endpoint |
 | Polling never completes | State field location and case; avoid another provider's state map |
-| Success has no `data.video_url` | Inspect the actual wrapper and adapt the parser explicitly |
+| Success has no `data.output` | Check for `data.outputs` or a known compatible shape, then choose the extraction field explicitly |
 | Generation succeeds but downloading fails | Query the current result link and inspect the download response |
 | The same parameters fail after changing models | Return to a minimum request, then validate duration, ratio and image fields one at a time |
 
@@ -167,6 +254,6 @@ Keep `video-submit.json` or the original task ID in your business record, then r
 - If submission times out with an unknown outcome, inspect existing tasks before creating another.
 - Retry temporary query failures with delays and an overall deadline.
 - For a failed generation, retain the task ID, model and reason before deciding whether to change inputs and resubmit.
-- Reaching your local waiting deadline does not cancel the server-side task.
+- Reaching your local waiting deadline does not cancel the server-side task. The unified contract does not define a general cancellation route; do not infer one from another video protocol.
 
 See [asynchronous tasks](/en/guides/async-tasks) for bounded polling, callbacks and persistent task records.

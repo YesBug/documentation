@@ -1,0 +1,65 @@
+---
+title: "Suno NewAPI: submit music"
+description: "Submit a custom, inspiration, or continuation request, then safely extract the task identifier from either supported NewAPI response envelope."
+keywords: ["MaxAPI", "Suno", "submit"]
+openapi: "openapi/suno-en.json POST /suno/submit/music"
+---
+
+The NewAPI-compatible endpoint wraps music generation in a task. Choose a generation mode, save the returned task ID, then [retrieve the task](/en/api-reference/suno/fetch) to read status and songs.
+
+
+<Note>
+The playground starts with a custom-song example. Open **Try it**, expand optional fields to edit `mv`, lyrics, and title, or switch to JSON to edit the full body. “Optional” means a field is not used by every mode; it does not mean an empty request is valid. Replace the model placeholder and keep only the fields needed for your selected mode.
+</Note>
+
+## Choose one request mode
+
+| Mode | Fields |
+| --- | --- |
+| Custom song | Lyrics in `prompt`, with `title` and `tags`; explicitly select an enabled `mv` |
+| Inspiration | Theme description in `gpt_description_prompt`; distinguish it from custom lyrics |
+| Continuation | Source `continue_clip_id` and position `continue_at`; the compatible example uses `task: "extend"` |
+
+Use `make_instrumental` to request instrumental music where the channel and mode support it. Some compatible continuation flows also use the original `task_id`, which is distinct from `continue_clip_id`. Do not fill every mode's fields in an initial generation request.
+
+## Check the business result and data type
+
+Handle both submission shapes below. They are compatibility differences, not different completion states.
+
+<CodeGroup>
+
+```json Standard task ID response
+{"code": "success", "message": "", "data": "YOUR_TASK_ID"}
+```
+
+```json Compatible task object response
+{
+  "code": "success",
+  "message": "",
+  "data": {"task_id": "YOUR_TASK_ID", "status": "SUBMITTED"}
+}
+```
+
+</CodeGroup>
+
+```python Extract an ID from a saved submission
+import json
+from pathlib import Path
+
+response = json.loads(Path("suno-task.json").read_text(encoding="utf-8"))
+if not isinstance(response, dict) or response.get("code") != "success":
+    raise ValueError("Submission failed; inspect suno-task.json")
+data = response.get("data")
+task_id = data if isinstance(data, str) else data.get("task_id") if isinstance(data, dict) else None
+if not isinstance(task_id, str) or not task_id.strip():
+    raise ValueError("No valid task ID in submission response")
+print(task_id)
+```
+
+Do not always read `data.task_id`, or stringify a complete `data` object and use it as the identifier.
+
+## Retrieve and extend
+
+Send the extracted task ID to `/suno/fetch/{task_id}`. Once songs are available, choose an actual clip ID from the result array for the next continuation. A continuation submission creates its own task; retrieve that task instead of waiting for the original to change.
+
+See [Generate and extend music](/en/media/music) for initial generation, continuation, type checks, and polling examples.

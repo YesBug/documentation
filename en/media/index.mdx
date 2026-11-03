@@ -21,6 +21,17 @@ All requests use `https://api.maxapi.ai`. Confirm model, group and channel acces
 | Suno music and continuation | [Music](/en/media/music) | Query a task or song clip after submission |
 | Speech, transcription and translation | [Speech](/en/api-reference/audio-speech), [transcription](/en/api-reference/audio-transcriptions), [translation](/en/api-reference/audio-translations) | Audio bytes or text output |
 
+## Open a task endpoint for online testing
+
+| Protocol | Create content | Query existing content |
+| --- | --- | --- |
+| Unified video | [Create a video task](/en/api-reference/videos/create) | [Retrieve a video task](/en/api-reference/videos/retrieve) |
+| Midjourney | [Imagine](/en/api-reference/midjourney/imagine) | [Fetch](/en/api-reference/midjourney/fetch) |
+| Suno v2 | [Generate](/en/api-reference/suno/v2-generate) | [Feed by clip ID](/en/api-reference/suno/v2-feed) |
+| Suno NewAPI | [Submit a music task](/en/api-reference/suno/submit) | [Fetch by task ID](/en/api-reference/suno/fetch) |
+
+Each page provides authentication, parameters and response examples. Open the query endpoint when a task already exists; use its guide to understand where identifiers and result fields come from.
+
 ## Move from a first result to an application
 
 <Steps>

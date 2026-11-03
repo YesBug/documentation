@@ -1,0 +1,644 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MaxAPI Suno 核心接口",
+    "version": "1.0.0",
+    "description": "Suno v2 与 NewAPI 兼容格式。路径、请求与响应依据现有导出及匹配的公开协议资料整理；具体通道与模型可用性以账户为准。"
+  },
+  "servers": [
+    {
+      "url": "https://api.maxapi.ai"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "paths": {
+    "/suno/v2/generate": {
+      "post": {
+        "summary": "生成或续写音乐（v2）",
+        "description": "自定义歌词生成与续写共用本接口。保存 clips[].id，再用 feed 查询；顶层 id 不是 feed 的查询标识。",
+        "operationId": "generateSunoV2",
+        "responses": {
+          "200": {
+            "description": "请求结果。请分别检查 HTTP 状态、业务结果和生成状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V2GenerateResponse"
+                },
+                "examples": {
+                  "submitted": {
+                    "summary": "片段已提交",
+                    "value": {
+                      "id": "YOUR_GENERATION_ID",
+                      "status": "complete",
+                      "clips": [
+                        {
+                          "id": "YOUR_CLIP_ID",
+                          "status": "submitted",
+                          "audio_url": ""
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "请求结果。请分别检查 HTTP 状态、业务结果和生成状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/V2GenerateRequest"
+              },
+              "example": {
+                "mv": "YOUR_ENABLED_SUNO_MODEL",
+                "prompt": "[Verse]\nMorning light across the floor\nA new road waits beyond the door",
+                "tags": "acoustic pop, warm vocals",
+                "title": "A new road"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/suno/v2/feed": {
+      "get": {
+        "summary": "查询歌曲片段（v2）",
+        "description": "用英文逗号分隔的 clip ID 查询。逐首检查状态并按 id 匹配，不把缺失的片段当作成功。",
+        "operationId": "getSunoV2Clips",
+        "responses": {
+          "200": {
+            "description": "请求结果。请分别检查 HTTP 状态、业务结果和生成状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V2FeedResponse"
+                },
+                "examples": {
+                  "complete": {
+                    "summary": "片段完成",
+                    "value": {
+                      "clips": [
+                        {
+                          "id": "YOUR_CLIP_ID",
+                          "status": "complete",
+                          "title": "A new road",
+                          "audio_url": "https://example.com/music.mp3",
+                          "metadata": {
+                            "duration": 120,
+                            "error_type": null,
+                            "error_message": null
+                          }
+                        }
+                      ],
+                      "num_total_results": 1,
+                      "current_page": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "请求结果。请分别检查 HTTP 状态、业务结果和生成状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "ids",
+            "in": "query",
+            "required": false,
+            "description": "歌曲片段 ID，多个用英文逗号分隔。已知任务查询时显式填写，不使用生成顶层 id 或 NewAPI task_id。",
+            "schema": {
+              "type": "string",
+              "example": "YOUR_FIRST_CLIP_ID,YOUR_SECOND_CLIP_ID"
+            }
+          }
+        ]
+      }
+    },
+    "/suno/submit/music": {
+      "post": {
+        "summary": "提交音乐任务（NewAPI）",
+        "description": "灵感、自定义与续写共用本接口。选择一种模式填写对应字段；提交返回任务 ID 或任务对象，先判断 data 类型，再查询任务。",
+        "operationId": "submitSunoMusic",
+        "responses": {
+          "200": {
+            "description": "请求结果。请分别检查 HTTP 状态、业务结果和生成状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitEnvelope"
+                },
+                "examples": {
+                  "taskId": {
+                    "summary": "标准任务 ID 响应",
+                    "value": {
+                      "code": "success",
+                      "message": "",
+                      "data": "YOUR_TASK_ID"
+                    }
+                  },
+                  "taskObject": {
+                    "summary": "兼容任务对象响应",
+                    "value": {
+                      "code": "success",
+                      "message": "",
+                      "data": {
+                        "task_id": "YOUR_TASK_ID",
+                        "status": "SUBMITTED",
+                        "data": [
+                          {
+                            "id": "YOUR_CLIP_ID",
+                            "status": "submitted",
+                            "audio_url": ""
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "请求结果。请分别检查 HTTP 状态、业务结果和生成状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MusicSubmitRequest"
+              },
+              "example": {
+                "mv": "YOUR_ENABLED_SUNO_MODEL",
+                "prompt": "[Verse]\nMorning light across the floor\nA new road waits beyond the door",
+                "tags": "acoustic pop, warm vocals",
+                "title": "A new road"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/suno/fetch/{task_id}": {
+      "get": {
+        "summary": "查询音乐任务（NewAPI）",
+        "description": "先检查 code，再读取 data 中的任务状态。音乐结果位于 data.data[]；歌曲片段 id 用于后续续写，不替代本接口的 task_id。",
+        "operationId": "getSunoMusicTask",
+        "responses": {
+          "200": {
+            "description": "请求结果。请分别检查 HTTP 状态、业务结果和生成状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FetchEnvelope"
+                },
+                "examples": {
+                  "complete": {
+                    "summary": "音乐任务完成",
+                    "value": {
+                      "code": "success",
+                      "message": "",
+                      "data": {
+                        "task_id": "YOUR_TASK_ID",
+                        "action": "MUSIC",
+                        "status": "SUCCESS",
+                        "progress": "100%",
+                        "data": [
+                          {
+                            "id": "YOUR_CLIP_ID",
+                            "status": "complete",
+                            "title": "A new road",
+                            "audio_url": "https://example.com/music.mp3",
+                            "metadata": {
+                              "duration": 120,
+                              "error_type": null,
+                              "error_message": null
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "请求结果。请分别检查 HTTP 状态、业务结果和生成状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "description": "提交返回的 NewAPI 任务 ID，不是歌曲 clip ID。",
+            "schema": {
+              "type": "string",
+              "example": "YOUR_TASK_ID"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "V2GenerateRequest": {
+        "type": "object",
+        "properties": {
+          "mv": {
+            "type": "string",
+            "description": "音乐模型版本。填写当前账户已开通的值，不把示例当作可用模型清单。",
+            "example": "YOUR_ENABLED_SUNO_MODEL"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "自定义歌曲的歌词。续写时填写新片段需要使用的歌词。",
+            "example": "[Verse]\nMorning light across the floor\nA new road waits beyond the door"
+          },
+          "tags": {
+            "type": "string",
+            "description": "音乐风格描述。",
+            "example": "acoustic pop, warm vocals"
+          },
+          "title": {
+            "type": "string",
+            "description": "歌曲标题。",
+            "example": "A new road"
+          },
+          "continue_clip_id": {
+            "type": "string",
+            "description": "已有歌曲的 clip ID，不是生成请求顶层 id，也不是 NewAPI task_id。",
+            "example": "YOUR_SOURCE_CLIP_ID"
+          },
+          "continue_at": {
+            "type": "number",
+            "description": "续写起点，单位为秒。按原片段实际时长选择。",
+            "example": 30
+          }
+        },
+        "required": [
+          "prompt",
+          "mv"
+        ]
+      },
+      "ClipMetadata": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "生成时使用的歌词。"
+          },
+          "tags": {
+            "type": "string",
+            "description": "音乐风格。"
+          },
+          "duration": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "音频时长，单位为秒；尚未确定时可能为 null。"
+          },
+          "error_type": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "片段错误类型，存在有效值时按失败处理。"
+          },
+          "error_message": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "片段错误详情。"
+          }
+        },
+        "additionalProperties": true
+      },
+      "SongClip": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "歌曲片段 ID。用于 v2 feed 查询，或作为后续续写的 continue_clip_id。",
+            "example": "YOUR_CLIP_ID"
+          },
+          "status": {
+            "type": "string",
+            "description": "歌曲片段状态。示例包括 submitted、streaming、complete；不假定这是完整枚举。"
+          },
+          "title": {
+            "type": "string",
+            "description": "歌曲标题。",
+            "example": "A new road"
+          },
+          "audio_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "音频地址。地址可能在生成过程中出现，最终交付前检查片段状态。"
+          },
+          "video_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "可用时返回的音乐视频地址。"
+          },
+          "image_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "封面图片地址，生成过程中可能为空。"
+          },
+          "image_large_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "大尺寸封面地址，可用时返回。"
+          },
+          "model_name": {
+            "type": "string",
+            "description": "结果实际使用的模型名称。"
+          },
+          "major_model_version": {
+            "type": "string",
+            "description": "结果返回的模型主版本。"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/ClipMetadata"
+          }
+        },
+        "additionalProperties": true
+      },
+      "V2GenerateResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "本次生成的顶层标识，不用于 feed 的 ids。",
+            "example": "YOUR_GENERATION_ID"
+          },
+          "clips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SongClip"
+            },
+            "description": "保存其中每个 clip 的 id，逐首查询。"
+          },
+          "status": {
+            "type": "string",
+            "description": "生成响应的顶层状态，不能代替 clips 中的片段状态。"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/ClipMetadata"
+          },
+          "batch_size": {
+            "type": "integer",
+            "description": "响应报告的本批片段数量。"
+          }
+        },
+        "additionalProperties": true
+      },
+      "V2FeedResponse": {
+        "type": "object",
+        "properties": {
+          "clips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SongClip"
+            }
+          },
+          "num_total_results": {
+            "type": "integer",
+            "description": "响应报告的结果数量。"
+          },
+          "current_page": {
+            "type": "integer",
+            "description": "响应报告的当前页。"
+          }
+        },
+        "additionalProperties": true
+      },
+      "MusicSubmitRequest": {
+        "type": "object",
+        "properties": {
+          "mv": {
+            "type": "string",
+            "description": "音乐模型版本。填写当前账户已开通的值，不把示例当作可用模型清单。",
+            "example": "YOUR_ENABLED_SUNO_MODEL"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "自定义歌曲的歌词。续写时填写新片段需要使用的歌词。",
+            "example": "[Verse]\nMorning light across the floor\nA new road waits beyond the door"
+          },
+          "tags": {
+            "type": "string",
+            "description": "音乐风格描述。",
+            "example": "acoustic pop, warm vocals"
+          },
+          "title": {
+            "type": "string",
+            "description": "歌曲标题。",
+            "example": "A new road"
+          },
+          "continue_clip_id": {
+            "type": "string",
+            "description": "已有歌曲的 clip ID，不是生成请求顶层 id，也不是 NewAPI task_id。",
+            "example": "YOUR_SOURCE_CLIP_ID"
+          },
+          "continue_at": {
+            "type": "number",
+            "description": "续写起点，单位为秒。按原片段实际时长选择。",
+            "example": 30
+          },
+          "gpt_description_prompt": {
+            "type": "string",
+            "description": "灵感模式的歌曲主题描述。自定义模式使用 prompt、title、tags；不要混淆主题描述与歌词。",
+            "example": "A warm acoustic song about starting a new journey"
+          },
+          "make_instrumental": {
+            "type": "boolean",
+            "description": "是否请求纯音乐。按当前渠道及模式支持情况填写。",
+            "example": false
+          },
+          "task": {
+            "type": "string",
+            "description": "兼容续写请求可使用 extend；首次生成时省略，不将它当作所有模式的必填项。",
+            "example": "extend"
+          },
+          "task_id": {
+            "type": "string",
+            "description": "部分兼容续写流程用于关联原任务的 task_id。它不能代替 continue_clip_id；按当前渠道要求填写。",
+            "example": "YOUR_SOURCE_TASK_ID"
+          }
+        },
+        "additionalProperties": true
+      },
+      "TaskRecord": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "NewAPI 任务 ID，用于 /suno/fetch/{task_id} 查询。",
+            "example": "YOUR_TASK_ID"
+          },
+          "action": {
+            "type": "string",
+            "description": "任务类型，例如 MUSIC、LYRICS；仍需检查 data 的实际结构。"
+          },
+          "status": {
+            "type": "string",
+            "description": "任务级状态，如 SUBMITTED、IN_PROGRESS、SUCCESS；失败版本可能返回 FAIL 或 FAILURE。不同于片段的小写状态。"
+          },
+          "progress": {
+            "type": "string",
+            "description": "任务进度显示文本，不代替终态判断。"
+          },
+          "fail_reason": {
+            "type": "string",
+            "description": "任务失败详情。"
+          },
+          "notify_hook": {
+            "type": "string",
+            "description": "任务记录返回的回调地址，如有。"
+          },
+          "data": {
+            "description": "音乐任务返回歌曲数组。其他任务类型可能返回对象，例如歌词结果；不要无条件遍历为歌曲。",
+            "oneOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SongClip"
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "SubmitEnvelope": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "业务结果码。success 表示本次请求成功，不代表歌曲生成已完成。",
+            "example": "success"
+          },
+          "message": {
+            "type": "string",
+            "description": "业务错误或补充说明。"
+          },
+          "data": {
+            "description": "标准 NewAPI 返回任务 ID 字符串；部分兼容渠道直接返回含 task_id 的任务对象。先检查类型再读取。",
+            "oneOf": [
+              {
+                "type": "string",
+                "example": "YOUR_TASK_ID"
+              },
+              {
+                "$ref": "#/components/schemas/TaskRecord"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "FetchEnvelope": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "业务结果码。success 表示本次请求成功，不代表歌曲生成已完成。",
+            "example": "success"
+          },
+          "message": {
+            "type": "string",
+            "description": "业务错误或补充说明。"
+          },
+          "data": {
+            "description": "查询成功时为任务对象。",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TaskRecord"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "description": "错误结构由网关或渠道决定，保留原始响应。",
+        "additionalProperties": true
+      }
+    }
+  }
+}
