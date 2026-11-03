@@ -1,0 +1,97 @@
+---
+title: "Understand images with a vision model"
+description: "Send image URLs or Base64 data URLs with chat messages, compare multiple images, and diagnose image access, encoding and model capability issues."
+keywords: ["MaxAPI", "Understand images with a vision model", "API documentation"]
+sidebarTitle: "Vision"
+---
+
+A vision-capable MaxAPI model can receive text and images through [Chat Completions](/en/api-reference/chat-completions) to describe images, inspect screenshots or recognize text. Confirm that your model and account channel support image input first.
+
+## Build an image message
+
+Replace the user message's string `content` with an array. Add separate text and image items:
+
+| Field | Type | Requirement | Meaning |
+| --- | --- | --- | --- |
+| `model` | `string` | Required | A vision-capable model ID |
+| `messages` | `array` | Required | Conversation messages |
+| `messages[].role` | `string` | Required | Use `user` in these examples |
+| `messages[].content` | `array` | Required | Text and image items |
+| Text item `type` | `string` | Required | `text` |
+| Text item `text` | `string` | Required | Your question about the image |
+| Image item `type` | `string` | Required | `image_url` |
+| Image item `image_url.url` | `string` | Required | An accessible image URL or complete Base64 data URL |
+| Image item `image_url.detail` | `string` | Optional | Model-supported detail level, such as `auto`, `low` or `high` |
+
+Image count, size, format and detail support depend on the model. `image_url` is an object containing `url`, not a plain string. Pasting an image URL into ordinary text does not create an image content item.
+
+## Use an image URL
+
+Set `MAXAPI_API_KEY`, a vision model in `MAXAPI_MODEL`, and a direct image URL in `MAXAPI_IMAGE_URL`. This example requires `jq`:
+
+```bash Send an image URL
+jq -n \
+  --arg model "$MAXAPI_MODEL" \
+  --arg image "$MAXAPI_IMAGE_URL" '{
+    model: $model,
+    messages: [{
+      role: "user",
+      content: [
+        {type: "text", text: "Describe this image and list any readable text."},
+        {type: "image_url", image_url: {url: $image}}
+      ]
+    }]
+  }' | curl --fail-with-body https://api.maxapi.ai/v1/chat/completions \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @-
+```
+
+The generation service must be able to fetch the image directly. Album pages, login-protected sharing links, `localhost` and local file paths are not direct image URLs.
+
+## Use a local image
+
+Encode a local image as `data:MIME_TYPE;base64,ENCODED_DATA`. This example reads a real PNG named `image.png`; change the MIME type if you use another image format.
+
+```python Read a local PNG
+import base64
+import os
+from pathlib import Path
+from openai import OpenAI
+
+client = OpenAI(
+    api_key=os.environ["MAXAPI_API_KEY"],
+    base_url="https://api.maxapi.ai/v1",
+)
+encoded = base64.b64encode(Path("image.png").read_bytes()).decode("ascii")
+response = client.chat.completions.create(
+    model=os.environ["MAXAPI_MODEL"],
+    messages=[{
+        "role": "user",
+        "content": [
+            {"type": "text", "text": "Which action buttons are visible in this screenshot?"},
+            {"type": "image_url", "image_url": {
+                "url": f"data:image/png;base64,{encoded}"
+            }},
+        ],
+    }],
+)
+print(response.choices[0].message.content)
+```
+
+Install `openai` before running it. The text response uses the same `choices[].message.content` field as a text chat.
+
+## Compare multiple images
+
+If the model supports multiple images, append additional `image_url` items to the same `content` array. Explain which image is first or second in your question. Start with a small set: image count and resolution affect request size, processing time and usage.
+
+## Troubleshoot image input
+
+| Symptom | Check |
+| --- | --- |
+| The model cannot see the image | Vision support, content array and `image_url` object structure |
+| Image download fails | Direct-link access, expiration and actual image content; try Base64 if appropriate |
+| Invalid Base64 image | MIME type, `base64,` prefix and complete encoded data |
+| Small text is recognized poorly | Crop the relevant area, improve clarity and use a supported detail level |
+
+To generate or modify an image, use [image generation](/en/api-reference/images) or [image editing](/en/api-reference/images-edits). See [troubleshooting](/en/help/errors) for HTTP failures.

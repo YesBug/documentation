@@ -1,0 +1,97 @@
+---
+title: "Python SDK"
+description: "使用 OpenAI Python SDK，通过 MaxAPI 发送对话请求。"
+keywords: ["MaxAPI", "Python SDK", "python"]
+---
+
+通过自定义 `base_url`，可以使用 OpenAI Python SDK 调用 MaxAPI 的兼容接口。
+
+## 安装
+
+建议在项目的虚拟环境中安装依赖：
+
+```bash "终端"
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install openai
+```
+
+以上激活命令适用于 macOS 和 Linux。Windows PowerShell 使用 `.venv\Scripts\Activate.ps1`。
+
+## 配置环境变量
+
+```bash
+export MAXAPI_API_KEY="替换为你的 API Key"
+export MAXAPI_MODEL="替换为模型 ID"
+```
+
+在 [控制台](https://platform.maxapi.ai) 获取密钥，并通过 [模型列表](/zh/api-reference/models) 确认模型 ID。下面的程序直接读取进程环境变量，不会自动加载 `.env` 文件。
+
+## 发送对话请求
+
+```python "main.py"
+import os
+from openai import OpenAI
+
+client = OpenAI(
+    api_key=os.environ["MAXAPI_API_KEY"],
+    base_url="https://api.maxapi.ai/v1",
+)
+
+completion = client.chat.completions.create(
+    model=os.environ["MAXAPI_MODEL"],
+    messages=[
+        {"role": "user", "content": "用三个要点解释什么是 API。"},
+    ],
+)
+
+print(completion.choices[0].message.content or "")
+```
+
+```bash "运行"
+python main.py
+```
+
+客户端会为请求添加验证头。`base_url` 使用 `/v1` 结尾的根地址，不要在这里追加 `/chat/completions`。
+
+## 保留对话上下文
+
+Chat Completions 通过 `messages` 传递对话历史。发送后续问题时，将需要的历史消息一起放入本次请求。
+
+```python "多轮对话"
+messages = [
+    {"role": "user", "content": "什么是 REST API？"},
+    {"role": "assistant", "content": "REST API 是按资源组织的网络接口。"},
+    {"role": "user", "content": "给我一个简单的例子。"},
+]
+
+completion = client.chat.completions.create(
+    model=os.environ["MAXAPI_MODEL"],
+    messages=messages,
+)
+
+print(completion.choices[0].message.content or "")
+```
+
+历史消息会占用模型上下文。长期对话可以通过摘要或保留相关片段控制输入长度。
+
+## 处理失败请求
+
+将请求放入异常处理逻辑，区分网络连接问题与 API 返回的错误状态。
+
+```python "异常处理"
+import openai
+
+try:
+    completion = client.chat.completions.create(
+        model=os.environ["MAXAPI_MODEL"],
+        messages=[{"role": "user", "content": "你好！"}],
+    )
+    print(completion.choices[0].message.content or "")
+except openai.APIConnectionError:
+    print("连接失败，请检查网络与接口地址。")
+except openai.APIStatusError as error:
+    print(f"请求失败，HTTP 状态码：{error.status_code}")
+```
+
+更详细的故障定位见 [错误排查](/zh/help/errors)。如果希望逐段接收文本，继续阅读 [流式响应](/zh/guides/streaming)。SDK 的完整配置选项可查阅 [官方 Python SDK 文档](https://github.com/openai/openai-python)。

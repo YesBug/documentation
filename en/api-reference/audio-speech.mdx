@@ -1,0 +1,61 @@
+---
+title: "Generate speech from text"
+description: "POST /v1/audio/speech: synthesize text with a supported model and voice, save audio bytes, and distinguish successful audio output from JSON errors."
+keywords: ["MaxAPI", "Generate speech from text", "API documentation"]
+sidebarTitle: "Generate speech"
+openapi: "openapi/en.json POST /v1/audio/speech"
+---
+
+The speech endpoint synthesizes text into audio for narration and spoken content. Your selected MaxAPI channel must support the model, voice and requested format.
+
+## Generate and save audio
+
+Prepare `MAXAPI_API_KEY`, set `MAXAPI_AUDIO_MODEL` to a speech model and `MAXAPI_VOICE` to a valid voice for that model. This example requires `jq` and MP3 output support:
+
+```bash Save speech as MP3
+jq -n \
+  --arg model "$MAXAPI_AUDIO_MODEL" \
+  --arg voice "$MAXAPI_VOICE" '{
+    model: $model,
+    voice: $voice,
+    input: "Welcome to MaxAPI. Start building your intelligent application.",
+    response_format: "mp3"
+  }' | curl --fail-with-body https://api.maxapi.ai/v1/audio/speech \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @- \
+  --output speech.mp3
+```
+
+Do not reuse one model's voice IDs, text length limits or speed ranges for another model. Begin with a short text and a confirmed voice.
+
+## Receive audio in Python
+
+Install `openai`. The response context writes audio chunks without loading the entire file at once:
+
+```python Save audio incrementally
+import os
+from openai import OpenAI
+
+client = OpenAI(
+    api_key=os.environ["MAXAPI_API_KEY"],
+    base_url="https://api.maxapi.ai/v1",
+)
+with client.audio.speech.with_streaming_response.create(
+    model=os.environ["MAXAPI_AUDIO_MODEL"],
+    voice=os.environ["MAXAPI_VOICE"],
+    input="Welcome to MaxAPI.",
+    response_format="mp3",
+) as response:
+    response.stream_to_file("speech.mp3")
+```
+
+This streams audio bytes, which differs from parsing [chat SSE events](/en/guides/streaming).
+
+## Check the response before playback
+
+A successful body contains audio bytes, not a JSON object with an audio URL. Its `Content-Type` depends on the output format. An error can still be JSON.
+
+The cURL command may write an error body into `speech.mp3` when it fails. Check the exit status and HTTP response before playing the file. If text exceeds the model's limit, synthesize sentence or paragraph segments and maintain their order in your application.
+
+For speech recognition, use [transcription](/en/api-reference/audio-transcriptions). For authentication and quota failures, see [troubleshooting](/en/help/errors).

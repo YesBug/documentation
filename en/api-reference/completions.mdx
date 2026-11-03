@@ -1,0 +1,41 @@
+---
+title: "Create a text completion"
+description: "POST /v1/completions: continue a prompt with a model supporting the legacy Completions format, and read generated text in regular or streaming responses."
+keywords: ["MaxAPI", "Create a text completion", "API documentation"]
+sidebarTitle: "Completions"
+openapi: "openapi/en.json POST /v1/completions"
+---
+
+The Completions endpoint continues a `prompt` for existing integrations using the legacy format. It uses a different request and response shape from [Chat Completions](/en/api-reference/chat-completions). Confirm that the selected model supports this endpoint.
+
+## Send a minimal completion request
+
+Set `MAXAPI_MODEL` to a completion-capable model, prepare `MAXAPI_API_KEY` and install `jq`:
+
+```bash Complete a prompt
+jq -n --arg model "$MAXAPI_MODEL" '{
+  model: $model,
+  prompt: "Continue this introduction: MaxAPI helps developers",
+  max_tokens: 128
+}' | curl --fail-with-body https://api.maxapi.ai/v1/completions \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @-
+```
+
+The output limit in this example is a client request value, not a platform limit. Supported parameters and context limits depend on the model.
+
+## Read generated text
+
+Read `choices[].text`, rather than `choices[].message.content`. In streaming mode, incremental completion text still uses `choices[].text`; do not reuse chat's `delta.content` parser. See [streaming](/en/guides/streaming) for SSE framing.
+
+## Check compatibility
+
+| Problem | Action |
+| --- | --- |
+| Listed model rejects the request | Confirm that it supports `/v1/completions` |
+| Generated text appears missing | Read `choices[].text` |
+| Chat messages are rejected | Send `prompt`, or use Chat Completions |
+| Text is truncated | Inspect `finish_reason: "length"` and the model's context limits |
+
+See [troubleshooting](/en/help/errors) for other HTTP errors.

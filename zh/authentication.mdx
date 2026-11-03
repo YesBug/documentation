@@ -1,0 +1,81 @@
+---
+title: "身份验证"
+description: "了解 Bearer Token 验证方式，并安全管理你的 API Key。"
+keywords: ["MaxAPI", "身份验证", "authentication"]
+---
+
+MaxAPI 使用 API Key 验证请求。所有示例都通过 HTTPS 访问接口，并在 `Authorization` 请求头中携带密钥。
+
+## 请求头格式
+
+```http
+Authorization: Bearer YOUR_MAXAPI_API_KEY
+```
+
+`Bearer` 与密钥之间保留一个空格。不要将 API Key 放进 URL 查询参数，也不要把完整密钥输出到日志。
+
+```bash "验证连接"
+curl --fail-with-body https://api.maxapi.ai/v1/models \
+  -H "Authorization: Bearer $MAXAPI_API_KEY"
+```
+
+成功查询模型列表可以帮助确认密钥和网络配置，但不代表每个模型都支持相同参数或具备相同访问权限。
+
+## 在服务端保存密钥
+
+本地开发时可以将密钥写入 `.env` 文件；应用需要通过运行时或环境变量加载工具读取该文件。
+
+```dotenv ".env"
+MAXAPI_API_KEY=替换为你的_API_Key
+MAXAPI_MODEL=替换为模型_ID
+```
+
+将包含真实密钥的文件加入 Git 忽略规则。可以提交只包含占位符的 `.env.example`，帮助团队了解必要配置。
+
+```text ".gitignore"
+.env
+.env.*
+!.env.example
+```
+
+在部署环境中使用平台提供的环境变量或密钥管理服务。避免使用 `NEXT_PUBLIC_`、`VITE_` 等会将变量暴露给浏览器的前缀。
+
+## 配置 SDK
+
+```python "Python"
+import os
+from openai import OpenAI
+
+client = OpenAI(
+    api_key=os.environ["MAXAPI_API_KEY"],
+    base_url="https://api.maxapi.ai/v1",
+)
+```
+
+```javascript "Node.js"
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: process.env.MAXAPI_API_KEY,
+  baseURL: "https://api.maxapi.ai/v1",
+});
+```
+
+使用 MaxAPI 密钥时，务必同时设置 MaxAPI 的 Base URL。
+
+## 轮换与撤销
+
+建议为不同应用、开发环境和生产环境分别管理密钥，并根据控制台提供的能力配置访问范围。
+
+轮换时先创建新密钥，更新应用配置并验证请求成功，再撤销旧密钥。如果发现密钥泄露，应尽快撤销受影响的密钥、替换部署配置，并检查相关调用记录。
+
+## 排查验证失败
+
+遇到 `401` 时，优先检查以下内容：
+
+- 环境变量是否已经加载到实际运行的进程。
+- 密钥是否包含复制时引入的空格、换行或额外引号。
+- 请求是否包含完整的 `Authorization: Bearer ...` 请求头。
+- 密钥是否仍然有效，且来自当前使用的 MaxAPI 账户。
+
+如果认证通过但模型请求仍失败，继续检查 [模型与能力](/zh/models) 和 [错误排查](/zh/help/errors)。

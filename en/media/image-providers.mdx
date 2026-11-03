@@ -1,0 +1,145 @@
+---
+title: "Use provider-specific image protocols"
+description: "Compare Gemini content blocks, Stable Diffusion multipart requests, Ideogram image_request objects and asynchronous image tasks before integrating a channel."
+keywords: ["MaxAPI", "Use provider-specific image protocols", "API documentation"]
+sidebarTitle: "Image protocols"
+---
+
+Image generation can use [OpenAI-compatible Images](/en/api-reference/images), provider-specific bodies or asynchronous task resources. Confirm the model's enabled route first; the same output goal does not imply an interchangeable request body.
+
+## Compare image formats
+
+| Format | Entry points | Encoding | Output |
+| --- | --- | --- | --- |
+| OpenAI Images | `/v1/images/generations`, `/v1/images/edits` | JSON or multipart | URL or Base64 |
+| Native Gemini image | `/v1beta/models/{model}:generateContent` | JSON `contents[].parts[]` | Model response content parts |
+| Stable Diffusion 3 | `/sd/v2beta/stable-image/generate/sd3` | Multipart | Image or JSON selected with `Accept` |
+| Ideogram | `/ideogram/generate` | JSON `image_request` | Image information in `data[]` |
+| Asynchronous image-compatible | `/v1/videos` | Multipart for this branch | Query a task, then retrieve content |
+
+The following examples apply only to channels that enable the corresponding format. A compatible SDK will not automatically turn `prompt` into Gemini content parts or an Ideogram wrapper.
+
+## Gemini generateContent
+
+The source documents an image route for `gemini-2.5-flash-image`. Confirm access and protocol support before substituting a different model ID.
+
+```http Referenced image route
+POST https://api.maxapi.ai/v1beta/models/gemini-2.5-flash-image:generateContent
+```
+
+| Field | Meaning |
+| --- | --- |
+| `contents[].role` | Message role, such as `user` |
+| `contents[].parts[].text` | Image description or editing instruction |
+| `contents[].parts[].inline_data` | Reference image with `mime_type` and Base64 `data` |
+| `generationConfig.responseModalities` | The referenced image format uses `TEXT` and `IMAGE` |
+
+Set `MAXAPI_GEMINI_IMAGE_MODEL` to a confirmed model:
+
+```bash Request Gemini image output
+: "${MAXAPI_GEMINI_IMAGE_MODEL:?Set a model supporting generateContent image generation}"
+MODEL_ESCAPED="$(printf '%s' "$MAXAPI_GEMINI_IMAGE_MODEL" | jq -sRr @uri)"
+jq -n '{
+  contents: [{
+    role: "user",
+    parts: [{text: "Create a watercolor illustration of a small library beside a river."}]
+  }],
+  generationConfig: {responseModalities: ["TEXT", "IMAGE"]}
+}' | curl --fail-with-body \
+  "https://api.maxapi.ai/v1beta/models/$MODEL_ESCAPED:generateContent" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @- \
+  --output gemini-image.json
+```
+
+For editing, add a reference image part to the same message, using its real MIME type. `data` expects Base64 content, not a whole `data:image/...;base64,...` URL.
+
+The response can include text and images, or no image because of input or model restrictions. Inspect candidate content parts according to their actual types. Do not use the OpenAI Images `data[0].url` parser. This MaxAPI route uses Bearer authentication; keep provider-direct hosts and keys out of this request.
+
+## Stable Diffusion 3 multipart and Accept
+
+SD3 uses `mode` to distinguish text-to-image and image-to-image. Supported models, dimensions and parameter combinations depend on the SD channel.
+
+```http SD3 endpoint
+POST https://api.maxapi.ai/sd/v2beta/stable-image/generate/sd3
+```
+
+| Field | Type | Use |
+| --- | --- | --- |
+| `prompt` | `string` | Required image description |
+| `model` | `string` | Enabled SD3 model |
+| `mode` | `string` | `text-to-image` or `image-to-image` |
+| `image` | File | Image-to-image input |
+| `strength` | `number` | Reference influence in image-to-image mode |
+| `aspect_ratio` | `string` | Supported text-to-image aspect ratio |
+| `output_format` | `string` | Supported image format |
+
+`Accept: image/*` requests image content; `Accept: application/json` requests JSON containing Base64. Let cURL generate the multipart content type:
+
+```bash Save an SD3 image
+: "${MAXAPI_SD_MODEL:?Set an enabled SD3 model ID}"
+curl --fail-with-body https://api.maxapi.ai/sd/v2beta/stable-image/generate/sd3 \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Accept: image/*" \
+  --form-string "model=$MAXAPI_SD_MODEL" \
+  --form-string "mode=text-to-image" \
+  --form-string "prompt=A small wooden cabin beside a quiet lake, ink illustration" \
+  --form-string "output_format=png" \
+  --dump-header sd-image.headers \
+  --output sd-image.png
+```
+
+Check status and `Content-Type` before displaying the file; an error may still be JSON. Image-to-image needs the upload and `strength`, not just a changed `mode`.
+
+SDXL's `/sd/v1/generation/{engine_id}/text-to-image` uses a different schema. Do not reuse SD3 multipart fields unchanged. See the [catalog](/en/api-reference/catalog) for branches.
+
+## Ideogram image_request wrapper
+
+Generation uses JSON `image_request`. Remix, upscale and describe operations can use multipart, so check encoding separately:
+
+```http Ideogram routes
+POST https://api.maxapi.ai/ideogram/generate
+POST https://api.maxapi.ai/ideogram/remix
+POST https://api.maxapi.ai/ideogram/upscale
+POST https://api.maxapi.ai/ideogram/describe
+```
+
+| Field | Meaning |
+| --- | --- |
+| `image_request.prompt` | Required description |
+| `image_request.model` | Model value supported by this channel |
+| `image_request.aspect_ratio` | Protocol-specific ratio identifier, distinct from ordinary `16:9` values |
+| `image_request.resolution` | Explicit resolution; do not combine with `aspect_ratio` |
+| `image_request.magic_prompt_option` | Prompt enhancement where supported |
+| `image_request.style_type` | Style parameter for models that support it |
+
+```bash Generate with Ideogram
+: "${MAXAPI_IDEOGRAM_MODEL:?Set an enabled Ideogram model value}"
+jq -n --arg model "$MAXAPI_IDEOGRAM_MODEL" '{
+  image_request: {
+    model: $model,
+    prompt: "A minimal poster for a reading club, warm colors, the title READ TOGETHER"
+  }
+}' | curl --fail-with-body https://api.maxapi.ai/ideogram/generate \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @- \
+  --output ideogram-images.json
+```
+
+Successful `data[]` items can include `url`, `prompt`, `resolution` and `is_image_safe`. Check for an actual URL per item; it may be absent. Persist required results rather than hard-coding a generated link's retention period.
+
+## Asynchronous images through video task resources
+
+Some image channels reuse the compatible `/v1/videos` resource. The returned object can be an `image` even though the route is named videos.
+
+| Step | Method and path | Use |
+| --- | --- | --- |
+| Submit | `POST /v1/videos` | Multipart image task with `model`, `prompt` and optional `input_reference` file in the reference example |
+| Query | `GET /v1/videos/{video_id}` | Query with the returned `id` |
+| Download | `GET /v1/videos/{task_id}/content` | Retrieve completed image content |
+
+The route also appears in video and character workflows. A shared export may retain only one branch's schema; do not treat character fields as image-generation inputs. Confirm the specific image branch rather than combining fields from different tasks.
+
+Save `id`, use that branch's state rules and retrieve content only after completion. The image example uses `in_progress`; do not apply unified video's uppercase `SUCCESS` to all tasks. Inspect `Content-Type` before reading image bytes. See [async tasks](/en/guides/async-tasks) for polling and storage.

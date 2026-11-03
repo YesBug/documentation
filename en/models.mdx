@@ -1,0 +1,76 @@
+---
+title: "Choose models and verify capabilities"
+description: "List the models visible to your MaxAPI key, use exact model IDs, and evaluate inputs, output quality, speed and supported parameters for your application."
+keywords: ["MaxAPI", "Choose models and verify capabilities", "API documentation"]
+sidebarTitle: "Models"
+---
+
+Select a MaxAPI model with the request's `model` field. Use the exact ID from the console or model list to avoid confusing a display name with an API identifier.
+
+## List visible models
+
+```bash List models
+curl --fail-with-body https://api.maxapi.ai/v1/models \
+  -H "Authorization: Bearer $MAXAPI_API_KEY"
+```
+
+The compatible list contains a `data` array. Use each item's `id` in later requests. See the [model list reference](/en/api-reference/models) for the response structure.
+
+If you have `jq`, print only model IDs:
+
+```bash Print model IDs
+curl --fail-with-body https://api.maxapi.ai/v1/models \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  | jq -r '.data[]?.id'
+```
+
+## Evaluate the capabilities you need
+
+Input types, parameter support and output behavior vary by model. Test a small representative set of your real tasks before sending production traffic.
+
+| Dimension | What to check |
+| --- | --- |
+| Quality | Instruction following, target language and domain content |
+| Speed | Time to first content and total generation time |
+| Context | Whether input history and expected output fit the model's limits |
+| Inputs | Support for text, images or other required input types |
+| Advanced capabilities | Tool calling, structured output or other required features |
+| Cost | Current billing rules and measured usage against your budget |
+
+The model list may not describe every capability. Prices, context lengths, limits and access conditions come from the console and the selected model's documentation.
+
+## Keep the model ID configurable
+
+Store it in an environment variable so you can switch models without changing application code:
+
+```bash Configure a model
+export MAXAPI_MODEL="YOUR_MODEL_ID"
+```
+
+```python Use the configured client
+response = client.chat.completions.create(
+    model=os.environ["MAXAPI_MODEL"],
+    messages=[{"role": "user", "content": "Summarize this content."}],
+)
+```
+
+This snippet uses an existing `client`. See [Python integration](/en/guides/python) for initialization.
+
+## Recheck parameters when switching models
+
+Start with `model` and `messages`, then add streaming, sampling and output limits one at a time. A field accepted by one model may be unavailable on another. Protocol compatibility does not mean identical model capabilities.
+
+## Match the model to the task
+
+| Task | Required capability | Guide or endpoint |
+| --- | --- | --- |
+| Text conversations | Text generation | [Chat Completions](/en/api-reference/chat-completions) |
+| Understand images | Vision input | [Vision](/en/guides/vision) |
+| Call application functions | Tool calling | [Tools](/en/guides/tools) |
+| Create or edit images | Image generation or editing | [Images](/en/api-reference/images) |
+| Semantic retrieval | Text embeddings | [Embeddings](/en/api-reference/embeddings) |
+| Generate speech | Text to speech | [Speech](/en/api-reference/audio-speech) |
+| Recognize recordings | Speech to text | [Transcription](/en/api-reference/audio-transcriptions) |
+| Generate video or music | Enabled asynchronous generation channel | [Multimedia](/en/media/index) |
+
+Do not use a chat model ID for an embedding, image or audio model. Native protocols can select models differently: Suno uses `mv`, and some Veo routes include the model in the URL. See [API formats](/en/guides/protocols) before switching protocols.

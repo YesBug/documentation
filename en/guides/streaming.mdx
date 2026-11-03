@@ -1,0 +1,106 @@
+---
+title: "Read streaming responses"
+description: "Receive MaxAPI chat output incrementally with Python, Node.js or raw SSE, and handle empty chunks, completion, cancellation and network interruptions."
+keywords: ["MaxAPI", "Read streaming responses", "API documentation"]
+sidebarTitle: "Streaming"
+---
+
+Streaming returns data while a model generates its response. For a model that supports streaming, set `stream` to `true` and read the incremental events instead of waiting for a complete JSON result.
+
+## Stream with Python
+
+Install `openai` and set `MAXAPI_API_KEY` and `MAXAPI_MODEL` before running this example:
+
+```python stream.py
+import os
+from openai import OpenAI
+
+client = OpenAI(
+    api_key=os.environ["MAXAPI_API_KEY"],
+    base_url="https://api.maxapi.ai/v1",
+)
+
+stream = client.chat.completions.create(
+    model=os.environ["MAXAPI_MODEL"],
+    messages=[{"role": "user", "content": "Write a short passage about exploration."}],
+    stream=True,
+)
+
+try:
+    for chunk in stream:
+        if not chunk.choices:
+            continue
+        text = chunk.choices[0].delta.content
+        if text:
+            print(text, end="", flush=True)
+finally:
+    stream.close()
+
+print()
+```
+
+## Stream with Node.js
+
+```javascript stream.mjs
+import OpenAI from "openai";
+
+const apiKey = process.env.MAXAPI_API_KEY;
+const model = process.env.MAXAPI_MODEL;
+if (!apiKey || !model) {
+  throw new Error("Set MAXAPI_API_KEY and MAXAPI_MODEL.");
+}
+
+const client = new OpenAI({
+  apiKey,
+  baseURL: "https://api.maxapi.ai/v1",
+});
+
+const stream = await client.chat.completions.create({
+  model,
+  messages: [{ role: "user", content: "Write a short passage about exploration." }],
+  stream: true,
+});
+
+for await (const chunk of stream) {
+  const text = chunk.choices[0]?.delta.content;
+  if (text) process.stdout.write(text);
+}
+
+process.stdout.write("\n");
+```
+
+## Understand incremental content
+
+Read `choices[0].message.content` for a non-streaming chat result. In a chat stream, concatenate the `choices[0].delta.content` values in order.
+
+Some chunks contain only a role, finish state or metadata. They may have empty `choices` or no text content. Tool arguments can also arrive in fragments; assemble them before parsing JSON. See [tool calling](/en/guides/tools).
+
+## Read raw HTTP events
+
+Compatible streaming endpoints use Server-Sent Events (SSE). The `-N` flag disables cURL output buffering so you can observe events arriving:
+
+```bash cURL with jq
+jq -n --arg model "$MAXAPI_MODEL" '{
+  model: $model,
+  messages: [{role: "user", content: "Write a short passage about exploration."}],
+  stream: true
+}' | curl -N --fail-with-body https://api.maxapi.ai/v1/chat/completions \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @-
+```
+
+Parse a raw SSE stream at event boundaries. One network chunk does not necessarily contain a whole JSON object or even a complete character. An SDK handles this framing for you.
+
+<Note>
+Legacy [Completions](/en/api-reference/completions) streams put text in `choices[].text`, not `delta.content`. Audio byte streaming is also different from chat SSE.
+</Note>
+
+## Connect a user interface
+
+- Show a loading state until the first content arrives, then append text in order.
+- Distinguish completion, user cancellation and network interruption. Do not mark interrupted text as a complete answer.
+- Close the connection when the user cancels generation or leaves the page.
+- Check response buffering and connection timeouts in your application and its hosting path.
+
+Streaming changes when content is displayed. Model capabilities, output limits and billing still follow the selected model and console information.

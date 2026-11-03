@@ -1,0 +1,2869 @@
+---
+title: "扩展接口目录"
+description: "搜索共用系统的接口路径、请求方法和字段，识别需要核对的定义。"
+keywords: ["MaxAPI", "扩展接口", "接口目录", "协议参考", "请求字段"]
+---
+
+扩展接口目录保留共用 API 系统导出文件中的 173 条结构定义，方便按功能、提供方和路径核对。**这些条目并不代表 MaxAPI 已全部开通，也不代表每条定义都已完成在线验证。**
+
+常用接口的参数与在线调试见 [API 总览](/zh/api-reference/index)；视频、音乐与图像任务的接入流程见 [多媒体接入](/zh/media/index)。
+
+## 阅读目录
+
+| 标记 | 含义 |
+| --- | --- |
+| 协议参考 | 可用于定位接口及核对字段，仍需确认账号通道和模型权限 |
+| 需核对 | 字段缺失、路径模板冲突或协议说明不一致，接入前应进一步核实 |
+| 示例路径 | 含示例标识或占位内容，不能作为真实任务地址直接调用 |
+
+字段表保留来源中的名称、类型与必填标记，尚未定义的部分不在此补造。目录未保留原始认证值、请求样例、第三方媒体地址或价格；固定任务与文件标识已替换为示例占位符。认证方式见 [身份验证](/zh/authentication)。
+
+目录中的同路径分支与模板差异按来源保留，因此 173 条记录不等于 173 个已经验证的独立可用操作。
+
+## 文本与向量（3 条）
+
+<AccordionGroup>
+
+<Accordion title="POST · 聊天补全">
+
+`POST /v1/chat/completions`
+
+**提供方**：OpenAI 兼容　**标记**：需核对
+
+需要核对：同一路径混合多种请求格式；参数类型需核对。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `frequency_penalty` | `body` | `number` | 否 |
+| `logit_bias` | `body` | `null` | 否 |
+| `max_tokens` | `body` | `integer` | 否 |
+| `messages` | `body` | `array` | 是 |
+| `model` | `body` | `string` | 是 |
+| `n` | `body` | `integer` | 否 |
+| `presence_penalty` | `body` | `number` | 否 |
+| `stop` | `body` | `string` | 否 |
+| `stream` | `body` | `boolean` | 否 |
+| `temperature` | `body` | `integer` | 否 |
+| `top_p` | `body` | `integer` | 否 |
+| `user` | `body` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · 内容补全接口">
+
+`POST /v1/completions`
+
+**提供方**：OpenAI 兼容　**标记**：协议参考
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `logprobs` | `body` | `null` | 否 |
+| `max_tokens` | `body` | `integer` | 否 |
+| `model` | `body` | `string` | 是 |
+| `n` | `body` | `integer` | 否 |
+| `prompt` | `body` | `string` | 否 |
+| `stop` | `body` | `string` | 否 |
+| `stream` | `body` | `boolean` | 否 |
+| `temperature` | `body` | `integer` | 否 |
+| `top_p` | `body` | `integer` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · 创建嵌入">
+
+`POST /v1/embeddings`
+
+**提供方**：OpenAI 兼容　**标记**：协议参考
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `input` | `body` | `string` | 是 |
+| `model` | `body` | `string` | 是 |
+
+</Accordion>
+
+</AccordionGroup>
+
+## 图像（13 条）
+
+<AccordionGroup>
+
+<Accordion title="POST · Nano-banana 官方格式">
+
+`POST /v1beta/models/gemini-2.5-flash-image:generateContent`
+
+**提供方**：Gemini　**标记**：需核对
+
+需要核对：请求字段定义不完整；响应字段定义不完整。
+
+请求编码：`application/json`。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · Describe">
+
+`POST /ideogram/describe`
+
+**提供方**：Ideogram　**标记**：协议参考
+
+请求编码：`multipart/form-data`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `image_file` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · Generate">
+
+`POST /ideogram/generate`
+
+**提供方**：Ideogram　**标记**：协议参考
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `image_request` | `body` | `object` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · Remix">
+
+`POST /ideogram/remix`
+
+**提供方**：Ideogram　**标记**：协议参考
+
+请求编码：`multipart/form-data`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `image_file` | `body` | `string` | 否 |
+| `image_request` | `body` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · Upscale">
+
+`POST /ideogram/upscale`
+
+**提供方**：Ideogram　**标记**：协议参考
+
+请求编码：`multipart/form-data`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `image_file` | `body` | `string` | 否 |
+| `image_request` | `body` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · 图像生成">
+
+`POST /kling/v1/images/generations`
+
+**提供方**：Kling　**标记**：需核对
+
+需要核对：示例与字段定义不一致。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `aspect_ratio` | `body` | `string` | 否 |
+| `callback_url` | `body` | `string` | 否 |
+| `image` | `body` | `string` | 否 |
+| `image_fidelity` | `body` | `number` | 否 |
+| `model` | `body` | `string` | 否 |
+| `n` | `body` | `integer` | 否 |
+| `negative_prompt` | `body` | `string` | 否 |
+| `prompt` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 图像编辑">
+
+`POST /v1/images/edits`
+
+**提供方**：OpenAI 兼容　**标记**：需核对
+
+需要核对：响应字段定义不完整。
+
+请求编码：`multipart/form-data`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `image` | `body` | `string` | 是 |
+| `mask` | `body` | `string` | 否 |
+| `model` | `body` | `string` | 是 |
+| `n` | `body` | `string` | 否 |
+| `prompt` | `body` | `string` | 否 |
+| `response_format` | `body` | `string` | 否 |
+| `size` | `body` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · 图像生成">
+
+`POST /v1/images/generations`
+
+**提供方**：OpenAI 兼容　**标记**：需核对
+
+需要核对：示例与字段定义不一致；同一路径混合多种请求格式。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `n` | `body` | `integer` | 否 |
+| `prompt` | `body` | `string` | 是 |
+| `size` | `body` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · Text-to-image">
+
+`POST /sd/v1/generation/{engine_id}/text-to-image`
+
+**提供方**：Stable Diffusion　**标记**：协议参考
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `engine_id` | `path` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · Stable Image Core">
+
+`POST /sd/v2beta/stable-image/generate/core`
+
+**提供方**：Stable Diffusion　**标记**：协议参考
+
+请求编码：`multipart/form-data`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `aspect_ratio` | `body` | `string` | 否 |
+| `negative_prompt` | `body` | `string` | 否 |
+| `output_format` | `body` | `string` | 否 |
+| `prompt` | `body` | `string` | 是 |
+| `seed` | `body` | `number` | 否 |
+| `style_preset` | `body` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · Stable Diffusion 3">
+
+`POST /sd/v2beta/stable-image/generate/sd3`
+
+**提供方**：Stable Diffusion　**标记**：协议参考
+
+请求编码：`multipart/form-data`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `aspect_ratio` | `body` | `string` | 否 |
+| `image` | `body` | `string` | 否 |
+| `mode` | `body` | `string` | 否 |
+| `model` | `body` | `string` | 否 |
+| `negative_prompt` | `body` | `string` | 否 |
+| `output_format` | `body` | `string` | 否 |
+| `prompt` | `body` | `string` | 是 |
+| `seed` | `body` | `number` | 否 |
+| `strength` | `body` | `number` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · Stable Image Ultra">
+
+`POST /sd/v2beta/stable-image/generate/ultra`
+
+**提供方**：Stable Diffusion　**标记**：协议参考
+
+请求编码：`multipart/form-data`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `aspect_ratio` | `body` | `string` | 否 |
+| `negative_prompt` | `body` | `string` | 否 |
+| `output_format` | `body` | `string` | 否 |
+| `prompt` | `body` | `string` | 是 |
+| `seed` | `body` | `number` | 否 |
+
+</Accordion>
+
+<Accordion title="GET · 下载异步图像结果">
+
+`GET /v1/videos/{task_id}/content`
+
+**提供方**：异步图像　**标记**：需核对
+
+需要核对：存在等价路径模板；响应字段定义不完整。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `task_id` | `path` | `string` | 是 |
+
+</Accordion>
+
+</AccordionGroup>
+
+## 音频（5 条）
+
+<AccordionGroup>
+
+<Accordion title="POST · asr">
+
+`POST /fish/v1/asr`
+
+**提供方**：Fish Audio　**标记**：需核对
+
+需要核对：响应字段定义不完整。
+
+请求编码：`multipart/form-data`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `audio` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · tts">
+
+`POST /fish/v1/tts`
+
+**提供方**：Fish Audio　**标记**：需核对
+
+需要核对：请求字段定义不完整；响应字段定义不完整。
+
+请求编码：`application/json`。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · TTS文本转语音">
+
+`POST /v1/audio/speech`
+
+**提供方**：OpenAI 兼容　**标记**：需核对
+
+需要核对：响应字段定义不完整。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `input` | `body` | `string` | 是 |
+| `model` | `body` | `string` | 是 |
+| `response_format` | `body` | `string` | 否 |
+| `speed` | `body` | `number` | 否 |
+| `voice` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 创建转录">
+
+`POST /v1/audio/transcriptions`
+
+**提供方**：OpenAI 兼容　**标记**：需核对
+
+需要核对：示例与必填字段不一致。
+
+请求编码：`multipart/form-data`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `file` | `body` | `string` | 是 |
+| `language` | `body` | `string` | 否 |
+| `model` | `body` | `string` | 是 |
+| `prompt` | `body` | `string` | 否 |
+| `response_format` | `body` | `string` | 否 |
+| `temperature` | `body` | `number` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · 创建翻译">
+
+`POST /v1/audio/translations`
+
+**提供方**：OpenAI 兼容　**标记**：需核对
+
+需要核对：示例与必填字段不一致。
+
+请求编码：`multipart/form-data`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `file` | `body` | `string` | 是 |
+| `model` | `body` | `string` | 是 |
+| `prompt` | `body` | `string` | 否 |
+| `response_format` | `body` | `string` | 否 |
+| `temperature` | `body` | `number` | 否 |
+
+</Accordion>
+
+</AccordionGroup>
+
+## 视频（57 条）
+
+<AccordionGroup>
+
+<Accordion title="GET · 视频下载路径示例">
+
+`GET /aistudio/v1beta/files/{example_file_id}:download`
+
+**提供方**：Google Veo　**标记**：示例路径
+
+需要核对：含示例标识或占位路径；读取请求声明了请求体；请求字段定义不完整。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `_task_id` | `query` | `string` | 否 |
+| `alt` | `query` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · 查询任务状态">
+
+`POST /aistudio/v1beta/models/{model}:fetchPredictOperation`
+
+**提供方**：Google Veo　**标记**：需核对
+
+需要核对：请求字段定义不完整。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `model` | `path` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 提交视频生成任务">
+
+`POST /aistudio/v1beta/models/{model}:predictLongRunning`
+
+**提供方**：Google Veo　**标记**：协议参考
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `model` | `path` | `string` | 是 |
+| `instances` | `body` | `array` | 否 |
+| `parameters` | `body` | `object` | 否 |
+
+</Accordion>
+
+<Accordion title="GET · 查询视频异步任务">
+
+`GET /v1/tasks/id`
+
+**提供方**：Google Veo　**标记**：示例路径
+
+需要核对：含示例标识或占位路径；读取请求声明了请求体；请求字段定义不完整；响应字段定义不完整。
+
+请求编码：`application/json`。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 提交视频垫图异步任务">
+
+`POST /v1/video/generations`
+
+**提供方**：Google Veo　**标记**：需核对
+
+需要核对：请求字段定义不完整；响应字段定义不完整。
+
+请求编码：`application/json`。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="GET · 查询视频任务">
+
+`GET /v1/videos/{id}`
+
+**提供方**：Google Veo　**标记**：需核对
+
+需要核对：存在等价路径模板；读取请求声明了请求体；响应字段定义不完整。
+
+请求编码：`multipart/form-data`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `id` | `path` | `string` | 是 |
+| `enable_upsample` | `body` | `string` | 否 |
+| `input_reference` | `body` | `string` | 否 |
+| `model` | `body` | `string` | 是 |
+| `prompt` | `body` | `string` | 是 |
+| `seconds` | `body` | `string` | 否 |
+| `size` | `body` | `string` | 否 |
+| `watermark` | `body` | `boolean` | 否 |
+
+</Accordion>
+
+<Accordion title="GET · 下载视频结果">
+
+`GET /v1/videos/{id}/content`
+
+**提供方**：Google Veo　**标记**：需核对
+
+需要核对：存在等价路径模板；读取请求声明了请求体；响应字段定义不完整。
+
+请求编码：`multipart/form-data`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `id` | `path` | `string` | 是 |
+| `enable_upsample` | `body` | `string` | 否 |
+| `input_reference` | `body` | `string` | 否 |
+| `model` | `body` | `string` | 是 |
+| `prompt` | `body` | `string` | 是 |
+| `seconds` | `body` | `string` | 否 |
+| `size` | `body` | `string` | 否 |
+| `watermark` | `body` | `boolean` | 否 |
+
+</Accordion>
+
+<Accordion title="GET · 查询视频生成状态">
+
+`GET /veo/v1/api/video/status/{taskId}`
+
+**提供方**：Google Veo　**标记**：协议参考
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `taskId` | `path` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 提交视频生成任务">
+
+`POST /veo/v1/api/video/submit`
+
+**提供方**：Google Veo　**标记**：协议参考
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `enhance_prompt` | `body` | `boolean` | 否 |
+| `images` | `body` | `array` | 否 |
+| `model` | `body` | `string` | 否 |
+| `prompt` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 查询任务状态">
+
+`POST /vertex/v1/publishers/google/models/{model}:fetchPredictOperation`
+
+**提供方**：Google Veo　**标记**：需核对
+
+需要核对：请求字段定义不完整。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `model` | `path` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 视频延长">
+
+`POST /vertex/v1/publishers/google/models/{model}:predictLongRunning`
+
+**提供方**：Google Veo　**标记**：协议参考
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `model` | `path` | `string` | 是 |
+| `instances` | `body` | `array` | 否 |
+| `parameters` | `body` | `object` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · 图生视频">
+
+`POST /kling/v1/videos/image2video`
+
+**提供方**：Kling　**标记**：需核对
+
+需要核对：示例与字段定义不一致。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `callback_url` | `body` | `string` | 否 |
+| `cfg_scale` | `body` | `number` | 否 |
+| `duration` | `body` | `string` | 否 |
+| `image` | `body` | `string` | 是 |
+| `image_tail` | `body` | `string` | 否 |
+| `mode` | `body` | `string` | 否 |
+| `model` | `body` | `string` | 否 |
+| `negative_prompt` | `body` | `string` | 否 |
+| `prompt` | `body` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · 文生视频">
+
+`POST /kling/v1/videos/text2video`
+
+**提供方**：Kling　**标记**：协议参考
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `aspect_ratio` | `body` | `string` | 否 |
+| `callback_url` | `body` | `string` | 否 |
+| `camera_control` | `body` | `object` | 否 |
+| `cfg_scale` | `body` | `number` | 否 |
+| `duration` | `body` | `string` | 否 |
+| `mode` | `body` | `string` | 否 |
+| `model` | `body` | `string` | 否 |
+| `negative_prompt` | `body` | `string` | 否 |
+| `prompt` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="GET · 查询任务">
+
+`GET /kling/v1/{action}/{action2}/{task_id}`
+
+**提供方**：Kling　**标记**：协议参考
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `action` | `path` | `string` | 是 |
+| `action2` | `path` | `string` | 是 |
+| `task_id` | `path` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 生成视频">
+
+`POST /luma-vip/luma/v1/generations`
+
+**提供方**：Luma　**标记**：需核对
+
+需要核对：示例与必填字段不一致；响应字段定义不完整。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `aspect_ratio` | `body` | `string` | 是 |
+| `expand_prompt` | `body` | `boolean` | 是 |
+| `image_end_url` | `body` | `string` | 是 |
+| `image_url` | `body` | `string` | 是 |
+| `user_prompt` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="GET · 获取视频">
+
+`GET /luma-vip/luma/v1/task`
+
+**提供方**：Luma　**标记**：需核对
+
+需要核对：响应字段定义不完整。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `id` | `query` | `string` | 否 |
+| `server_id` | `query` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · 生成视频">
+
+`POST /luma/v1/generations`
+
+**提供方**：Luma　**标记**：需核对
+
+需要核对：示例与必填字段不一致；响应字段定义不完整。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `aspect_ratio` | `body` | `string` | 是 |
+| `expand_prompt` | `body` | `boolean` | 是 |
+| `image_end_url` | `body` | `string` | 是 |
+| `image_url` | `body` | `string` | 是 |
+| `user_prompt` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="GET · 获取视频">
+
+`GET /luma/v1/task`
+
+**提供方**：Luma　**标记**：需核对
+
+需要核对：响应字段定义不完整。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `id` | `query` | `string` | 否 |
+| `server_id` | `query` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · 提交生成视频任务">
+
+`POST /luma/v2/generations`
+
+**提供方**：Luma　**标记**：需核对
+
+需要核对：响应字段定义不完整。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `aspect_ratio` | `body` | `string` | 否 |
+| `expand_prompt` | `body` | `boolean` | 否 |
+| `image_end_url` | `body` | `string` | 否 |
+| `image_url` | `body` | `string` | 否 |
+| `notify_hook` | `body` | `string` | 否 |
+| `user_prompt` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="GET · 查询单个任务">
+
+`GET /luma/v2/generations/task_id`
+
+**提供方**：Luma　**标记**：示例路径
+
+需要核对：含示例标识或占位路径；响应字段定义不完整。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="GET · 获取视频无水印链接">
+
+`GET /luma/v2/generations/task_id/download_video_url`
+
+**提供方**：Luma　**标记**：示例路径
+
+需要核对：含示例标识或占位路径；响应字段定义不完整。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 扩展视频">
+
+`POST /luma/v2/generations/task_id/extend`
+
+**提供方**：Luma　**标记**：示例路径
+
+需要核对：含示例标识或占位路径；响应字段定义不完整。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `aspect_ratio` | `body` | `string` | 否 |
+| `expand_prompt` | `body` | `boolean` | 否 |
+| `image_end_url` | `body` | `string` | 否 |
+| `image_url` | `body` | `string` | 否 |
+| `notify_hook` | `body` | `string` | 否 |
+| `user_prompt` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="GET · 下载视频文件">
+
+`GET /hailuo/v1/files/retrieve`
+
+**提供方**：MiniMax Hailuo　**标记**：协议参考
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `file_id` | `query` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="GET · 查询视频生成任务状态">
+
+`GET /hailuo/v1/query/video_generation`
+
+**提供方**：MiniMax Hailuo　**标记**：协议参考
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `task_id` | `query` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 视频生成">
+
+`POST /hailuo/v1/video_generation`
+
+**提供方**：MiniMax Hailuo　**标记**：协议参考
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `aigc_watermark` | `body` | `boolean` | 否 |
+| `callback_url` | `body` | `string` | 否 |
+| `duration` | `body` | `integer` | 否 |
+| `fast_pretreatment` | `body` | `boolean` | 否 |
+| `first_frame_image` | `body` | `string` | 否 |
+| `last_frame_image` | `body` | `string` | 否 |
+| `model` | `body` | `string` | 是 |
+| `prompt` | `body` | `string` | 否 |
+| `prompt_optimizer` | `body` | `boolean` | 否 |
+| `resolution` | `body` | `string` | 否 |
+| `subject_image` | `body` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · Control a character">
+
+`POST /runwayml/v1/character_performance`
+
+**提供方**：Runway　**标记**：需核对
+
+需要核对：请求字段定义不完整；响应字段定义不完整。
+
+请求编码：`application/json`。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 创建视频任务">
+
+`POST /runwayml/v1/image_to_video`
+
+**提供方**：Runway　**标记**：需核对
+
+需要核对：请求字段定义不完整；响应字段定义不完整。
+
+请求编码：`application/json`。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · video_to_video">
+
+`POST /runwayml/v1/video_to_video`
+
+**提供方**：Runway　**标记**：需核对
+
+需要核对：请求字段定义不完整；响应字段定义不完整。
+
+请求编码：`application/json`。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 创建 图生视频 任务">
+
+`POST /seedance/api/v3/contents/generations/tasks`
+
+**提供方**：Seedance　**标记**：需核对
+
+需要核对：示例与必填字段不一致；示例与字段定义不一致；来源字段定义存在冲突。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `input` | `body` | `object` | 是 |
+| `model` | `body` | `string` | 是 |
+| `parameters` | `body` | `object` | 否 |
+
+</Accordion>
+
+<Accordion title="GET · 查询任务状态">
+
+`GET /seedance/api/v3/contents/generations/tasks/{id}`
+
+**提供方**：Seedance　**标记**：协议参考
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `id` | `path` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 创建角色">
+
+`POST /sora/v1/characters`
+
+**提供方**：Sora　**标记**：协议参考
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `from_task` | `body` | `string` | 否 |
+| `timestamps` | `body` | `string` | 是 |
+| `url` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="GET · 查询积分余额">
+
+`GET /ent/v2/credits`
+
+**提供方**：Vidu　**标记**：需核对
+
+需要核对：厂商路径前缀不一致。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 视频延长">
+
+`POST /ent/v2/extend`
+
+**提供方**：Vidu　**标记**：需核对
+
+需要核对：厂商路径前缀不一致。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `extend_duration` | `body` | `integer` | 是 |
+| `model` | `body` | `string` | 是 |
+| `resolution` | `body` | `string` | 否 |
+| `video_url` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 推荐提示词">
+
+`POST /ent/v2/img2video-prompt-recommendation`
+
+**提供方**：Vidu　**标记**：需核对
+
+需要核对：厂商路径前缀不一致。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `count` | `body` | `integer` | 否 |
+| `image_url` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 对口型">
+
+`POST /ent/v2/lip-sync`
+
+**提供方**：Vidu　**标记**：需核对
+
+需要核对：厂商路径前缀不一致。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `audio_url` | `body` | `string` | 是 |
+| `model` | `body` | `string` | 是 |
+| `video_url` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 参考生图">
+
+`POST /ent/v2/reference2image`
+
+**提供方**：Vidu　**标记**：需核对
+
+需要核对：厂商路径前缀不一致。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `image_count` | `body` | `integer` | 否 |
+| `model` | `body` | `string` | 是 |
+| `prompt` | `body` | `string` | 是 |
+| `reference_image_url` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 参考生视频">
+
+`POST /ent/v2/reference2video`
+
+**提供方**：Vidu　**标记**：需核对
+
+需要核对：厂商路径前缀不一致。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `duration` | `body` | `integer` | 否 |
+| `model` | `body` | `string` | 是 |
+| `off_peak` | `body` | `boolean` | 否 |
+| `prompt` | `body` | `string` | 是 |
+| `reference_image_url` | `body` | `string` | 是 |
+| `resolution` | `body` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · 首尾帧生成视频">
+
+`POST /ent/v2/start-end2video`
+
+**提供方**：Vidu　**标记**：需核对
+
+需要核对：示例与必填字段不一致；示例与字段定义不一致；厂商路径前缀不一致。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `duration` | `body` | `integer` | 否 |
+| `first_frame_image` | `body` | `string` | 是 |
+| `last_frame_image` | `body` | `string` | 是 |
+| `model` | `body` | `string` | 是 |
+| `prompt` | `body` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · 取消任务">
+
+`POST /ent/v2/tasks/{id}/cancel`
+
+**提供方**：Vidu　**标记**：需核对
+
+需要核对：厂商路径前缀不一致；响应字段定义不完整。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `id` | `path` | `string` | 是 |
+| `id` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 场景模版">
+
+`POST /ent/v2/template`
+
+**提供方**：Vidu　**标记**：需核对
+
+需要核对：厂商路径前缀不一致。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `duration` | `body` | `integer` | 否 |
+| `model` | `body` | `string` | 是 |
+| `prompt` | `body` | `string` | 否 |
+| `resolution` | `body` | `string` | 否 |
+| `template_id` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 模版成片">
+
+`POST /ent/v2/template-story`
+
+**提供方**：Vidu　**标记**：需核对
+
+需要核对：厂商路径前缀不一致。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `duration` | `body` | `integer` | 否 |
+| `model` | `body` | `string` | 是 |
+| `story_content` | `body` | `string` | 是 |
+| `template_id` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 文生音频">
+
+`POST /ent/v2/text2audio`
+
+**提供方**：Vidu　**标记**：需核对
+
+需要核对：厂商路径前缀不一致。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `duration` | `body` | `integer` | 否 |
+| `model` | `body` | `string` | 是 |
+| `prompt` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 可控文生音效">
+
+`POST /ent/v2/timing2audio`
+
+**提供方**：Vidu　**标记**：需核对
+
+需要核对：厂商路径前缀不一致。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `duration` | `body` | `integer` | 否 |
+| `model` | `body` | `string` | 是 |
+| `prompt` | `body` | `string` | 是 |
+| `timing_points` | `body` | `array` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · 智能超清">
+
+`POST /ent/v2/upscale-new`
+
+**提供方**：Vidu　**标记**：需核对
+
+需要核对：厂商路径前缀不一致。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `model` | `body` | `string` | 是 |
+| `target_resolution` | `body` | `string` | 是 |
+| `video_url` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 图生视频">
+
+`POST /vidu/ent/v2/img2video`
+
+**提供方**：Vidu　**标记**：需核对
+
+需要核对：示例与必填字段不一致；示例与字段定义不一致；厂商路径前缀不一致。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `duration` | `body` | `integer` | 否 |
+| `first_frame_image` | `body` | `string` | 是 |
+| `model` | `body` | `string` | 是 |
+| `prompt` | `body` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="GET · 查询任务状态">
+
+`GET /vidu/ent/v2/tasks/{id}/creations`
+
+**提供方**：Vidu　**标记**：需核对
+
+需要核对：厂商路径前缀不一致。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `id` | `path` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 文生视频">
+
+`POST /vidu/ent/v2/text2video`
+
+**提供方**：Vidu　**标记**：需核对
+
+需要核对：示例与字段定义不一致；厂商路径前缀不一致；来源字段定义存在冲突。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `duration` | `body` | `integer` | 否 |
+| `model` | `body` | `string` | 是 |
+| `prompt` | `body` | `string` | 是 |
+| `prompt_optimizer` | `body` | `boolean` | 否 |
+| `resolution` | `body` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · 图生视频">
+
+`POST /wan/api/v1/services/aigc/image2video/image-to-video`
+
+**提供方**：Wan　**标记**：协议参考
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `input` | `body` | `object` | 是 |
+| `model` | `body` | `string` | 是 |
+| `parameters` | `body` | `object` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · 文生视频">
+
+`POST /wan/api/v1/services/aigc/text2video/text-to-video`
+
+**提供方**：Wan　**标记**：需核对
+
+需要核对：来源字段定义存在冲突。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `input` | `body` | `object` | 是 |
+| `model` | `body` | `string` | 是 |
+| `parameters` | `body` | `object` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · 视频生成">
+
+`POST /wan/api/v1/services/aigc/video-generation/video-synthesis`
+
+**提供方**：Wan　**标记**：协议参考
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `input` | `body` | `object` | 是 |
+| `model` | `body` | `string` | 是 |
+| `parameters` | `body` | `object` | 否 |
+
+</Accordion>
+
+<Accordion title="GET · 查询任务状态">
+
+`GET /wan/api/v1/tasks/{task_id}`
+
+**提供方**：Wan　**标记**：协议参考
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `task_id` | `path` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 创建统一视频任务">
+
+`POST /v2/videos/generations`
+
+**提供方**：统一视频　**标记**：需核对
+
+需要核对：示例与必填字段不一致；示例与字段定义不一致；同一路径混合多种请求格式；响应字段定义不完整。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `aspect_ratio` | `body` | `string` | 否 |
+| `enhance_prompt` | `body` | `boolean` | 否 |
+| `images` | `body` | `array` | 是 |
+| `model` | `body` | `string` | 是 |
+| `prompt` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="GET · 查询统一视频任务">
+
+`GET /v2/videos/generations/{task_id}`
+
+**提供方**：统一视频　**标记**：需核对
+
+需要核对：响应字段定义不完整。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `task_id` | `path` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 视频与角色任务">
+
+`POST /v1/videos`
+
+**提供方**：通用视频　**标记**：需核对
+
+需要核对：示例与字段定义不一致；同一路径混合多种请求格式。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `model` | `body` | `string` | 是 |
+| `timestamps` | `body` | `string` | 是 |
+| `url` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 编辑视频">
+
+`POST /v1/videos/{id}/remix`
+
+**提供方**：通用视频　**标记**：需核对
+
+需要核对：存在等价路径模板；响应字段定义不完整。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `id` | `path` | `string` | 是 |
+| `prompt` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="GET · 查询视频任务">
+
+`GET /v1/videos/{video_id}`
+
+**提供方**：通用视频　**标记**：需核对
+
+需要核对：存在等价路径模板。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `video_id` | `path` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 编辑视频">
+
+`POST /v1/videos/{video_id}/remix`
+
+**提供方**：通用视频　**标记**：需核对
+
+需要核对：存在等价路径模板。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `video_id` | `path` | `string` | 是 |
+
+</Accordion>
+
+</AccordionGroup>
+
+## 音乐（12 条）
+
+<AccordionGroup>
+
+<Accordion title="GET · 查询歌曲">
+
+`GET /suno/fetch/{task_id}`
+
+**提供方**：Suno　**标记**：需核对
+
+需要核对：响应字段定义不完整。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `task_id` | `path` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 生成音乐 v5">
+
+`POST /suno/submit/music`
+
+**提供方**：Suno　**标记**：需核对
+
+需要核对：请求字段定义不完整；响应字段定义不完整。
+
+请求编码：`application/json`。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 上传音乐">
+
+`POST /suno/uploads/audio-url`
+
+**提供方**：Suno　**标记**：需核对
+
+需要核对：请求字段定义不完整；响应字段定义不完整。
+
+请求编码：`application/json`。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 生成音乐">
+
+`POST /suno/v1/music`
+
+**提供方**：Suno　**标记**：协议参考
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `custom_mode` | `body` | `boolean` | 是 |
+| `input` | `body` | `object` | 是 |
+
+</Accordion>
+
+<Accordion title="GET · 获取音乐">
+
+`GET /suno/v1/music/id`
+
+**提供方**：Suno　**标记**：示例路径
+
+需要核对：含示例标识或占位路径。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 生成歌词">
+
+`POST /suno/v1/v3.0/lyrics`
+
+**提供方**：Suno　**标记**：需核对
+
+需要核对：示例与必填字段不一致；示例与字段定义不一致。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `prompt` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="GET · 获取歌词">
+
+`GET /suno/v1/v3.0/lyrics/id`
+
+**提供方**：Suno　**标记**：示例路径
+
+需要核对：含示例标识或占位路径。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 生成音乐">
+
+`POST /suno/v1/v3.0/music`
+
+**提供方**：Suno　**标记**：协议参考
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `custom_mode` | `body` | `boolean` | 是 |
+| `input` | `body` | `object` | 是 |
+
+</Accordion>
+
+<Accordion title="GET · 获取音乐">
+
+`GET /suno/v1/v3.0/music/id`
+
+**提供方**：Suno　**标记**：示例路径
+
+需要核对：含示例标识或占位路径。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="GET · 查询任务">
+
+`GET /suno/v2/feed`
+
+**提供方**：Suno　**标记**：协议参考
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `ids` | `query` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · 音乐生成">
+
+`POST /suno/v2/generate`
+
+**提供方**：Suno　**标记**：协议参考
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `continue_at` | `body` | `number` | 否 |
+| `continue_clip_id` | `body` | `string` | 否 |
+| `infill_end_s` | `body` | `null` | 否 |
+| `infill_start_s` | `body` | `null` | 否 |
+| `mv` | `body` | `string` | 是 |
+| `prompt` | `body` | `string` | 是 |
+| `tags` | `body` | `string` | 否 |
+| `title` | `body` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · 音乐链接转成suno">
+
+`POST /suno/v2/uploads/audio`
+
+**提供方**：Suno　**标记**：协议参考
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `url` | `body` | `string` | 是 |
+
+</Accordion>
+
+</AccordionGroup>
+
+## Midjourney（17 条）
+
+<AccordionGroup>
+
+<Accordion title="POST · Fast视频提交">
+
+`POST /mj-fast/mj/submit/video`
+
+**提供方**：Midjourney　**标记**：协议参考
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `action` | `body` | `string` | 否 |
+| `animate_mode` | `body` | `string` | 否 |
+| `base64` | `body` | `string` | 否 |
+| `motion` | `body` | `string` | 是 |
+| `prompt` | `body` | `string` | 是 |
+| `taskId` | `body` | `string` | 否 |
+| `video_type` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · Relax视频提交">
+
+`POST /mj-relax/mj/submit/video`
+
+**提供方**：Midjourney　**标记**：协议参考
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `action` | `body` | `string` | 否 |
+| `animate_mode` | `body` | `string` | 否 |
+| `base64` | `body` | `string` | 否 |
+| `motion` | `body` | `string` | 是 |
+| `prompt` | `body` | `string` | 是 |
+| `taskId` | `body` | `string` | 否 |
+| `video_type` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 提交swap_face任务">
+
+`POST /mj/insight-face/swap`
+
+**提供方**：Midjourney　**标记**：协议参考
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `accountFilter` | `body` | `object` | 否 |
+| `notifyHook` | `body` | `string` | 否 |
+| `sourceBase64` | `body` | `string` | 是 |
+| `state` | `body` | `string` | 否 |
+| `targetBase64` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 执行动作">
+
+`POST /mj/submit/action`
+
+**提供方**：Midjourney　**标记**：协议参考
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `customId` | `body` | `string` | 是 |
+| `notifyHook` | `body` | `string` | 否 |
+| `state` | `body` | `string` | 否 |
+| `taskId` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 提交Blend任务">
+
+`POST /mj/submit/blend`
+
+**提供方**：Midjourney　**标记**：协议参考
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `base64Array` | `body` | `array` | 是 |
+| `dimensions` | `body` | `string` | 否 |
+| `notifyHook` | `body` | `string` | 否 |
+| `state` | `body` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · 提交Describe任务">
+
+`POST /mj/submit/describe`
+
+**提供方**：Midjourney　**标记**：协议参考
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `base64` | `body` | `string` | 是 |
+| `notifyHook` | `body` | `string` | 否 |
+| `state` | `body` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · 提交Imagine任务">
+
+`POST /mj/submit/imagine`
+
+**提供方**：Midjourney　**标记**：协议参考
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `base64Array` | `body` | `array` | 否 |
+| `notifyHook` | `body` | `string` | 否 |
+| `prompt` | `body` | `string` | 是 |
+| `state` | `body` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · 提交Modal">
+
+`POST /mj/submit/modal`
+
+**提供方**：Midjourney　**标记**：协议参考
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `maskBase64` | `body` | `string` | 否 |
+| `prompt` | `body` | `string` | 否 |
+| `taskId` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 提交Shorten任务">
+
+`POST /mj/submit/shorten`
+
+**提供方**：Midjourney　**标记**：协议参考
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `accountFilter` | `body` | `object` | 否 |
+| `botType` | `body` | `string` | 否 |
+| `notifyHook` | `body` | `string` | 否 |
+| `prompt` | `body` | `string` | 是 |
+| `state` | `body` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="GET · 查询任务">
+
+`GET /mj/task/{example_task_id}/fetch`
+
+**提供方**：Midjourney　**标记**：示例路径
+
+需要核对：含示例标识或占位路径。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="GET · 查询所有任务">
+
+`GET /mj/task/list`
+
+**提供方**：Midjourney　**标记**：协议参考
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 根据ID列表查询任务">
+
+`POST /mj/task/list-by-condition`
+
+**提供方**：Midjourney　**标记**：协议参考
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `ids` | `body` | `array` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · 分页查询任务">
+
+`POST /mj/task/query`
+
+**提供方**：Midjourney　**标记**：协议参考
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `action` | `body` | `string` | 否 |
+| `description` | `body` | `string` | 否 |
+| `ids` | `body` | `array` | 否 |
+| `instanceId` | `body` | `string` | 否 |
+| `pageNumber` | `body` | `integer` | 否 |
+| `pageSize` | `body` | `integer` | 否 |
+| `prompt` | `body` | `string` | 否 |
+| `promptEn` | `body` | `string` | 否 |
+| `sort` | `body` | `string` | 否 |
+| `state` | `body` | `string` | 否 |
+| `status` | `body` | `string` | 否 |
+| `statusSet` | `body` | `array` | 否 |
+
+</Accordion>
+
+<Accordion title="GET · 查询任务队列">
+
+`GET /mj/task/queue`
+
+**提供方**：Midjourney　**标记**：协议参考
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 取消任务">
+
+`POST /mj/task/{id}/cancel`
+
+**提供方**：Midjourney　**标记**：协议参考
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `id` | `path` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="GET · 指定ID获取任务">
+
+`GET /mj/task/{id}/fetch`
+
+**提供方**：Midjourney　**标记**：协议参考
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `id` | `path` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="GET · 获取任务图片的seed">
+
+`GET /mj/task/{id}/image-seed`
+
+**提供方**：Midjourney　**标记**：协议参考
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `id` | `path` | `string` | 是 |
+
+</Accordion>
+
+</AccordionGroup>
+
+## 工具与图像处理（34 条）
+
+<AccordionGroup>
+
+<Accordion title="POST · 反词 - 追加反词（MX绘画-生成类接口-Cute-生成示例（必看））">
+
+`POST /api/v1/images/cute/generate`
+
+**提供方**：MewXAI　**标记**：需核对
+
+需要核对：响应字段定义不完整。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `args` | `body` | `object` | 是 |
+| `callback_url` | `body` | `string` | 是 |
+| `type` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="GET · 查询详情">
+
+`GET /api/v1/images/detail`
+
+**提供方**：MewXAI　**标记**：协议参考
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `img_uuid` | `query` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 不同版本">
+
+`POST /api/v1/images/generate`
+
+**提供方**：MewXAI　**标记**：需核对
+
+需要核对：响应字段定义不完整。
+
+请求编码：`text/plain`。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 生成图片融合示例">
+
+`POST /api/v1/images/neuralstyle/generate`
+
+**提供方**：MewXAI　**标记**：需核对
+
+需要核对：响应字段定义不完整。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `callback_url` | `body` | `string` | 是 |
+| `cn_list` | `body` | `array` | 是 |
+| `engine` | `body` | `integer` | 是 |
+| `source_img` | `body` | `string` | 是 |
+| `source_mode` | `body` | `integer` | 是 |
+| `style_img` | `body` | `string` | 是 |
+| `type` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 艺术字调用 - 使用模版">
+
+`POST /api/v1/images/shadow/generate`
+
+**提供方**：MewXAI　**标记**：需核对
+
+需要核对：响应字段定义不完整。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `callback_url` | `body` | `string` | 是 |
+| `prompt` | `body` | `string` | 是 |
+| `ratio` | `body` | `integer` | 是 |
+| `template_id` | `body` | `integer` | 是 |
+| `text_image` | `body` | `string` | 是 |
+| `type` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="GET · 获取模型列表">
+
+`GET /api/v1/model/list`
+
+**提供方**：MewXAI　**标记**：协议参考
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `type` | `query` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 计算点数">
+
+`POST /api/v1/mx/images/computed`
+
+**提供方**：MewXAI　**标记**：协议参考
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="GET · 融合模型列表">
+
+`GET /api/v1/mx/images/cute/extraList`
+
+**提供方**：MewXAI　**标记**：协议参考
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 生成图片接口">
+
+`POST /api/v1/mx/images/cute/generate`
+
+**提供方**：MewXAI　**标记**：协议参考
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `args` | `body` | `object` | 是 |
+| `type` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="GET · 融合模型列表">
+
+`GET /api/v1/mx/images/extraList`
+
+**提供方**：MewXAI　**标记**：协议参考
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 融合模型示例-多个融合模型（MX绘画-生成类接口-MX-生成示例（必看））">
+
+`POST /api/v1/mx/images/generate`
+
+**提供方**：MewXAI　**标记**：需核对
+
+需要核对：响应字段定义不完整。
+
+请求编码：`text/plain`。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="GET · 模型列表">
+
+`GET /api/v1/mx/images/modelList`
+
+**提供方**：MewXAI　**标记**：协议参考
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 校验接口">
+
+`POST /api/v1/mx/validate/checkPayload`
+
+**提供方**：MewXAI　**标记**：需核对
+
+需要核对：响应字段定义不完整。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="GET · 获取模板列表">
+
+`GET /api/v1/template/list`
+
+**提供方**：MewXAI　**标记**：协议参考
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `type` | `query` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="GET · 余额查询">
+
+`GET /api/v1/user/count`
+
+**提供方**：MewXAI　**标记**：协议参考
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 回调路径示例">
+
+`POST /api/xxx/xxx`
+
+**提供方**：MewXAI　**标记**：示例路径
+
+需要核对：含示例标识或占位路径；响应字段定义不完整。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 创建OCR任务">
+
+`POST /api/tasks/document/ocr`
+
+**提供方**：图像处理与 OCR　**标记**：协议参考
+
+请求编码：`multipart/form-data`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `format` | `body` | `string` | 否 |
+| `image_file` | `body` | `string` | 否 |
+| `image_url` | `body` | `string` | 否 |
+| `language` | `body` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="GET · 获取OCR结果">
+
+`GET /api/tasks/document/ocr/task_id`
+
+**提供方**：图像处理与 OCR　**标记**：示例路径
+
+需要核对：含示例标识或占位路径。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 创建图像上色任务">
+
+`POST /api/tasks/visual/colorization`
+
+**提供方**：图像处理与 OCR　**标记**：协议参考
+
+请求编码：`multipart/form-data`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `format` | `body` | `string` | 否 |
+| `image_file` | `body` | `string` | 否 |
+| `image_url` | `body` | `string` | 否 |
+| `return_type` | `body` | `integer` | 否 |
+| `sync` | `body` | `integer` | 否 |
+
+</Accordion>
+
+<Accordion title="GET · 获取黑白图像上色结果">
+
+`GET /api/tasks/visual/colorization/task_id`
+
+**提供方**：图像处理与 OCR　**标记**：示例路径
+
+需要核对：含示例标识或占位路径。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 创建图片智能切边任务">
+
+`POST /api/tasks/visual/correction`
+
+**提供方**：图像处理与 OCR　**标记**：协议参考
+
+请求编码：`multipart/form-data`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `image_file` | `body` | `string` | 否 |
+| `image_url` | `body` | `string` | 否 |
+| `return_type` | `body` | `integer` | 否 |
+| `sync` | `body` | `integer` | 否 |
+| `type` | `body` | `integer` | 否 |
+
+</Accordion>
+
+<Accordion title="GET · 获取图片智能切边结果">
+
+`GET /api/tasks/visual/correction/task_id`
+
+**提供方**：图像处理与 OCR　**标记**：示例路径
+
+需要核对：含示例标识或占位路径。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 创建证件照制作任务">
+
+`POST /api/tasks/visual/idphoto`
+
+**提供方**：图像处理与 OCR　**标记**：协议参考
+
+请求编码：`multipart/form-data`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `bg_color` | `body` | `string` | 否 |
+| `format` | `body` | `string` | 否 |
+| `image_file` | `body` | `string` | 否 |
+| `image_url` | `body` | `string` | 否 |
+| `return_type` | `body` | `integer` | 否 |
+| `size` | `body` | `string` | 否 |
+| `sync` | `body` | `integer` | 否 |
+
+</Accordion>
+
+<Accordion title="GET · 获取证件照制作结果">
+
+`GET /api/tasks/visual/idphoto/task_id`
+
+**提供方**：图像处理与 OCR　**标记**：示例路径
+
+需要核对：含示例标识或占位路径。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 创建图片压缩任务">
+
+`POST /api/tasks/visual/imgcompress`
+
+**提供方**：图像处理与 OCR　**标记**：协议参考
+
+请求编码：`multipart/form-data`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `format` | `body` | `string` | 否 |
+| `height` | `body` | `integer` | 否 |
+| `image_file` | `body` | `string` | 否 |
+| `image_url` | `body` | `string` | 否 |
+| `kbyte` | `body` | `integer` | 否 |
+| `quality` | `body` | `integer` | 否 |
+| `return_type` | `body` | `integer` | 否 |
+| `sync` | `body` | `integer` | 否 |
+| `width` | `body` | `integer` | 否 |
+
+</Accordion>
+
+<Accordion title="GET · 获取图片压缩结果">
+
+`GET /api/tasks/visual/imgcompress/task_id`
+
+**提供方**：图像处理与 OCR　**标记**：示例路径
+
+需要核对：含示例标识或占位路径。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 创建图像修复任务">
+
+`POST /api/tasks/visual/inpaint`
+
+**提供方**：图像处理与 OCR　**标记**：协议参考
+
+请求编码：`multipart/form-data`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `image_file` | `body` | `string` | 否 |
+| `image_url` | `body` | `string` | 否 |
+| `mask_file` | `body` | `string` | 否 |
+| `mask_url` | `body` | `string` | 否 |
+| `rectangles` | `body` | `string` | 否 |
+| `return_type` | `body` | `integer` | 否 |
+| `sync` | `body` | `integer` | 否 |
+
+</Accordion>
+
+<Accordion title="GET · 获取图像修复结果">
+
+`GET /api/tasks/visual/inpaint/task_id`
+
+**提供方**：图像处理与 OCR　**标记**：示例路径
+
+需要核对：含示例标识或占位路径。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 创建背景生成任务">
+
+`POST /api/tasks/visual/r-background`
+
+**提供方**：图像处理与 OCR　**标记**：协议参考
+
+请求编码：`multipart/form-data`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `batch_size` | `body` | `integer` | 否 |
+| `image_file` | `body` | `string` | 否 |
+| `image_url` | `body` | `string` | 否 |
+| `prompt` | `body` | `string` | 否 |
+| `scene_type` | `body` | `integer` | 否 |
+
+</Accordion>
+
+<Accordion title="GET · 获取背景生成结果">
+
+`GET /api/tasks/visual/r-background/task_id`
+
+**提供方**：图像处理与 OCR　**标记**：示例路径
+
+需要核对：含示例标识或占位路径。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 创建图片变清晰任务">
+
+`POST /api/tasks/visual/scale`
+
+**提供方**：图像处理与 OCR　**标记**：协议参考
+
+请求编码：`multipart/form-data`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `image_file` | `body` | `string` | 否 |
+| `image_url` | `body` | `string` | 否 |
+| `return_type` | `body` | `integer` | 否 |
+| `scale_factor` | `body` | `integer` | 否 |
+| `sync` | `body` | `integer` | 否 |
+| `type` | `body` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="GET · 获取图片变清晰结果">
+
+`GET /api/tasks/visual/scale/task_id`
+
+**提供方**：图像处理与 OCR　**标记**：示例路径
+
+需要核对：含示例标识或占位路径。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 创建抠图任务">
+
+`POST /api/tasks/visual/segmentation`
+
+**提供方**：图像处理与 OCR　**标记**：协议参考
+
+请求编码：`multipart/form-data`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `bg_color` | `body` | `string` | 否 |
+| `crop` | `body` | `integer` | 否 |
+| `format` | `body` | `string` | 否 |
+| `image_file` | `body` | `string` | 否 |
+| `image_url` | `body` | `string` | 否 |
+| `output_type` | `body` | `integer` | 否 |
+| `return_type` | `body` | `integer` | 否 |
+| `sync` | `body` | `integer` | 否 |
+| `type` | `body` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="GET · 获取抠图结果">
+
+`GET /api/tasks/visual/segmentation/task_id`
+
+**提供方**：图像处理与 OCR　**标记**：示例路径
+
+需要核对：含示例标识或占位路径。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+</AccordionGroup>
+
+## 历史协议（32 条）
+
+<AccordionGroup>
+
+<Accordion title="GET · 查询异步生成PPT信息">
+
+`GET /api/ppt/asyncPptInfo`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：历史接口需确认可用性；响应字段定义不完整。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `pptId` | `query` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 删除PPT">
+
+`POST /api/ppt/delete`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：历史接口需确认可用性；响应字段定义不完整。
+
+请求编码：`text/plain`。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 直接生成PPT">
+
+`POST /api/ppt/directGeneratePptx`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：历史接口需确认可用性；响应字段定义不完整。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `pptxProperty` | `body` | `boolean` | 是 |
+| `stream` | `body` | `boolean` | 是 |
+| `subject` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 下载 PPT">
+
+`POST /api/ppt/downloadPptx`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：历史接口需确认可用性；响应字段定义不完整。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `id` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 生成大纲内容同时异步生成PPT">
+
+`POST /api/ppt/generateContent`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：历史接口需确认可用性；响应字段定义不完整。
+
+请求编码：`text/plain`。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 生成大纲">
+
+`POST /api/ppt/generateOutline`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：历史接口需确认可用性；响应字段定义不完整。
+
+请求编码：`text/plain`。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 直接生成PPT">
+
+`POST /api/ppt/generatePptx`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：历史接口需确认可用性；响应字段定义不完整。
+
+请求编码：`text/plain`。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 获取 PPT 列表">
+
+`POST /api/ppt/listPptx`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：历史接口需确认可用性；响应字段定义不完整。
+
+请求编码：`text/plain`。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="GET · 加载 PPT 数据">
+
+`GET /api/ppt/loadPptx`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：历史接口需确认可用性；响应字段定义不完整。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `id` | `query` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 解析文件内容">
+
+`POST /api/ppt/parseFileData`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：历史接口需确认可用性；响应字段定义不完整。
+
+请求编码：`multipart/form-data`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `content` | `body` | `string` | 是 |
+| `file` | `body` | `string` | 是 |
+| `fileUrl` | `body` | `string` | 是 |
+| `websearch` | `body` | `string` | 是 |
+| `website` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 随机 PPT 模板">
+
+`POST /api/ppt/randomTemplates`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：历史接口需确认可用性；响应字段定义不完整。
+
+请求编码：`text/plain`。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 保存 PPT">
+
+`POST /api/ppt/savePptx`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：历史接口需确认可用性；响应字段定义不完整。
+
+请求编码：`text/plain`。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 分页查询 PPT 模板">
+
+`POST /api/ppt/templates`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：历史接口需确认可用性；响应字段定义不完整。
+
+请求编码：`text/plain`。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 更换 PPT 模板">
+
+`POST /api/ppt/updatePptTemplate`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：历史接口需确认可用性；响应字段定义不完整。
+
+请求编码：`text/plain`。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 更新 PPT 属性">
+
+`POST /api/ppt/updatePptxAttr`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：历史接口需确认可用性；响应字段定义不完整。
+
+请求编码：`text/plain`。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="GET · PPT 鉴权路径示例">
+
+`GET /api/ppt/xxx`
+
+**提供方**：PPT　**标记**：示例路径
+
+需要核对：历史接口需确认可用性；含示例标识或占位路径；响应字段定义不完整。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · json转ppt">
+
+`POST /api/pptjson/json2ppt`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：历史接口需确认可用性；响应字段定义不完整。
+
+请求编码：`text/plain`。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · ppt转json">
+
+`POST /api/pptjson/ppt2json`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：历史接口需确认可用性；响应字段定义不完整。
+
+请求编码：`multipart/form-data`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `file` | `body` | `string` | 是 |
+| `uploadImage` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="GET · 查询API信息">
+
+`GET /api/user/apiInfo`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：历史接口需确认可用性；响应字段定义不完整。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+<Accordion title="POST · 创建接口token">
+
+`POST /api/user/createApiToken`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：历史接口需确认可用性；响应字段定义不完整。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `limit` | `body` | `integer` | 是 |
+| `uid` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 根据标题生成封面预览图">
+
+`POST /apps/ppt-cover`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：历史接口需确认可用性。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `color` | `body` | `string` | 否 |
+| `count` | `body` | `string` | 是 |
+| `style` | `body` | `string` | 否 |
+| `title` | `body` | `string` | 是 |
+| `user_name` | `body` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · 基于当前模板生成">
+
+`POST /apps/ppt-create`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：历史接口需确认可用性。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `cover_id` | `body` | `string` | 是 |
+| `custom_data` | `body` | `object` | 是 |
+| `font_name` | `body` | `string` | 是 |
+| `id` | `body` | `string` | 否 |
+| `text` | `body` | `string` | 否 |
+| `transition` | `body` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 短文本文件生成PPT">
+
+`POST /apps/ppt-create-file`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：历史接口需确认可用性。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `cover_id` | `body` | `string` | 否 |
+| `file_url` | `body` | `string` | 是 |
+| `user_name` | `body` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · 更换模版">
+
+`POST /apps/ppt-create-task`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：历史接口需确认可用性。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `cover_id` | `body` | `string` | 是 |
+| `font_name` | `body` | `string` | 否 |
+| `id` | `body` | `string` | 是 |
+| `transition` | `body` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · 通过文件生成PPT">
+
+`POST /apps/ppt-create-thesis`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：示例与必填字段不一致；示例与字段定义不一致；历史接口需确认可用性；属性名称需核对。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `advisor` | `body` | `string` | 否 |
+| `color` | `body` | `string` | 否 |
+| `ffile_key` | `body` | `string` | 是 |
+| `pleader` | `body` | `string` | 否 |
+| `school` | `body` | `string` | 否 |
+| `school_logo` | `body` | `string` | 否 |
+| `style` | `body` | `string` | 否 |
+| `title` | `body` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="GET · 获取PPT下载链接">
+
+`GET /apps/ppt-download`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：历史接口需确认可用性。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `id` | `query` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 生成PPT备注">
+
+`POST /apps/ppt-note`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：历史接口需确认可用性。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `catalog_note` | `body` | `string` | 是 |
+| `cover_note` | `body` | `string` | 是 |
+| `end_note` | `body` | `string` | 是 |
+| `id` | `body` | `string` | 是 |
+| `mind_map_note` | `body` | `string` | 是 |
+| `notes` | `body` | `array` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 通过task_id增加PPT单页">
+
+`POST /apps/ppt-page`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：历史接口需确认可用性。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `complex` | `body` | `string` | 否 |
+| `font_name` | `body` | `string` | 否 |
+| `id` | `body` | `string` | 否 |
+| `slide_number` | `body` | `string` | 否 |
+| `slide_type` | `body` | `string` | 否 |
+| `text` | `body` | `string` | 否 |
+| `theme` | `body` | `string` | 否 |
+| `transition` | `body` | `string` | 否 |
+| `user_name` | `body` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · 根据标题以及封面预览信息生成不同主题色的预览">
+
+`POST /apps/ppt-recover`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：历史接口需确认可用性。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `count` | `body` | `string` | 是 |
+| `cover_id` | `body` | `string` | 是 |
+| `title` | `body` | `string` | 是 |
+| `user_name` | `body` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="GET · 获取PPT生成状态和预览页">
+
+`GET /apps/ppt-result`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：历史接口需确认可用性。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `id` | `query` | `string` | 是 |
+
+</Accordion>
+
+<Accordion title="POST · 通过描述生成PPT标题大纲">
+
+`POST /apps/ppt-structure`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：历史接口需确认可用性。
+
+请求编码：`application/json`。
+
+| 字段 | 位置 | 来源类型 | 必填 |
+| --- | --- | --- | --- |
+| `text` | `body` | `string` | 否 |
+| `theme` | `body` | `string` | 否 |
+| `title` | `body` | `string` | 否 |
+
+</Accordion>
+
+<Accordion title="POST · 修改大纲">
+
+`POST /ppt/updateOutline`
+
+**提供方**：PPT　**标记**：需核对
+
+需要核对：历史接口需确认可用性；响应字段定义不完整。
+
+请求编码：`text/plain`。
+
+来源未提供可展示的参数或请求字段；不能据此推断该操作不需要参数。
+
+</Accordion>
+
+</AccordionGroup>
+
+## 使用方式
+
+OpenAI SDK 的 Base URL 为 `https://api.maxapi.ai/v1`；直接调用扩展协议时，使用 API 根地址 `https://api.maxapi.ai` 加上已确认的接口路径。不要自动向原生路径再添加 `/v1`。
+
+若出现多个仅参数名称不同的路径，应先核对真实路由和返回体。异步请求还需要确认对应查询方法，完整流程见 [异步任务与回调](/zh/guides/async-tasks)。

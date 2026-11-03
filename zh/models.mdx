@@ -1,0 +1,79 @@
+---
+title: "模型与能力"
+description: "查询可用模型，并为你的任务选择合适的模型与参数。"
+keywords: ["MaxAPI", "模型与能力", "models"]
+---
+
+调用 MaxAPI 时，通过请求中的 `model` 指定目标模型。使用控制台或模型列表返回的准确 ID，可以避免模型名称、展示名称与 API 标识之间的混淆。
+
+## 查询模型
+
+```bash "列出可见模型"
+curl --fail-with-body https://api.maxapi.ai/v1/models \
+  -H "Authorization: Bearer $MAXAPI_API_KEY"
+```
+
+模型列表的兼容结构包含 `data` 数组，每一项中的 `id` 用于后续请求。具体响应以实时接口为准，参见 [模型列表接口](/zh/api-reference/models)。
+
+如果已安装 `jq`，可以只输出模型 ID：
+
+```bash
+curl --fail-with-body https://api.maxapi.ai/v1/models \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  | jq -r '.data[]?.id'
+```
+
+## 按任务验证能力
+
+模型之间的输入类型、参数支持和输出行为可能不同。建议先用少量有代表性的真实任务验证，再将模型用于生产流量。
+
+| 验证维度 | 建议检查 |
+| --- | --- |
+| 任务质量 | 是否能遵循你的指令，处理目标语言和业务内容 |
+| 响应速度 | 首次返回内容的时间与完整生成耗时 |
+| 上下文 | 输入历史和预期输出是否处于模型允许的范围内 |
+| 输入类型 | 是否支持任务需要的文本、图片或其他输入 |
+| 高级能力 | 是否支持工具调用、结构化输出等所需功能 |
+| 成本 | 当前模型计费方式与实际用量是否符合预算 |
+
+模型列表并不一定包含完整能力说明。价格、上下文长度、限额和访问条件，以控制台及对应模型说明为准。
+
+## 把模型 ID 配置化
+
+将模型 ID 放在环境变量中，可以在不修改业务代码的情况下切换模型：
+
+```bash
+export MAXAPI_MODEL="替换为模型 ID"
+```
+
+```python
+response = client.chat.completions.create(
+    model=os.environ["MAXAPI_MODEL"],
+    messages=[{"role": "user", "content": "请总结这段内容。"}],
+)
+```
+
+这段代码使用已配置的 `client`；完整初始化示例见 [Python SDK](/zh/guides/python)。
+
+## 切换模型时重新检查参数
+
+先用 `model` 和 `messages` 验证基础调用，再逐个加入流式响应、采样参数或输出限制。一个模型接受的字段和值不一定适用于另一个模型。
+
+当出现“不支持的参数”或类似错误时，应根据目标模型说明调整字段。不要仅因为接口协议兼容，就假定所有模型的功能完全一致。
+
+## 按任务选择模型和协议
+
+| 任务 | 模型能力 | 常见接口 |
+| --- | --- | --- |
+| 文本对话 | 文本输入与生成 | [Chat Completions](/zh/api-reference/chat-completions) |
+| 图片理解 | 多模态视觉输入 | [图像理解](/zh/guides/vision) |
+| 调用应用函数 | 工具调用 | [工具调用](/zh/guides/tools) |
+| 生成图片或编辑图片 | 图像生成或图像编辑 | [Images](/zh/api-reference/images) |
+| 文本检索与相似度 | 向量生成 | [Embeddings](/zh/api-reference/embeddings) |
+| 合成语音 | 文本转语音 | [Speech](/zh/api-reference/audio-speech) |
+| 识别录音 | 语音转文本 | [转录与翻译](/zh/api-reference/audio-transcriptions) |
+| 视频或音乐 | 对应异步生成通道 | [多媒体接入](/zh/media/index) |
+
+不要把聊天模型 ID 用作嵌入、图像或音频模型。原生协议的模型选择方式也可能不同，例如 Suno 使用 `mv`，部分 Veo 路径直接包含模型名。
+
+模型目录只提供部分线索。它不能证明一个模型同时支持所有输入格式、工具调用、原生路由或同样的参数范围。完整的格式选择方式见 [选择接口格式](/zh/guides/protocols)。

@@ -1,0 +1,461 @@
+{
+  "version": 1,
+  "source": {
+    "project": "maxapi-docs",
+    "contentRoot": "content/docs",
+    "baseUrl": "/docs",
+    "trailingSlash": true,
+    "routeEvidence": [
+      "lib/source.ts: source loader uses docsRoute as baseUrl",
+      "lib/shared.ts: docsRoute is /docs",
+      "next.config.mjs: trailingSlash is true",
+      "Each source URL was matched to its built out/docs/**/index.html artifact."
+    ]
+  },
+  "target": {
+    "project": "mintlify-docs",
+    "defaultLanguage": "zh",
+    "languages": [
+      "zh",
+      "en"
+    ],
+    "pageCountPerLanguage": 31,
+    "totalPageCount": 62
+  },
+  "counts": {
+    "sourceMdxPages": 29,
+    "migrationRows": 29,
+    "addedTopics": 2,
+    "englishCounterparts": 31,
+    "sourceUrlRedirects": 58
+  },
+  "migrations": [
+    {
+      "sourceFile": "content/docs/api-reference/audio-speech.mdx",
+      "sourceSha256": "b72027d785df36c9692baaff816fc675405b9944e6642e58af42c6481145effe",
+      "sourceUrl": "/docs/api-reference/audio-speech",
+      "canonicalSourceUrl": "/docs/api-reference/audio-speech/",
+      "sourceBuildArtifact": "out/docs/api-reference/audio-speech/index.html",
+      "targetChinese": "/zh/api-reference/audio-speech",
+      "targetEnglish": "/en/api-reference/audio-speech",
+      "redirectSources": [
+        "/docs/api-reference/audio-speech",
+        "/docs/api-reference/audio-speech/"
+      ],
+      "strategy": "Moved the endpoint contract to a language-specific OpenAPI reference; retained usage guidance."
+    },
+    {
+      "sourceFile": "content/docs/api-reference/audio-transcriptions.mdx",
+      "sourceSha256": "379ebae73ef3097c9d3d8d5cb5428ccd7bfd6bffe208520e393a2f3fa143302f",
+      "sourceUrl": "/docs/api-reference/audio-transcriptions",
+      "canonicalSourceUrl": "/docs/api-reference/audio-transcriptions/",
+      "sourceBuildArtifact": "out/docs/api-reference/audio-transcriptions/index.html",
+      "targetChinese": "/zh/api-reference/audio-transcriptions",
+      "targetEnglish": "/en/api-reference/audio-transcriptions",
+      "redirectSources": [
+        "/docs/api-reference/audio-transcriptions",
+        "/docs/api-reference/audio-transcriptions/"
+      ],
+      "strategy": "Moved the endpoint contract to a language-specific OpenAPI reference; retained usage guidance."
+    },
+    {
+      "sourceFile": "content/docs/api-reference/catalog.mdx",
+      "sourceSha256": "8a7caae92d1df5ad6a6eee18e8cc28151f33c9c0f703b26dc93a986b1afaddf4",
+      "sourceUrl": "/docs/api-reference/catalog",
+      "canonicalSourceUrl": "/docs/api-reference/catalog/",
+      "sourceBuildArtifact": "out/docs/api-reference/catalog/index.html",
+      "targetChinese": "/zh/api-reference/catalog",
+      "targetEnglish": "/en/api-reference/catalog",
+      "redirectSources": [
+        "/docs/api-reference/catalog",
+        "/docs/api-reference/catalog/"
+      ],
+      "strategy": "Replaced previous custom UI with Mintlify native components; retained its documented purpose."
+    },
+    {
+      "sourceFile": "content/docs/api-reference/chat-completions.mdx",
+      "sourceSha256": "5455137c1084c9bcdf9125ddb58ed431aece05796ee1851d0355a02316039f41",
+      "sourceUrl": "/docs/api-reference/chat-completions",
+      "canonicalSourceUrl": "/docs/api-reference/chat-completions/",
+      "sourceBuildArtifact": "out/docs/api-reference/chat-completions/index.html",
+      "targetChinese": "/zh/api-reference/chat-completions",
+      "targetEnglish": "/en/api-reference/chat-completions",
+      "redirectSources": [
+        "/docs/api-reference/chat-completions",
+        "/docs/api-reference/chat-completions/"
+      ],
+      "strategy": "Moved the endpoint contract to a language-specific OpenAPI reference; retained usage guidance."
+    },
+    {
+      "sourceFile": "content/docs/api-reference/completions.mdx",
+      "sourceSha256": "2d2ee706da1d3f61ecf6dc51a64884288378e2df2339884667fb4fcccfc63f34",
+      "sourceUrl": "/docs/api-reference/completions",
+      "canonicalSourceUrl": "/docs/api-reference/completions/",
+      "sourceBuildArtifact": "out/docs/api-reference/completions/index.html",
+      "targetChinese": "/zh/api-reference/completions",
+      "targetEnglish": "/en/api-reference/completions",
+      "redirectSources": [
+        "/docs/api-reference/completions",
+        "/docs/api-reference/completions/"
+      ],
+      "strategy": "Moved the endpoint contract to a language-specific OpenAPI reference; retained usage guidance."
+    },
+    {
+      "sourceFile": "content/docs/api-reference/embeddings.mdx",
+      "sourceSha256": "cd7663d017975642b2f8e38f552888500ba465a3844c5026a754bfc541127dd0",
+      "sourceUrl": "/docs/api-reference/embeddings",
+      "canonicalSourceUrl": "/docs/api-reference/embeddings/",
+      "sourceBuildArtifact": "out/docs/api-reference/embeddings/index.html",
+      "targetChinese": "/zh/api-reference/embeddings",
+      "targetEnglish": "/en/api-reference/embeddings",
+      "redirectSources": [
+        "/docs/api-reference/embeddings",
+        "/docs/api-reference/embeddings/"
+      ],
+      "strategy": "Moved the endpoint contract to a language-specific OpenAPI reference; retained usage guidance."
+    },
+    {
+      "sourceFile": "content/docs/api-reference/images.mdx",
+      "sourceSha256": "a2035bb7cec14957b3ba30166fe1a5d831532095353eb271021f54f2278eb056",
+      "sourceUrl": "/docs/api-reference/images",
+      "canonicalSourceUrl": "/docs/api-reference/images/",
+      "sourceBuildArtifact": "out/docs/api-reference/images/index.html",
+      "targetChinese": "/zh/api-reference/images",
+      "targetEnglish": "/en/api-reference/images",
+      "redirectSources": [
+        "/docs/api-reference/images",
+        "/docs/api-reference/images/"
+      ],
+      "strategy": "Moved the endpoint contract to a language-specific OpenAPI reference; retained usage guidance."
+    },
+    {
+      "sourceFile": "content/docs/api-reference/index.mdx",
+      "sourceSha256": "8c200a631c54aa70c28e3c7e70126951ab4d1b43eb3f4bc6362160a1a46e06eb",
+      "sourceUrl": "/docs/api-reference",
+      "canonicalSourceUrl": "/docs/api-reference/",
+      "sourceBuildArtifact": "out/docs/api-reference/index.html",
+      "targetChinese": "/zh/api-reference/index",
+      "targetEnglish": "/en/api-reference/index",
+      "redirectSources": [
+        "/docs/api-reference",
+        "/docs/api-reference/"
+      ],
+      "strategy": "Ported the source page to Mintlify MDX with localized metadata, components, and links."
+    },
+    {
+      "sourceFile": "content/docs/api-reference/models.mdx",
+      "sourceSha256": "571bcd0e5df7bb658783bb245f9fd273e19a4ff1f4d5faef057e995508a77bf9",
+      "sourceUrl": "/docs/api-reference/models",
+      "canonicalSourceUrl": "/docs/api-reference/models/",
+      "sourceBuildArtifact": "out/docs/api-reference/models/index.html",
+      "targetChinese": "/zh/api-reference/models",
+      "targetEnglish": "/en/api-reference/models",
+      "redirectSources": [
+        "/docs/api-reference/models",
+        "/docs/api-reference/models/"
+      ],
+      "strategy": "Moved the endpoint contract to a language-specific OpenAPI reference; retained usage guidance."
+    },
+    {
+      "sourceFile": "content/docs/authentication.mdx",
+      "sourceSha256": "6b368b9d86831860078412379d117987a5d917d1f879b695cb9381b9138c92cb",
+      "sourceUrl": "/docs/authentication",
+      "canonicalSourceUrl": "/docs/authentication/",
+      "sourceBuildArtifact": "out/docs/authentication/index.html",
+      "targetChinese": "/zh/authentication",
+      "targetEnglish": "/en/authentication",
+      "redirectSources": [
+        "/docs/authentication",
+        "/docs/authentication/"
+      ],
+      "strategy": "Ported the source page to Mintlify MDX with localized metadata, components, and links."
+    },
+    {
+      "sourceFile": "content/docs/guides/async-tasks.mdx",
+      "sourceSha256": "cbefa655822848ede2b498ffc9eb7973f60714d82e18c2002f626adb6f276dea",
+      "sourceUrl": "/docs/guides/async-tasks",
+      "canonicalSourceUrl": "/docs/guides/async-tasks/",
+      "sourceBuildArtifact": "out/docs/guides/async-tasks/index.html",
+      "targetChinese": "/zh/guides/async-tasks",
+      "targetEnglish": "/en/guides/async-tasks",
+      "redirectSources": [
+        "/docs/guides/async-tasks",
+        "/docs/guides/async-tasks/"
+      ],
+      "strategy": "Ported the source page to Mintlify MDX with localized metadata, components, and links."
+    },
+    {
+      "sourceFile": "content/docs/guides/nodejs.mdx",
+      "sourceSha256": "d95389372ec40fb1b9dbd042e8030565288e6c7e657f90db6ed2353cfa46eae3",
+      "sourceUrl": "/docs/guides/nodejs",
+      "canonicalSourceUrl": "/docs/guides/nodejs/",
+      "sourceBuildArtifact": "out/docs/guides/nodejs/index.html",
+      "targetChinese": "/zh/guides/nodejs",
+      "targetEnglish": "/en/guides/nodejs",
+      "redirectSources": [
+        "/docs/guides/nodejs",
+        "/docs/guides/nodejs/"
+      ],
+      "strategy": "Ported the source page to Mintlify MDX with localized metadata, components, and links."
+    },
+    {
+      "sourceFile": "content/docs/guides/protocols.mdx",
+      "sourceSha256": "90a1dbfe90e30dabbda0f0e5f27a317ad139ac3dc99d13320ee54224444ed0f8",
+      "sourceUrl": "/docs/guides/protocols",
+      "canonicalSourceUrl": "/docs/guides/protocols/",
+      "sourceBuildArtifact": "out/docs/guides/protocols/index.html",
+      "targetChinese": "/zh/guides/protocols",
+      "targetEnglish": "/en/guides/protocols",
+      "redirectSources": [
+        "/docs/guides/protocols",
+        "/docs/guides/protocols/"
+      ],
+      "strategy": "Ported the source page to Mintlify MDX with localized metadata, components, and links."
+    },
+    {
+      "sourceFile": "content/docs/guides/python.mdx",
+      "sourceSha256": "e4cb6c95f268e6ffa368027da44ddb7e2706e3e9b27bdf622b1ec4d3d1543282",
+      "sourceUrl": "/docs/guides/python",
+      "canonicalSourceUrl": "/docs/guides/python/",
+      "sourceBuildArtifact": "out/docs/guides/python/index.html",
+      "targetChinese": "/zh/guides/python",
+      "targetEnglish": "/en/guides/python",
+      "redirectSources": [
+        "/docs/guides/python",
+        "/docs/guides/python/"
+      ],
+      "strategy": "Ported the source page to Mintlify MDX with localized metadata, components, and links."
+    },
+    {
+      "sourceFile": "content/docs/guides/streaming.mdx",
+      "sourceSha256": "8562bb50a81e57acbad1320c0e4dfac29c8eb489ba0c03e0458b13850927ee1d",
+      "sourceUrl": "/docs/guides/streaming",
+      "canonicalSourceUrl": "/docs/guides/streaming/",
+      "sourceBuildArtifact": "out/docs/guides/streaming/index.html",
+      "targetChinese": "/zh/guides/streaming",
+      "targetEnglish": "/en/guides/streaming",
+      "redirectSources": [
+        "/docs/guides/streaming",
+        "/docs/guides/streaming/"
+      ],
+      "strategy": "Ported the source page to Mintlify MDX with localized metadata, components, and links."
+    },
+    {
+      "sourceFile": "content/docs/guides/tools.mdx",
+      "sourceSha256": "e01da01597d4d4c0d341d5044b03717c8acc02dd930b51fa5f6452bc3de89ea0",
+      "sourceUrl": "/docs/guides/tools",
+      "canonicalSourceUrl": "/docs/guides/tools/",
+      "sourceBuildArtifact": "out/docs/guides/tools/index.html",
+      "targetChinese": "/zh/guides/tools",
+      "targetEnglish": "/en/guides/tools",
+      "redirectSources": [
+        "/docs/guides/tools",
+        "/docs/guides/tools/"
+      ],
+      "strategy": "Ported the source page to Mintlify MDX with localized metadata, components, and links."
+    },
+    {
+      "sourceFile": "content/docs/guides/vision.mdx",
+      "sourceSha256": "4e8a0a64701556e9eeb794e4105b891feae8cef48f508eea0231d6500b611e86",
+      "sourceUrl": "/docs/guides/vision",
+      "canonicalSourceUrl": "/docs/guides/vision/",
+      "sourceBuildArtifact": "out/docs/guides/vision/index.html",
+      "targetChinese": "/zh/guides/vision",
+      "targetEnglish": "/en/guides/vision",
+      "redirectSources": [
+        "/docs/guides/vision",
+        "/docs/guides/vision/"
+      ],
+      "strategy": "Ported the source page to Mintlify MDX with localized metadata, components, and links."
+    },
+    {
+      "sourceFile": "content/docs/help/errors.mdx",
+      "sourceSha256": "79d418a9ee6a0431920cd5fa14cc7bcd9b676143720bdcbc8b6b511aa3e569df",
+      "sourceUrl": "/docs/help/errors",
+      "canonicalSourceUrl": "/docs/help/errors/",
+      "sourceBuildArtifact": "out/docs/help/errors/index.html",
+      "targetChinese": "/zh/help/errors",
+      "targetEnglish": "/en/help/errors",
+      "redirectSources": [
+        "/docs/help/errors",
+        "/docs/help/errors/"
+      ],
+      "strategy": "Ported the source page to Mintlify MDX with localized metadata, components, and links."
+    },
+    {
+      "sourceFile": "content/docs/help/faq.mdx",
+      "sourceSha256": "941b2d9775011c3fbc58067a9bcfef5b7e5f449478441ba69deca53745fa8824",
+      "sourceUrl": "/docs/help/faq",
+      "canonicalSourceUrl": "/docs/help/faq/",
+      "sourceBuildArtifact": "out/docs/help/faq/index.html",
+      "targetChinese": "/zh/help/faq",
+      "targetEnglish": "/en/help/faq",
+      "redirectSources": [
+        "/docs/help/faq",
+        "/docs/help/faq/"
+      ],
+      "strategy": "Ported the source page to Mintlify MDX with localized metadata, components, and links."
+    },
+    {
+      "sourceFile": "content/docs/index.mdx",
+      "sourceSha256": "750bbc7d5d65f3d0366274dc70a4dde0325d63afa3fbb1d3ca6e806a862c4a0a",
+      "sourceUrl": "/docs",
+      "canonicalSourceUrl": "/docs/",
+      "sourceBuildArtifact": "out/docs/index.html",
+      "targetChinese": "/zh/index",
+      "targetEnglish": "/en/index",
+      "redirectSources": [
+        "/docs",
+        "/docs/"
+      ],
+      "strategy": "Replaced previous custom UI with Mintlify native components; retained its documented purpose."
+    },
+    {
+      "sourceFile": "content/docs/media/image-providers.mdx",
+      "sourceSha256": "53ab671436a0c89478806f1912fe2246308f40b8d0ec54ad9ff85566de75fb86",
+      "sourceUrl": "/docs/media/image-providers",
+      "canonicalSourceUrl": "/docs/media/image-providers/",
+      "sourceBuildArtifact": "out/docs/media/image-providers/index.html",
+      "targetChinese": "/zh/media/image-providers",
+      "targetEnglish": "/en/media/image-providers",
+      "redirectSources": [
+        "/docs/media/image-providers",
+        "/docs/media/image-providers/"
+      ],
+      "strategy": "Ported the source page to Mintlify MDX with localized metadata, components, and links."
+    },
+    {
+      "sourceFile": "content/docs/media/index.mdx",
+      "sourceSha256": "9f9b6fa7dcb3a78cff4c2567ee10a4f1f48a8d9afac5d6e171e60558291268e9",
+      "sourceUrl": "/docs/media",
+      "canonicalSourceUrl": "/docs/media/",
+      "sourceBuildArtifact": "out/docs/media/index.html",
+      "targetChinese": "/zh/media/index",
+      "targetEnglish": "/en/media/index",
+      "redirectSources": [
+        "/docs/media",
+        "/docs/media/"
+      ],
+      "strategy": "Ported the source page to Mintlify MDX with localized metadata, components, and links."
+    },
+    {
+      "sourceFile": "content/docs/media/midjourney.mdx",
+      "sourceSha256": "d6bd4b93b689475cd29553f9dfa46b443df72b24a6bdb4ec29f3b3e90a89b7d5",
+      "sourceUrl": "/docs/media/midjourney",
+      "canonicalSourceUrl": "/docs/media/midjourney/",
+      "sourceBuildArtifact": "out/docs/media/midjourney/index.html",
+      "targetChinese": "/zh/media/midjourney",
+      "targetEnglish": "/en/media/midjourney",
+      "redirectSources": [
+        "/docs/media/midjourney",
+        "/docs/media/midjourney/"
+      ],
+      "strategy": "Ported the source page to Mintlify MDX with localized metadata, components, and links."
+    },
+    {
+      "sourceFile": "content/docs/media/music.mdx",
+      "sourceSha256": "1622e776e24044c2a4d1e11b5b2f936c0b5f8e866213b070299b43fc42134992",
+      "sourceUrl": "/docs/media/music",
+      "canonicalSourceUrl": "/docs/media/music/",
+      "sourceBuildArtifact": "out/docs/media/music/index.html",
+      "targetChinese": "/zh/media/music",
+      "targetEnglish": "/en/media/music",
+      "redirectSources": [
+        "/docs/media/music",
+        "/docs/media/music/"
+      ],
+      "strategy": "Ported the source page to Mintlify MDX with localized metadata, components, and links."
+    },
+    {
+      "sourceFile": "content/docs/media/video-providers.mdx",
+      "sourceSha256": "5381199172f2f2d0ae6216f54a98822c6ebdfb7f67bbed92087b790f95a1034a",
+      "sourceUrl": "/docs/media/video-providers",
+      "canonicalSourceUrl": "/docs/media/video-providers/",
+      "sourceBuildArtifact": "out/docs/media/video-providers/index.html",
+      "targetChinese": "/zh/media/video-providers",
+      "targetEnglish": "/en/media/video-providers",
+      "redirectSources": [
+        "/docs/media/video-providers",
+        "/docs/media/video-providers/"
+      ],
+      "strategy": "Ported the source page to Mintlify MDX with localized metadata, components, and links."
+    },
+    {
+      "sourceFile": "content/docs/media/videos.mdx",
+      "sourceSha256": "32ed701516487cd119657ba32f77ad8b329795373effd3d47ee207dce12c2e63",
+      "sourceUrl": "/docs/media/videos",
+      "canonicalSourceUrl": "/docs/media/videos/",
+      "sourceBuildArtifact": "out/docs/media/videos/index.html",
+      "targetChinese": "/zh/media/videos",
+      "targetEnglish": "/en/media/videos",
+      "redirectSources": [
+        "/docs/media/videos",
+        "/docs/media/videos/"
+      ],
+      "strategy": "Ported the source page to Mintlify MDX with localized metadata, components, and links."
+    },
+    {
+      "sourceFile": "content/docs/models.mdx",
+      "sourceSha256": "316265a1d2324bf400edf15191583ef42f6ca92341438644e83d8ee39994479a",
+      "sourceUrl": "/docs/models",
+      "canonicalSourceUrl": "/docs/models/",
+      "sourceBuildArtifact": "out/docs/models/index.html",
+      "targetChinese": "/zh/models",
+      "targetEnglish": "/en/models",
+      "redirectSources": [
+        "/docs/models",
+        "/docs/models/"
+      ],
+      "strategy": "Ported the source page to Mintlify MDX with localized metadata, components, and links."
+    },
+    {
+      "sourceFile": "content/docs/playground.mdx",
+      "sourceSha256": "1d61660733623e685a6413c5f052d56249a8b29c9c3ddb0a24bde67c22544728",
+      "sourceUrl": "/docs/playground",
+      "canonicalSourceUrl": "/docs/playground/",
+      "sourceBuildArtifact": "out/docs/playground/index.html",
+      "targetChinese": "/zh/playground",
+      "targetEnglish": "/en/playground",
+      "redirectSources": [
+        "/docs/playground",
+        "/docs/playground/"
+      ],
+      "strategy": "Replaced previous custom UI with Mintlify native components; retained its documented purpose."
+    },
+    {
+      "sourceFile": "content/docs/quickstart.mdx",
+      "sourceSha256": "e9c7d47dfff578d05d7b503d1add2f76926fb71633a1f6d56ba09b34cce66d2d",
+      "sourceUrl": "/docs/quickstart",
+      "canonicalSourceUrl": "/docs/quickstart/",
+      "sourceBuildArtifact": "out/docs/quickstart/index.html",
+      "targetChinese": "/zh/quickstart",
+      "targetEnglish": "/en/quickstart",
+      "redirectSources": [
+        "/docs/quickstart",
+        "/docs/quickstart/"
+      ],
+      "strategy": "Ported the source page to Mintlify MDX with localized metadata, components, and links."
+    }
+  ],
+  "addedPages": [
+    {
+      "targetChinese": "/zh/api-reference/images-edits",
+      "targetEnglish": "/en/api-reference/images-edits",
+      "sourceContent": "content/docs/api-reference/images.mdx",
+      "reason": "Split image editing into its own native OpenAPI operation page."
+    },
+    {
+      "targetChinese": "/zh/api-reference/audio-translations",
+      "targetEnglish": "/en/api-reference/audio-translations",
+      "sourceContent": "content/docs/api-reference/audio-transcriptions.mdx",
+      "reason": "Split audio translation into its own native OpenAPI operation page."
+    }
+  ],
+  "notes": [
+    "Only the 29 original MDX files are counted as migrated source pages. English counterparts and the two split API topics do not add migration rows.",
+    "Both slash and no-slash legacy URL forms redirect to the Chinese page, matching the old loader URLs and static-export canonical URLs.",
+    "Existing root redirect and all curated navigation/API settings were preserved. Tab-level OpenAPI auto-generation was removed because explicit endpoint MDX pages already reference the two language-specific specs, preventing duplicate operation navigation.",
+    "The extended catalog retains 173 structural records. It does not assert account availability or successful live validation.",
+    "URL fragments and legacy playground query selections are not a server redirect contract; the target page provides the corresponding native Mintlify workflow."
+  ]
+}

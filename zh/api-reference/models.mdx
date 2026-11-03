@@ -1,0 +1,18 @@
+---
+title: "模型列表"
+description: "查询当前 API Key 可见的模型，并获取调用时使用的模型 ID。"
+keywords: ["MaxAPI", "模型列表", "models"]
+openapi: "openapi/zh.json GET /v1/models"
+---
+
+通过模型列表接口获取当前 MaxAPI API Key 可见的模型标识。使用返回的准确 `id` 作为后续请求中的 `model` 值，先确认模型适合当前任务。
+
+该接口使用 Bearer 鉴权，无需请求体。可以先在本页的 **Try it** 调试面板验证密钥与网络，再尝试生成请求。
+
+## 使用模型 ID
+
+将选定的文本对话模型 ID 传入 [创建对话](/zh/api-reference/chat-completions) 接口。模型出现在列表中，不等于它支持所有输入类型或所有可选参数。
+
+如果无法查询列表，先根据 [身份验证](/zh/authentication) 检查密钥。要了解如何评估模型，继续阅读 [模型与能力](/zh/models)。
+
+响应可能包含其他元信息，应用应允许出现额外字段。账户权限和模型状态可能变化，实际结果以当前请求为准。

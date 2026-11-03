@@ -1,0 +1,4098 @@
+---
+title: "Extended API operation catalog"
+description: "Browse 173 sanitized shared-system operation definitions, including methods, routes, fields and review flags, without assuming account availability or support."
+keywords: ["MaxAPI", "Extended API operation catalog", "API documentation"]
+sidebarTitle: "Extended catalog"
+---
+
+The MaxAPI extended catalog contains **173 operations** preserved from a sanitized shared-system export. Use it to locate methods, paths and declared fields. It is a structural reference, **not a statement that every endpoint is enabled for MaxAPI or your account**, and not a record of successful live tests.
+
+Start with the [core API reference](/en/api-reference/index) for documented interactive endpoints, or [multimedia guides](/en/media/index) for task workflows. Use page search to locate a provider, method or path in this catalog.
+
+## Read the status labels
+
+| Label | Meaning |
+| --- | --- |
+| Protocol reference | Useful for locating an operation and checking fields; confirm model and channel access |
+| Needs review | Source definitions are incomplete, conflicting or ambiguous |
+| Example path | The source contains a literal sample or placeholder; verify the real route before calling it |
+
+Authentication values, original request examples, third-party file addresses and prices were removed from the source catalog. Two fixed example identifiers have been replaced with `{example_file_id}` and `{example_task_id}`. An absent authentication definition does not imply anonymous access; follow [MaxAPI authentication](/en/authentication).
+
+## Use the correct base URL
+
+Compatible SDKs use `https://api.maxapi.ai/v1`. For a confirmed native route, append its path to `https://api.maxapi.ai` without automatically adding `/v1`. Keep query methods, IDs and result handling aligned with the selected [protocol](/en/guides/protocols).
+
+Field requirements and types below reproduce the structural export, including known limitations. They are not substitutes for a confirmed channel contract. **Not specified in source** means the definition was missing, not that the endpoint accepts no parameters.
+
+## Text and embeddings (3)
+
+<AccordionGroup>
+
+<Accordion title="Chat completions" description="POST · OpenAI-compatible · Needs review">
+
+```http Route reference
+POST /v1/chat/completions
+```
+
+Catalog ID: `post-18674ab494f1`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `frequency_penalty` | `number` | No |
+| `logit_bias` | `null` | No |
+| `max_tokens` | `integer` | No |
+| `messages` | `array` | Yes |
+| `model` | `string` | Yes |
+| `n` | `integer` | No |
+| `presence_penalty` | `number` | No |
+| `stop` | `string` | No |
+| `stream` | `boolean` | No |
+| `temperature` | `integer` | No |
+| `top_p` | `integer` | No |
+| `user` | `string` | No |
+
+Source issues:
+
+- **overloaded-source-schema**: One source route combines schemas for different protocol branches.
+- **parameter-type-mismatch**: Parameter type definitions conflict with the supplied examples.
+
+</Accordion>
+
+<Accordion title="Legacy text completions" description="POST · OpenAI-compatible · Protocol reference">
+
+```http Route reference
+POST /v1/completions
+```
+
+Catalog ID: `post-66ad7ec60910`. Status: **Protocol reference**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `logprobs` | `null` | No |
+| `max_tokens` | `integer` | No |
+| `model` | `string` | Yes |
+| `n` | `integer` | No |
+| `prompt` | `string` | No |
+| `stop` | `string` | No |
+| `stream` | `boolean` | No |
+| `temperature` | `integer` | No |
+| `top_p` | `integer` | No |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Create embeddings" description="POST · OpenAI-compatible · Protocol reference">
+
+```http Route reference
+POST /v1/embeddings
+```
+
+Catalog ID: `post-def569146a1a`. Status: **Protocol reference**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `input` | `string` | Yes |
+| `model` | `string` | Yes |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+</AccordionGroup>
+
+## Image generation (13)
+
+<AccordionGroup>
+
+<Accordion title="Nano Banana native format" description="POST · Gemini · Needs review">
+
+```http Route reference
+POST /v1beta/models/gemini-2.5-flash-image:generateContent
+```
+
+Catalog ID: `post-2967b1157a53`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **request-schema-incomplete**: Request schema is incomplete.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Describe an image" description="POST · Ideogram · Protocol reference">
+
+```http Route reference
+POST /ideogram/describe
+```
+
+Catalog ID: `post-11f3f48818cc`. Status: **Protocol reference**.
+
+Request content types: `multipart/form-data`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `image_file` | `string` | Yes |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Generate an image" description="POST · Ideogram · Protocol reference">
+
+```http Route reference
+POST /ideogram/generate
+```
+
+Catalog ID: `post-3430a32c8c7e`. Status: **Protocol reference**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `image_request` | `object` | Yes |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Remix an image" description="POST · Ideogram · Protocol reference">
+
+```http Route reference
+POST /ideogram/remix
+```
+
+Catalog ID: `post-49b66c490161`. Status: **Protocol reference**.
+
+Request content types: `multipart/form-data`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `image_file` | `string` | No |
+| `image_request` | `string` | No |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Upscale an image" description="POST · Ideogram · Protocol reference">
+
+```http Route reference
+POST /ideogram/upscale
+```
+
+Catalog ID: `post-c80234984ece`. Status: **Protocol reference**.
+
+Request content types: `multipart/form-data`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `image_file` | `string` | No |
+| `image_request` | `string` | No |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Generate images" description="POST · Kling · Needs review">
+
+```http Route reference
+POST /kling/v1/images/generations
+```
+
+Catalog ID: `post-7cb4b138e204`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `aspect_ratio` | `string` | No |
+| `callback_url` | `string` | No |
+| `image` | `string` | No |
+| `image_fidelity` | `number` | No |
+| `model` | `string` | No |
+| `n` | `integer` | No |
+| `negative_prompt` | `string` | No |
+| `prompt` | `string` | Yes |
+
+Source issues:
+
+- **example-schema-mismatch**: The source example and schema disagree.
+
+</Accordion>
+
+<Accordion title="Edit images" description="POST · OpenAI-compatible · Needs review">
+
+```http Route reference
+POST /v1/images/edits
+```
+
+Catalog ID: `post-2cfe0bd97465`. Status: **Needs review**.
+
+Request content types: `multipart/form-data`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `image` | `string` | Yes |
+| `mask` | `string` | No |
+| `model` | `string` | Yes |
+| `n` | `string` | No |
+| `prompt` | `string` | No |
+| `response_format` | `string` | No |
+| `size` | `string` | No |
+
+Source issues:
+
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Generate images" description="POST · OpenAI-compatible · Needs review">
+
+```http Route reference
+POST /v1/images/generations
+```
+
+Catalog ID: `post-04d8520b8a19`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `n` | `integer` | No |
+| `prompt` | `string` | Yes |
+| `size` | `string` | No |
+
+Source issues:
+
+- **example-schema-mismatch**: The source example and schema disagree.
+- **overloaded-source-schema**: One source route combines schemas for different protocol branches.
+
+</Accordion>
+
+<Accordion title="Text-to-image" description="POST · Stable Diffusion · Protocol reference">
+
+```http Route reference
+POST /sd/v1/generation/{engine_id}/text-to-image
+```
+
+Catalog ID: `post-a66e8dc03712`. Status: **Protocol reference**.
+
+Request content types: `application/json`
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `engine_id` | `path` | `string` | Yes |
+
+Body field definitions: not specified in source.
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Stable Image Core" description="POST · Stable Diffusion · Protocol reference">
+
+```http Route reference
+POST /sd/v2beta/stable-image/generate/core
+```
+
+Catalog ID: `post-4825a6a81a22`. Status: **Protocol reference**.
+
+Request content types: `multipart/form-data`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `aspect_ratio` | `string` | No |
+| `negative_prompt` | `string` | No |
+| `output_format` | `string` | No |
+| `prompt` | `string` | Yes |
+| `seed` | `number` | No |
+| `style_preset` | `string` | No |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Stable Diffusion 3" description="POST · Stable Diffusion · Protocol reference">
+
+```http Route reference
+POST /sd/v2beta/stable-image/generate/sd3
+```
+
+Catalog ID: `post-5d66db593ba6`. Status: **Protocol reference**.
+
+Request content types: `multipart/form-data`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `aspect_ratio` | `string` | No |
+| `image` | `string` | No |
+| `mode` | `string` | No |
+| `model` | `string` | No |
+| `negative_prompt` | `string` | No |
+| `output_format` | `string` | No |
+| `prompt` | `string` | Yes |
+| `seed` | `number` | No |
+| `strength` | `number` | No |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Stable Image Ultra" description="POST · Stable Diffusion · Protocol reference">
+
+```http Route reference
+POST /sd/v2beta/stable-image/generate/ultra
+```
+
+Catalog ID: `post-54ab7156c5c6`. Status: **Protocol reference**.
+
+Request content types: `multipart/form-data`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `aspect_ratio` | `string` | No |
+| `negative_prompt` | `string` | No |
+| `output_format` | `string` | No |
+| `prompt` | `string` | Yes |
+| `seed` | `number` | No |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Download an asynchronous image result" description="GET · Asynchronous images · Needs review">
+
+```http Route reference
+GET /v1/videos/{task_id}/content
+```
+
+Catalog ID: `get-4a4c5e7419a4`. Status: **Needs review**.
+
+Request content types: Not specified in source.
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `task_id` | `path` | `string` | Yes |
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **equivalent-path-template**: Equivalent path templates use different parameter names. Confirm the actual route.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+Equivalent template entries: `get-d1c3bcab459d`.
+
+</Accordion>
+
+</AccordionGroup>
+
+## Audio (5)
+
+<AccordionGroup>
+
+<Accordion title="Recognize speech" description="POST · Fish Audio · Needs review">
+
+```http Route reference
+POST /fish/v1/asr
+```
+
+Catalog ID: `post-100efce2feb4`. Status: **Needs review**.
+
+Request content types: `multipart/form-data`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `audio` | `string` | Yes |
+
+Source issues:
+
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Synthesize speech" description="POST · Fish Audio · Needs review">
+
+```http Route reference
+POST /fish/v1/tts
+```
+
+Catalog ID: `post-9d3d5d07f11a`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **request-schema-incomplete**: Request schema is incomplete.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Text to speech" description="POST · OpenAI-compatible · Needs review">
+
+```http Route reference
+POST /v1/audio/speech
+```
+
+Catalog ID: `post-a85a55dd9bde`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `input` | `string` | Yes |
+| `model` | `string` | Yes |
+| `response_format` | `string` | No |
+| `speed` | `number` | No |
+| `voice` | `string` | Yes |
+
+Source issues:
+
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Create a transcription" description="POST · OpenAI-compatible · Needs review">
+
+```http Route reference
+POST /v1/audio/transcriptions
+```
+
+Catalog ID: `post-9fe5be35c3c0`. Status: **Needs review**.
+
+Request content types: `multipart/form-data`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `file` | `string` | Yes |
+| `language` | `string` | No |
+| `model` | `string` | Yes |
+| `prompt` | `string` | No |
+| `response_format` | `string` | No |
+| `temperature` | `number` | No |
+
+Source issues:
+
+- **example-required-mismatch**: Example values do not match the schema required-field list.
+
+</Accordion>
+
+<Accordion title="Create an audio translation" description="POST · OpenAI-compatible · Needs review">
+
+```http Route reference
+POST /v1/audio/translations
+```
+
+Catalog ID: `post-192f234eea08`. Status: **Needs review**.
+
+Request content types: `multipart/form-data`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `file` | `string` | Yes |
+| `model` | `string` | Yes |
+| `prompt` | `string` | No |
+| `response_format` | `string` | No |
+| `temperature` | `number` | No |
+
+Source issues:
+
+- **example-required-mismatch**: Example values do not match the schema required-field list.
+
+</Accordion>
+
+</AccordionGroup>
+
+## Video (57)
+
+<AccordionGroup>
+
+<Accordion title="Example video download path" description="GET · Google Veo · Example path">
+
+```http Route reference
+GET /aistudio/v1beta/files/{example_file_id}:download
+```
+
+Catalog ID: `get-90b070c7f82c`. Status: **Example path**.
+
+Request content types: `application/json`
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `_task_id` | `query` | `string` | No |
+| `alt` | `query` | `string` | No |
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **literal-example-path**: The source path contains a literal example or placeholder; confirm the actual route.
+- **read-request-body**: The source defines a request body on a read operation; confirm accepted behavior.
+- **request-schema-incomplete**: Request schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Query an operation" description="POST · Google Veo · Needs review">
+
+```http Route reference
+POST /aistudio/v1beta/models/{model}:fetchPredictOperation
+```
+
+Catalog ID: `post-554e34e0b3f7`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `model` | `path` | `string` | Yes |
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **request-schema-incomplete**: Request schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Submit a video generation task" description="POST · Google Veo · Protocol reference">
+
+```http Route reference
+POST /aistudio/v1beta/models/{model}:predictLongRunning
+```
+
+Catalog ID: `post-5df56283d008`. Status: **Protocol reference**.
+
+Request content types: `application/json`
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `model` | `path` | `string` | Yes |
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `instances` | `array` | No |
+| `parameters` | `object` | No |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Query an asynchronous video task" description="GET · Google Veo · Example path">
+
+```http Route reference
+GET /v1/tasks/id
+```
+
+Catalog ID: `get-e85b8c702087`. Status: **Example path**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **literal-example-path**: The source path contains a literal example or placeholder; confirm the actual route.
+- **read-request-body**: The source defines a request body on a read operation; confirm accepted behavior.
+- **request-schema-incomplete**: Request schema is incomplete.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Submit a reference-image video task" description="POST · Google Veo · Needs review">
+
+```http Route reference
+POST /v1/video/generations
+```
+
+Catalog ID: `post-6089fcb93c8b`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **request-schema-incomplete**: Request schema is incomplete.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Query a video task" description="GET · Google Veo · Needs review">
+
+```http Route reference
+GET /v1/videos/{id}
+```
+
+Catalog ID: `get-be29529bb622`. Status: **Needs review**.
+
+Request content types: `multipart/form-data`
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `id` | `path` | `string` | Yes |
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `enable_upsample` | `string` | No |
+| `input_reference` | `string` | No |
+| `model` | `string` | Yes |
+| `prompt` | `string` | Yes |
+| `seconds` | `string` | No |
+| `size` | `string` | No |
+| `watermark` | `boolean` | No |
+
+Source issues:
+
+- **equivalent-path-template**: Equivalent path templates use different parameter names. Confirm the actual route.
+- **read-request-body**: The source defines a request body on a read operation; confirm accepted behavior.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+Equivalent template entries: `get-addc81b2e020`.
+
+</Accordion>
+
+<Accordion title="Download a video result" description="GET · Google Veo · Needs review">
+
+```http Route reference
+GET /v1/videos/{id}/content
+```
+
+Catalog ID: `get-d1c3bcab459d`. Status: **Needs review**.
+
+Request content types: `multipart/form-data`
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `id` | `path` | `string` | Yes |
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `enable_upsample` | `string` | No |
+| `input_reference` | `string` | No |
+| `model` | `string` | Yes |
+| `prompt` | `string` | Yes |
+| `seconds` | `string` | No |
+| `size` | `string` | No |
+| `watermark` | `boolean` | No |
+
+Source issues:
+
+- **equivalent-path-template**: Equivalent path templates use different parameter names. Confirm the actual route.
+- **read-request-body**: The source defines a request body on a read operation; confirm accepted behavior.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+Equivalent template entries: `get-4a4c5e7419a4`.
+
+</Accordion>
+
+<Accordion title="Query video generation status" description="GET · Google Veo · Protocol reference">
+
+```http Route reference
+GET /veo/v1/api/video/status/{taskId}
+```
+
+Catalog ID: `get-2f40301dd1c5`. Status: **Protocol reference**.
+
+Request content types: Not specified in source.
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `taskId` | `path` | `string` | Yes |
+
+Body field definitions: not specified in source.
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Submit a video generation task" description="POST · Google Veo · Protocol reference">
+
+```http Route reference
+POST /veo/v1/api/video/submit
+```
+
+Catalog ID: `post-6c794140c4c2`. Status: **Protocol reference**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `enhance_prompt` | `boolean` | No |
+| `images` | `array` | No |
+| `model` | `string` | No |
+| `prompt` | `string` | Yes |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Query an operation" description="POST · Google Veo · Needs review">
+
+```http Route reference
+POST /vertex/v1/publishers/google/models/{model}:fetchPredictOperation
+```
+
+Catalog ID: `post-43eefa8bceb5`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `model` | `path` | `string` | Yes |
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **request-schema-incomplete**: Request schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Extend a video" description="POST · Google Veo · Protocol reference">
+
+```http Route reference
+POST /vertex/v1/publishers/google/models/{model}:predictLongRunning
+```
+
+Catalog ID: `post-942f9f6028c8`. Status: **Protocol reference**.
+
+Request content types: `application/json`
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `model` | `path` | `string` | Yes |
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `instances` | `array` | No |
+| `parameters` | `object` | No |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Image-to-video" description="POST · Kling · Needs review">
+
+```http Route reference
+POST /kling/v1/videos/image2video
+```
+
+Catalog ID: `post-034e5127a3dd`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `callback_url` | `string` | No |
+| `cfg_scale` | `number` | No |
+| `duration` | `string` | No |
+| `image` | `string` | Yes |
+| `image_tail` | `string` | No |
+| `mode` | `string` | No |
+| `model` | `string` | No |
+| `negative_prompt` | `string` | No |
+| `prompt` | `string` | No |
+
+Source issues:
+
+- **example-schema-mismatch**: The source example and schema disagree.
+
+</Accordion>
+
+<Accordion title="Text-to-video" description="POST · Kling · Protocol reference">
+
+```http Route reference
+POST /kling/v1/videos/text2video
+```
+
+Catalog ID: `post-0a1f7daf5a1c`. Status: **Protocol reference**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `aspect_ratio` | `string` | No |
+| `callback_url` | `string` | No |
+| `camera_control` | `object` | No |
+| `cfg_scale` | `number` | No |
+| `duration` | `string` | No |
+| `mode` | `string` | No |
+| `model` | `string` | No |
+| `negative_prompt` | `string` | No |
+| `prompt` | `string` | Yes |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Query a task" description="GET · Kling · Protocol reference">
+
+```http Route reference
+GET /kling/v1/{action}/{action2}/{task_id}
+```
+
+Catalog ID: `get-9923e435698a`. Status: **Protocol reference**.
+
+Request content types: Not specified in source.
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `action` | `path` | `string` | Yes |
+| `action2` | `path` | `string` | Yes |
+| `task_id` | `path` | `string` | Yes |
+
+Body field definitions: not specified in source.
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Generate a video" description="POST · Luma · Needs review">
+
+```http Route reference
+POST /luma-vip/luma/v1/generations
+```
+
+Catalog ID: `post-0d37046cebb4`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `aspect_ratio` | `string` | Yes |
+| `expand_prompt` | `boolean` | Yes |
+| `image_end_url` | `string` | Yes |
+| `image_url` | `string` | Yes |
+| `user_prompt` | `string` | Yes |
+
+Source issues:
+
+- **example-required-mismatch**: Example values do not match the schema required-field list.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Retrieve a video" description="GET · Luma · Needs review">
+
+```http Route reference
+GET /luma-vip/luma/v1/task
+```
+
+Catalog ID: `get-c60252d4e7ca`. Status: **Needs review**.
+
+Request content types: Not specified in source.
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `id` | `query` | `string` | No |
+| `server_id` | `query` | `string` | No |
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Generate a video" description="POST · Luma · Needs review">
+
+```http Route reference
+POST /luma/v1/generations
+```
+
+Catalog ID: `post-2cdc2d43dc47`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `aspect_ratio` | `string` | Yes |
+| `expand_prompt` | `boolean` | Yes |
+| `image_end_url` | `string` | Yes |
+| `image_url` | `string` | Yes |
+| `user_prompt` | `string` | Yes |
+
+Source issues:
+
+- **example-required-mismatch**: Example values do not match the schema required-field list.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Retrieve a video" description="GET · Luma · Needs review">
+
+```http Route reference
+GET /luma/v1/task
+```
+
+Catalog ID: `get-59b72f7ce2ba`. Status: **Needs review**.
+
+Request content types: Not specified in source.
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `id` | `query` | `string` | No |
+| `server_id` | `query` | `string` | No |
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Submit a video generation task" description="POST · Luma · Needs review">
+
+```http Route reference
+POST /luma/v2/generations
+```
+
+Catalog ID: `post-cdb4ea625222`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `aspect_ratio` | `string` | No |
+| `expand_prompt` | `boolean` | No |
+| `image_end_url` | `string` | No |
+| `image_url` | `string` | No |
+| `notify_hook` | `string` | No |
+| `user_prompt` | `string` | Yes |
+
+Source issues:
+
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Query a single task" description="GET · Luma · Example path">
+
+```http Route reference
+GET /luma/v2/generations/task_id
+```
+
+Catalog ID: `get-cbfa50ed3353`. Status: **Example path**.
+
+Request content types: Not specified in source.
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **literal-example-path**: The source path contains a literal example or placeholder; confirm the actual route.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Get a watermark-free video link" description="GET · Luma · Example path">
+
+```http Route reference
+GET /luma/v2/generations/task_id/download_video_url
+```
+
+Catalog ID: `get-a72b99dd1443`. Status: **Example path**.
+
+Request content types: Not specified in source.
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **literal-example-path**: The source path contains a literal example or placeholder; confirm the actual route.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Extend a video" description="POST · Luma · Example path">
+
+```http Route reference
+POST /luma/v2/generations/task_id/extend
+```
+
+Catalog ID: `post-d775b605947c`. Status: **Example path**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `aspect_ratio` | `string` | No |
+| `expand_prompt` | `boolean` | No |
+| `image_end_url` | `string` | No |
+| `image_url` | `string` | No |
+| `notify_hook` | `string` | No |
+| `user_prompt` | `string` | Yes |
+
+Source issues:
+
+- **literal-example-path**: The source path contains a literal example or placeholder; confirm the actual route.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Retrieve a video file" description="GET · MiniMax Hailuo · Protocol reference">
+
+```http Route reference
+GET /hailuo/v1/files/retrieve
+```
+
+Catalog ID: `get-406927265abd`. Status: **Protocol reference**.
+
+Request content types: Not specified in source.
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `file_id` | `query` | `string` | Yes |
+
+Body field definitions: not specified in source.
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Query video generation status" description="GET · MiniMax Hailuo · Protocol reference">
+
+```http Route reference
+GET /hailuo/v1/query/video_generation
+```
+
+Catalog ID: `get-5e1a432c54e2`. Status: **Protocol reference**.
+
+Request content types: Not specified in source.
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `task_id` | `query` | `string` | Yes |
+
+Body field definitions: not specified in source.
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Generate a video" description="POST · MiniMax Hailuo · Protocol reference">
+
+```http Route reference
+POST /hailuo/v1/video_generation
+```
+
+Catalog ID: `post-27ae9ff0ef18`. Status: **Protocol reference**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `aigc_watermark` | `boolean` | No |
+| `callback_url` | `string` | No |
+| `duration` | `integer` | No |
+| `fast_pretreatment` | `boolean` | No |
+| `first_frame_image` | `string` | No |
+| `last_frame_image` | `string` | No |
+| `model` | `string` | Yes |
+| `prompt` | `string` | No |
+| `prompt_optimizer` | `boolean` | No |
+| `resolution` | `string` | No |
+| `subject_image` | `string` | No |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Control a character" description="POST · Runway · Needs review">
+
+```http Route reference
+POST /runwayml/v1/character_performance
+```
+
+Catalog ID: `post-a5a8e7987204`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **request-schema-incomplete**: Request schema is incomplete.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Create a video task" description="POST · Runway · Needs review">
+
+```http Route reference
+POST /runwayml/v1/image_to_video
+```
+
+Catalog ID: `post-40e982f6c5cb`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **request-schema-incomplete**: Request schema is incomplete.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Video-to-video" description="POST · Runway · Needs review">
+
+```http Route reference
+POST /runwayml/v1/video_to_video
+```
+
+Catalog ID: `post-02e2972adcca`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **request-schema-incomplete**: Request schema is incomplete.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Create an image-to-video task" description="POST · Seedance · Needs review">
+
+```http Route reference
+POST /seedance/api/v3/contents/generations/tasks
+```
+
+Catalog ID: `post-73426a3d2563`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `input` | `object` | Yes |
+| `model` | `string` | Yes |
+| `parameters` | `object` | No |
+
+Source issues:
+
+- **example-required-mismatch**: Example values do not match the schema required-field list.
+- **example-schema-mismatch**: The source example and schema disagree.
+- **source-schema-conflict**: Source schema definitions conflict and require confirmation.
+
+</Accordion>
+
+<Accordion title="Query task status" description="GET · Seedance · Protocol reference">
+
+```http Route reference
+GET /seedance/api/v3/contents/generations/tasks/{id}
+```
+
+Catalog ID: `get-9259506154c2`. Status: **Protocol reference**.
+
+Request content types: Not specified in source.
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `id` | `path` | `string` | Yes |
+
+Body field definitions: not specified in source.
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Create a character" description="POST · Sora · Protocol reference">
+
+```http Route reference
+POST /sora/v1/characters
+```
+
+Catalog ID: `post-cc187ff55aeb`. Status: **Protocol reference**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `from_task` | `string` | No |
+| `timestamps` | `string` | Yes |
+| `url` | `string` | Yes |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Query credit balance" description="GET · Vidu · Needs review">
+
+```http Route reference
+GET /ent/v2/credits
+```
+
+Catalog ID: `get-019b89efaa48`. Status: **Needs review**.
+
+Request content types: Not specified in source.
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **provider-prefix-inconsistent**: Provider prefix usage is inconsistent across the source routes.
+
+</Accordion>
+
+<Accordion title="Extend a video" description="POST · Vidu · Needs review">
+
+```http Route reference
+POST /ent/v2/extend
+```
+
+Catalog ID: `post-bfc3adb1a63a`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `extend_duration` | `integer` | Yes |
+| `model` | `string` | Yes |
+| `resolution` | `string` | No |
+| `video_url` | `string` | Yes |
+
+Source issues:
+
+- **provider-prefix-inconsistent**: Provider prefix usage is inconsistent across the source routes.
+
+</Accordion>
+
+<Accordion title="Recommend an image-to-video prompt" description="POST · Vidu · Needs review">
+
+```http Route reference
+POST /ent/v2/img2video-prompt-recommendation
+```
+
+Catalog ID: `post-280bcdf92c27`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `count` | `integer` | No |
+| `image_url` | `string` | Yes |
+
+Source issues:
+
+- **provider-prefix-inconsistent**: Provider prefix usage is inconsistent across the source routes.
+
+</Accordion>
+
+<Accordion title="Lip sync" description="POST · Vidu · Needs review">
+
+```http Route reference
+POST /ent/v2/lip-sync
+```
+
+Catalog ID: `post-cd7e122a6c03`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `audio_url` | `string` | Yes |
+| `model` | `string` | Yes |
+| `video_url` | `string` | Yes |
+
+Source issues:
+
+- **provider-prefix-inconsistent**: Provider prefix usage is inconsistent across the source routes.
+
+</Accordion>
+
+<Accordion title="Generate an image from references" description="POST · Vidu · Needs review">
+
+```http Route reference
+POST /ent/v2/reference2image
+```
+
+Catalog ID: `post-3b1e0efd429b`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `image_count` | `integer` | No |
+| `model` | `string` | Yes |
+| `prompt` | `string` | Yes |
+| `reference_image_url` | `string` | Yes |
+
+Source issues:
+
+- **provider-prefix-inconsistent**: Provider prefix usage is inconsistent across the source routes.
+
+</Accordion>
+
+<Accordion title="Generate a video from references" description="POST · Vidu · Needs review">
+
+```http Route reference
+POST /ent/v2/reference2video
+```
+
+Catalog ID: `post-dadd67b0aebb`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `duration` | `integer` | No |
+| `model` | `string` | Yes |
+| `off_peak` | `boolean` | No |
+| `prompt` | `string` | Yes |
+| `reference_image_url` | `string` | Yes |
+| `resolution` | `string` | No |
+
+Source issues:
+
+- **provider-prefix-inconsistent**: Provider prefix usage is inconsistent across the source routes.
+
+</Accordion>
+
+<Accordion title="Generate video from first and last frames" description="POST · Vidu · Needs review">
+
+```http Route reference
+POST /ent/v2/start-end2video
+```
+
+Catalog ID: `post-97f6d48930c9`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `duration` | `integer` | No |
+| `first_frame_image` | `string` | Yes |
+| `last_frame_image` | `string` | Yes |
+| `model` | `string` | Yes |
+| `prompt` | `string` | No |
+
+Source issues:
+
+- **example-required-mismatch**: Example values do not match the schema required-field list.
+- **example-schema-mismatch**: The source example and schema disagree.
+- **provider-prefix-inconsistent**: Provider prefix usage is inconsistent across the source routes.
+
+</Accordion>
+
+<Accordion title="Cancel a task" description="POST · Vidu · Needs review">
+
+```http Route reference
+POST /ent/v2/tasks/{id}/cancel
+```
+
+Catalog ID: `post-7a9be168a097`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `id` | `path` | `string` | Yes |
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `id` | `string` | Yes |
+
+Source issues:
+
+- **provider-prefix-inconsistent**: Provider prefix usage is inconsistent across the source routes.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Create a scene from a template" description="POST · Vidu · Needs review">
+
+```http Route reference
+POST /ent/v2/template
+```
+
+Catalog ID: `post-769ecb82b026`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `duration` | `integer` | No |
+| `model` | `string` | Yes |
+| `prompt` | `string` | No |
+| `resolution` | `string` | No |
+| `template_id` | `string` | Yes |
+
+Source issues:
+
+- **provider-prefix-inconsistent**: Provider prefix usage is inconsistent across the source routes.
+
+</Accordion>
+
+<Accordion title="Create a template story" description="POST · Vidu · Needs review">
+
+```http Route reference
+POST /ent/v2/template-story
+```
+
+Catalog ID: `post-d930e537c14d`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `duration` | `integer` | No |
+| `model` | `string` | Yes |
+| `story_content` | `string` | Yes |
+| `template_id` | `string` | Yes |
+
+Source issues:
+
+- **provider-prefix-inconsistent**: Provider prefix usage is inconsistent across the source routes.
+
+</Accordion>
+
+<Accordion title="Text-to-audio" description="POST · Vidu · Needs review">
+
+```http Route reference
+POST /ent/v2/text2audio
+```
+
+Catalog ID: `post-002810029e3a`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `duration` | `integer` | No |
+| `model` | `string` | Yes |
+| `prompt` | `string` | Yes |
+
+Source issues:
+
+- **provider-prefix-inconsistent**: Provider prefix usage is inconsistent across the source routes.
+
+</Accordion>
+
+<Accordion title="Generate timed sound effects" description="POST · Vidu · Needs review">
+
+```http Route reference
+POST /ent/v2/timing2audio
+```
+
+Catalog ID: `post-a64b9378c3d5`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `duration` | `integer` | No |
+| `model` | `string` | Yes |
+| `prompt` | `string` | Yes |
+| `timing_points` | `array` | No |
+
+Source issues:
+
+- **provider-prefix-inconsistent**: Provider prefix usage is inconsistent across the source routes.
+
+</Accordion>
+
+<Accordion title="Upscale a video" description="POST · Vidu · Needs review">
+
+```http Route reference
+POST /ent/v2/upscale-new
+```
+
+Catalog ID: `post-ec42d79653a3`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `model` | `string` | Yes |
+| `target_resolution` | `string` | Yes |
+| `video_url` | `string` | Yes |
+
+Source issues:
+
+- **provider-prefix-inconsistent**: Provider prefix usage is inconsistent across the source routes.
+
+</Accordion>
+
+<Accordion title="Image-to-video" description="POST · Vidu · Needs review">
+
+```http Route reference
+POST /vidu/ent/v2/img2video
+```
+
+Catalog ID: `post-a36997f9a67f`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `duration` | `integer` | No |
+| `first_frame_image` | `string` | Yes |
+| `model` | `string` | Yes |
+| `prompt` | `string` | No |
+
+Source issues:
+
+- **example-required-mismatch**: Example values do not match the schema required-field list.
+- **example-schema-mismatch**: The source example and schema disagree.
+- **provider-prefix-inconsistent**: Provider prefix usage is inconsistent across the source routes.
+
+</Accordion>
+
+<Accordion title="Query task creations" description="GET · Vidu · Needs review">
+
+```http Route reference
+GET /vidu/ent/v2/tasks/{id}/creations
+```
+
+Catalog ID: `get-b8140daf95b6`. Status: **Needs review**.
+
+Request content types: Not specified in source.
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `id` | `path` | `string` | Yes |
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **provider-prefix-inconsistent**: Provider prefix usage is inconsistent across the source routes.
+
+</Accordion>
+
+<Accordion title="Text-to-video" description="POST · Vidu · Needs review">
+
+```http Route reference
+POST /vidu/ent/v2/text2video
+```
+
+Catalog ID: `post-604432ddd561`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `duration` | `integer` | No |
+| `model` | `string` | Yes |
+| `prompt` | `string` | Yes |
+| `prompt_optimizer` | `boolean` | No |
+| `resolution` | `string` | No |
+
+Source issues:
+
+- **example-schema-mismatch**: The source example and schema disagree.
+- **provider-prefix-inconsistent**: Provider prefix usage is inconsistent across the source routes.
+- **source-schema-conflict**: Source schema definitions conflict and require confirmation.
+
+</Accordion>
+
+<Accordion title="Image-to-video" description="POST · Wan · Protocol reference">
+
+```http Route reference
+POST /wan/api/v1/services/aigc/image2video/image-to-video
+```
+
+Catalog ID: `post-ecc22f41482c`. Status: **Protocol reference**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `input` | `object` | Yes |
+| `model` | `string` | Yes |
+| `parameters` | `object` | No |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Text-to-video" description="POST · Wan · Needs review">
+
+```http Route reference
+POST /wan/api/v1/services/aigc/text2video/text-to-video
+```
+
+Catalog ID: `post-7a4dc3837846`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `input` | `object` | Yes |
+| `model` | `string` | Yes |
+| `parameters` | `object` | No |
+
+Source issues:
+
+- **source-schema-conflict**: Source schema definitions conflict and require confirmation.
+
+</Accordion>
+
+<Accordion title="Generate a video" description="POST · Wan · Protocol reference">
+
+```http Route reference
+POST /wan/api/v1/services/aigc/video-generation/video-synthesis
+```
+
+Catalog ID: `post-7b561b737e48`. Status: **Protocol reference**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `input` | `object` | Yes |
+| `model` | `string` | Yes |
+| `parameters` | `object` | No |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Query task status" description="GET · Wan · Protocol reference">
+
+```http Route reference
+GET /wan/api/v1/tasks/{task_id}
+```
+
+Catalog ID: `get-4a2d7e5c2875`. Status: **Protocol reference**.
+
+Request content types: Not specified in source.
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `task_id` | `path` | `string` | Yes |
+
+Body field definitions: not specified in source.
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Create a unified video task" description="POST · Unified video · Needs review">
+
+```http Route reference
+POST /v2/videos/generations
+```
+
+Catalog ID: `post-e586b0b7e600`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `aspect_ratio` | `string` | No |
+| `enhance_prompt` | `boolean` | No |
+| `images` | `array` | Yes |
+| `model` | `string` | Yes |
+| `prompt` | `string` | Yes |
+
+Source issues:
+
+- **example-required-mismatch**: Example values do not match the schema required-field list.
+- **example-schema-mismatch**: The source example and schema disagree.
+- **overloaded-source-schema**: One source route combines schemas for different protocol branches.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Query a unified video task" description="GET · Unified video · Needs review">
+
+```http Route reference
+GET /v2/videos/generations/{task_id}
+```
+
+Catalog ID: `get-f48cde61646a`. Status: **Needs review**.
+
+Request content types: Not specified in source.
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `task_id` | `path` | `string` | Yes |
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Video and character tasks" description="POST · General video · Needs review">
+
+```http Route reference
+POST /v1/videos
+```
+
+Catalog ID: `post-416f0004b7c4`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `model` | `string` | Yes |
+| `timestamps` | `string` | Yes |
+| `url` | `string` | Yes |
+
+Source issues:
+
+- **example-schema-mismatch**: The source example and schema disagree.
+- **overloaded-source-schema**: One source route combines schemas for different protocol branches.
+
+</Accordion>
+
+<Accordion title="Remix a video" description="POST · General video · Needs review">
+
+```http Route reference
+POST /v1/videos/{id}/remix
+```
+
+Catalog ID: `post-d4b1bb2463f7`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `id` | `path` | `string` | Yes |
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `prompt` | `string` | Yes |
+
+Source issues:
+
+- **equivalent-path-template**: Equivalent path templates use different parameter names. Confirm the actual route.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+Equivalent template entries: `post-a96fd5dd160b`.
+
+</Accordion>
+
+<Accordion title="Query a video task" description="GET · General video · Needs review">
+
+```http Route reference
+GET /v1/videos/{video_id}
+```
+
+Catalog ID: `get-addc81b2e020`. Status: **Needs review**.
+
+Request content types: Not specified in source.
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `video_id` | `path` | `string` | Yes |
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **equivalent-path-template**: Equivalent path templates use different parameter names. Confirm the actual route.
+
+Equivalent template entries: `get-be29529bb622`.
+
+</Accordion>
+
+<Accordion title="Remix a video" description="POST · General video · Needs review">
+
+```http Route reference
+POST /v1/videos/{video_id}/remix
+```
+
+Catalog ID: `post-a96fd5dd160b`. Status: **Needs review**.
+
+Request content types: Not specified in source.
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `video_id` | `path` | `string` | Yes |
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **equivalent-path-template**: Equivalent path templates use different parameter names. Confirm the actual route.
+
+Equivalent template entries: `post-d4b1bb2463f7`.
+
+</Accordion>
+
+</AccordionGroup>
+
+## Music (12)
+
+<AccordionGroup>
+
+<Accordion title="Query a music task" description="GET · Suno · Needs review">
+
+```http Route reference
+GET /suno/fetch/{task_id}
+```
+
+Catalog ID: `get-87800c8dd091`. Status: **Needs review**.
+
+Request content types: Not specified in source.
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `task_id` | `path` | `string` | Yes |
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Generate music with the v5 task format" description="POST · Suno · Needs review">
+
+```http Route reference
+POST /suno/submit/music
+```
+
+Catalog ID: `post-b1b71fcd5d28`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **request-schema-incomplete**: Request schema is incomplete.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Upload music by URL" description="POST · Suno · Needs review">
+
+```http Route reference
+POST /suno/uploads/audio-url
+```
+
+Catalog ID: `post-918e2d81562e`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **request-schema-incomplete**: Request schema is incomplete.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Generate music" description="POST · Suno · Protocol reference">
+
+```http Route reference
+POST /suno/v1/music
+```
+
+Catalog ID: `post-8b9da41bc8e9`. Status: **Protocol reference**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `custom_mode` | `boolean` | Yes |
+| `input` | `object` | Yes |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Retrieve music" description="GET · Suno · Example path">
+
+```http Route reference
+GET /suno/v1/music/id
+```
+
+Catalog ID: `get-919f37ed5bc3`. Status: **Example path**.
+
+Request content types: Not specified in source.
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **literal-example-path**: The source path contains a literal example or placeholder; confirm the actual route.
+
+</Accordion>
+
+<Accordion title="Generate lyrics" description="POST · Suno · Needs review">
+
+```http Route reference
+POST /suno/v1/v3.0/lyrics
+```
+
+Catalog ID: `post-314ee6487287`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `prompt` | `string` | Yes |
+
+Source issues:
+
+- **example-required-mismatch**: Example values do not match the schema required-field list.
+- **example-schema-mismatch**: The source example and schema disagree.
+
+</Accordion>
+
+<Accordion title="Retrieve lyrics" description="GET · Suno · Example path">
+
+```http Route reference
+GET /suno/v1/v3.0/lyrics/id
+```
+
+Catalog ID: `get-d63cfa13eb69`. Status: **Example path**.
+
+Request content types: Not specified in source.
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **literal-example-path**: The source path contains a literal example or placeholder; confirm the actual route.
+
+</Accordion>
+
+<Accordion title="Generate music" description="POST · Suno · Protocol reference">
+
+```http Route reference
+POST /suno/v1/v3.0/music
+```
+
+Catalog ID: `post-97492bf54b54`. Status: **Protocol reference**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `custom_mode` | `boolean` | Yes |
+| `input` | `object` | Yes |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Retrieve music" description="GET · Suno · Example path">
+
+```http Route reference
+GET /suno/v1/v3.0/music/id
+```
+
+Catalog ID: `get-dfdb4771522b`. Status: **Example path**.
+
+Request content types: Not specified in source.
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **literal-example-path**: The source path contains a literal example or placeholder; confirm the actual route.
+
+</Accordion>
+
+<Accordion title="Query song clips" description="GET · Suno · Protocol reference">
+
+```http Route reference
+GET /suno/v2/feed
+```
+
+Catalog ID: `get-8b3986547a87`. Status: **Protocol reference**.
+
+Request content types: Not specified in source.
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `ids` | `query` | `string` | No |
+
+Body field definitions: not specified in source.
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Generate music" description="POST · Suno · Protocol reference">
+
+```http Route reference
+POST /suno/v2/generate
+```
+
+Catalog ID: `post-fdf7869ec5c4`. Status: **Protocol reference**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `continue_at` | `number` | No |
+| `continue_clip_id` | `string` | No |
+| `infill_end_s` | `null` | No |
+| `infill_start_s` | `null` | No |
+| `mv` | `string` | Yes |
+| `prompt` | `string` | Yes |
+| `tags` | `string` | No |
+| `title` | `string` | No |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Import an audio URL into Suno" description="POST · Suno · Protocol reference">
+
+```http Route reference
+POST /suno/v2/uploads/audio
+```
+
+Catalog ID: `post-fd325801d7e3`. Status: **Protocol reference**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `url` | `string` | Yes |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+</AccordionGroup>
+
+## Midjourney (17)
+
+<AccordionGroup>
+
+<Accordion title="Submit a Fast video task" description="POST · Midjourney · Protocol reference">
+
+```http Route reference
+POST /mj-fast/mj/submit/video
+```
+
+Catalog ID: `post-8f6074e95d29`. Status: **Protocol reference**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `action` | `string` | No |
+| `animate_mode` | `string` | No |
+| `base64` | `string` | No |
+| `motion` | `string` | Yes |
+| `prompt` | `string` | Yes |
+| `taskId` | `string` | No |
+| `video_type` | `string` | Yes |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Submit a Relax video task" description="POST · Midjourney · Protocol reference">
+
+```http Route reference
+POST /mj-relax/mj/submit/video
+```
+
+Catalog ID: `post-83341fc30375`. Status: **Protocol reference**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `action` | `string` | No |
+| `animate_mode` | `string` | No |
+| `base64` | `string` | No |
+| `motion` | `string` | Yes |
+| `prompt` | `string` | Yes |
+| `taskId` | `string` | No |
+| `video_type` | `string` | Yes |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Submit a face swap task" description="POST · Midjourney · Protocol reference">
+
+```http Route reference
+POST /mj/insight-face/swap
+```
+
+Catalog ID: `post-43fb724147cc`. Status: **Protocol reference**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `accountFilter` | `object` | No |
+| `notifyHook` | `string` | No |
+| `sourceBase64` | `string` | Yes |
+| `state` | `string` | No |
+| `targetBase64` | `string` | Yes |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Execute an action" description="POST · Midjourney · Protocol reference">
+
+```http Route reference
+POST /mj/submit/action
+```
+
+Catalog ID: `post-a603c69d9f40`. Status: **Protocol reference**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `customId` | `string` | Yes |
+| `notifyHook` | `string` | No |
+| `state` | `string` | No |
+| `taskId` | `string` | Yes |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Submit a Blend task" description="POST · Midjourney · Protocol reference">
+
+```http Route reference
+POST /mj/submit/blend
+```
+
+Catalog ID: `post-63d9378de49c`. Status: **Protocol reference**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `base64Array` | `array` | Yes |
+| `dimensions` | `string` | No |
+| `notifyHook` | `string` | No |
+| `state` | `string` | No |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Submit a Describe task" description="POST · Midjourney · Protocol reference">
+
+```http Route reference
+POST /mj/submit/describe
+```
+
+Catalog ID: `post-c44710e33149`. Status: **Protocol reference**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `base64` | `string` | Yes |
+| `notifyHook` | `string` | No |
+| `state` | `string` | No |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Submit an Imagine task" description="POST · Midjourney · Protocol reference">
+
+```http Route reference
+POST /mj/submit/imagine
+```
+
+Catalog ID: `post-7cb7a057fdbe`. Status: **Protocol reference**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `base64Array` | `array` | No |
+| `notifyHook` | `string` | No |
+| `prompt` | `string` | Yes |
+| `state` | `string` | No |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Submit a Modal interaction" description="POST · Midjourney · Protocol reference">
+
+```http Route reference
+POST /mj/submit/modal
+```
+
+Catalog ID: `post-155fe8557e6a`. Status: **Protocol reference**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `maskBase64` | `string` | No |
+| `prompt` | `string` | No |
+| `taskId` | `string` | Yes |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Submit a Shorten task" description="POST · Midjourney · Protocol reference">
+
+```http Route reference
+POST /mj/submit/shorten
+```
+
+Catalog ID: `post-62a5122ea772`. Status: **Protocol reference**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `accountFilter` | `object` | No |
+| `botType` | `string` | No |
+| `notifyHook` | `string` | No |
+| `prompt` | `string` | Yes |
+| `state` | `string` | No |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Query an example task" description="GET · Midjourney · Example path">
+
+```http Route reference
+GET /mj/task/{example_task_id}/fetch
+```
+
+Catalog ID: `get-f98650e42a87`. Status: **Example path**.
+
+Request content types: Not specified in source.
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **literal-example-path**: The source path contains a literal example or placeholder; confirm the actual route.
+
+</Accordion>
+
+<Accordion title="List all tasks" description="GET · Midjourney · Protocol reference">
+
+```http Route reference
+GET /mj/task/list
+```
+
+Catalog ID: `get-9e776a2c4741`. Status: **Protocol reference**.
+
+Request content types: Not specified in source.
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Query tasks by ID list" description="POST · Midjourney · Protocol reference">
+
+```http Route reference
+POST /mj/task/list-by-condition
+```
+
+Catalog ID: `post-4fc1f14d4c65`. Status: **Protocol reference**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `ids` | `array` | No |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Query tasks with pagination" description="POST · Midjourney · Protocol reference">
+
+```http Route reference
+POST /mj/task/query
+```
+
+Catalog ID: `post-bbace5637275`. Status: **Protocol reference**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `action` | `string` | No |
+| `description` | `string` | No |
+| `ids` | `array` | No |
+| `instanceId` | `string` | No |
+| `pageNumber` | `integer` | No |
+| `pageSize` | `integer` | No |
+| `prompt` | `string` | No |
+| `promptEn` | `string` | No |
+| `sort` | `string` | No |
+| `state` | `string` | No |
+| `status` | `string` | No |
+| `statusSet` | `array` | No |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Query the task queue" description="GET · Midjourney · Protocol reference">
+
+```http Route reference
+GET /mj/task/queue
+```
+
+Catalog ID: `get-2e1442a527aa`. Status: **Protocol reference**.
+
+Request content types: Not specified in source.
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Cancel a task" description="POST · Midjourney · Protocol reference">
+
+```http Route reference
+POST /mj/task/{id}/cancel
+```
+
+Catalog ID: `post-81449e2d412c`. Status: **Protocol reference**.
+
+Request content types: Not specified in source.
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `id` | `path` | `string` | Yes |
+
+Body field definitions: not specified in source.
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Get a task by ID" description="GET · Midjourney · Protocol reference">
+
+```http Route reference
+GET /mj/task/{id}/fetch
+```
+
+Catalog ID: `get-a5b9e74e0ad1`. Status: **Protocol reference**.
+
+Request content types: Not specified in source.
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `id` | `path` | `string` | Yes |
+
+Body field definitions: not specified in source.
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Get a task image seed" description="GET · Midjourney · Protocol reference">
+
+```http Route reference
+GET /mj/task/{id}/image-seed
+```
+
+Catalog ID: `get-4738df615c16`. Status: **Protocol reference**.
+
+Request content types: Not specified in source.
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `id` | `path` | `string` | Yes |
+
+Body field definitions: not specified in source.
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+</AccordionGroup>
+
+## Legacy and utility operations (32)
+
+<AccordionGroup>
+
+<Accordion title="Query asynchronous presentation information" description="GET · Presentations · Needs review">
+
+```http Route reference
+GET /api/ppt/asyncPptInfo
+```
+
+Catalog ID: `get-43c621ed0ee4`. Status: **Needs review**.
+
+Request content types: Not specified in source.
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `pptId` | `query` | `string` | Yes |
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Delete a presentation" description="POST · Presentations · Needs review">
+
+```http Route reference
+POST /api/ppt/delete
+```
+
+Catalog ID: `post-eb99e8ee6a5f`. Status: **Needs review**.
+
+Request content types: `text/plain`
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Generate a presentation directly" description="POST · Presentations · Needs review">
+
+```http Route reference
+POST /api/ppt/directGeneratePptx
+```
+
+Catalog ID: `post-355e75a0a953`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `pptxProperty` | `boolean` | Yes |
+| `stream` | `boolean` | Yes |
+| `subject` | `string` | Yes |
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Download a presentation" description="POST · Presentations · Needs review">
+
+```http Route reference
+POST /api/ppt/downloadPptx
+```
+
+Catalog ID: `post-81f8de13e54a`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `id` | `string` | Yes |
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Generate outline content and an asynchronous presentation" description="POST · Presentations · Needs review">
+
+```http Route reference
+POST /api/ppt/generateContent
+```
+
+Catalog ID: `post-3206f6606df1`. Status: **Needs review**.
+
+Request content types: `text/plain`
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Generate an outline" description="POST · Presentations · Needs review">
+
+```http Route reference
+POST /api/ppt/generateOutline
+```
+
+Catalog ID: `post-d5dbb7019230`. Status: **Needs review**.
+
+Request content types: `text/plain`
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Generate a presentation directly" description="POST · Presentations · Needs review">
+
+```http Route reference
+POST /api/ppt/generatePptx
+```
+
+Catalog ID: `post-f915ad6bcc14`. Status: **Needs review**.
+
+Request content types: `text/plain`
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="List presentations" description="POST · Presentations · Needs review">
+
+```http Route reference
+POST /api/ppt/listPptx
+```
+
+Catalog ID: `post-848a603f1aa0`. Status: **Needs review**.
+
+Request content types: `text/plain`
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Load presentation data" description="GET · Presentations · Needs review">
+
+```http Route reference
+GET /api/ppt/loadPptx
+```
+
+Catalog ID: `get-79a8add5130b`. Status: **Needs review**.
+
+Request content types: Not specified in source.
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `id` | `query` | `string` | Yes |
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Parse file content" description="POST · Presentations · Needs review">
+
+```http Route reference
+POST /api/ppt/parseFileData
+```
+
+Catalog ID: `post-b8f8f159263c`. Status: **Needs review**.
+
+Request content types: `multipart/form-data`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `content` | `string` | Yes |
+| `file` | `string` | Yes |
+| `fileUrl` | `string` | Yes |
+| `websearch` | `string` | Yes |
+| `website` | `string` | Yes |
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Choose random presentation templates" description="POST · Presentations · Needs review">
+
+```http Route reference
+POST /api/ppt/randomTemplates
+```
+
+Catalog ID: `post-6b0250648c88`. Status: **Needs review**.
+
+Request content types: `text/plain`
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Save a presentation" description="POST · Presentations · Needs review">
+
+```http Route reference
+POST /api/ppt/savePptx
+```
+
+Catalog ID: `post-747b4e3ea162`. Status: **Needs review**.
+
+Request content types: `text/plain`
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="List presentation templates with pagination" description="POST · Presentations · Needs review">
+
+```http Route reference
+POST /api/ppt/templates
+```
+
+Catalog ID: `post-37c6feedef85`. Status: **Needs review**.
+
+Request content types: `text/plain`
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Change a presentation template" description="POST · Presentations · Needs review">
+
+```http Route reference
+POST /api/ppt/updatePptTemplate
+```
+
+Catalog ID: `post-3c9edc7cd894`. Status: **Needs review**.
+
+Request content types: `text/plain`
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Update presentation properties" description="POST · Presentations · Needs review">
+
+```http Route reference
+POST /api/ppt/updatePptxAttr
+```
+
+Catalog ID: `post-1c6aaceb13aa`. Status: **Needs review**.
+
+Request content types: `text/plain`
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Example presentation authentication path" description="GET · Presentations · Example path">
+
+```http Route reference
+GET /api/ppt/xxx
+```
+
+Catalog ID: `get-d17df4ac47e1`. Status: **Example path**.
+
+Request content types: Not specified in source.
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+- **literal-example-path**: The source path contains a literal example or placeholder; confirm the actual route.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Convert JSON to a presentation" description="POST · Presentations · Needs review">
+
+```http Route reference
+POST /api/pptjson/json2ppt
+```
+
+Catalog ID: `post-60bb072b84fb`. Status: **Needs review**.
+
+Request content types: `text/plain`
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Convert a presentation to JSON" description="POST · Presentations · Needs review">
+
+```http Route reference
+POST /api/pptjson/ppt2json
+```
+
+Catalog ID: `post-3fbbb783d66c`. Status: **Needs review**.
+
+Request content types: `multipart/form-data`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `file` | `string` | Yes |
+| `uploadImage` | `string` | Yes |
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Query API information" description="GET · Presentations · Needs review">
+
+```http Route reference
+GET /api/user/apiInfo
+```
+
+Catalog ID: `get-d226c1d9cf02`. Status: **Needs review**.
+
+Request content types: Not specified in source.
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Create an API token" description="POST · Presentations · Needs review">
+
+```http Route reference
+POST /api/user/createApiToken
+```
+
+Catalog ID: `post-69b074e77f9c`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `limit` | `integer` | Yes |
+| `uid` | `string` | Yes |
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Generate a cover preview from a title" description="POST · Presentations · Needs review">
+
+```http Route reference
+POST /apps/ppt-cover
+```
+
+Catalog ID: `post-58585eb38268`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `color` | `string` | No |
+| `count` | `string` | Yes |
+| `style` | `string` | No |
+| `title` | `string` | Yes |
+| `user_name` | `string` | No |
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+
+</Accordion>
+
+<Accordion title="Generate with the current template" description="POST · Presentations · Needs review">
+
+```http Route reference
+POST /apps/ppt-create
+```
+
+Catalog ID: `post-eb702787f985`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `cover_id` | `string` | Yes |
+| `custom_data` | `object` | Yes |
+| `font_name` | `string` | Yes |
+| `id` | `string` | No |
+| `text` | `string` | No |
+| `transition` | `string` | Yes |
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+
+</Accordion>
+
+<Accordion title="Generate a presentation from a short text file" description="POST · Presentations · Needs review">
+
+```http Route reference
+POST /apps/ppt-create-file
+```
+
+Catalog ID: `post-d9f9760ce5c0`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `cover_id` | `string` | No |
+| `file_url` | `string` | Yes |
+| `user_name` | `string` | No |
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+
+</Accordion>
+
+<Accordion title="Change a template" description="POST · Presentations · Needs review">
+
+```http Route reference
+POST /apps/ppt-create-task
+```
+
+Catalog ID: `post-cae15307a2b0`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `cover_id` | `string` | Yes |
+| `font_name` | `string` | No |
+| `id` | `string` | Yes |
+| `transition` | `string` | No |
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+
+</Accordion>
+
+<Accordion title="Generate a presentation from a file" description="POST · Presentations · Needs review">
+
+```http Route reference
+POST /apps/ppt-create-thesis
+```
+
+Catalog ID: `post-50edf305073d`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `advisor` | `string` | No |
+| `color` | `string` | No |
+| `ffile_key` | `string` | Yes |
+| `pleader` | `string` | No |
+| `school` | `string` | No |
+| `school_logo` | `string` | No |
+| `style` | `string` | No |
+| `title` | `string` | No |
+
+Source issues:
+
+- **example-required-mismatch**: Example values do not match the schema required-field list.
+- **example-schema-mismatch**: The source example and schema disagree.
+- **historical-interface**: Historical interface; confirm current support before use.
+- **invalid-property-name**: The source includes an invalid property name.
+
+</Accordion>
+
+<Accordion title="Get a presentation download link" description="GET · Presentations · Needs review">
+
+```http Route reference
+GET /apps/ppt-download
+```
+
+Catalog ID: `get-f4320842be04`. Status: **Needs review**.
+
+Request content types: Not specified in source.
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `id` | `query` | `string` | Yes |
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+
+</Accordion>
+
+<Accordion title="Generate presentation notes" description="POST · Presentations · Needs review">
+
+```http Route reference
+POST /apps/ppt-note
+```
+
+Catalog ID: `post-3c8a157c353f`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `catalog_note` | `string` | Yes |
+| `cover_note` | `string` | Yes |
+| `end_note` | `string` | Yes |
+| `id` | `string` | Yes |
+| `mind_map_note` | `string` | Yes |
+| `notes` | `array` | Yes |
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+
+</Accordion>
+
+<Accordion title="Add one slide by task ID" description="POST · Presentations · Needs review">
+
+```http Route reference
+POST /apps/ppt-page
+```
+
+Catalog ID: `post-0ffb968b16af`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `complex` | `string` | No |
+| `font_name` | `string` | No |
+| `id` | `string` | No |
+| `slide_number` | `string` | No |
+| `slide_type` | `string` | No |
+| `text` | `string` | No |
+| `theme` | `string` | No |
+| `transition` | `string` | No |
+| `user_name` | `string` | No |
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+
+</Accordion>
+
+<Accordion title="Generate themed cover previews" description="POST · Presentations · Needs review">
+
+```http Route reference
+POST /apps/ppt-recover
+```
+
+Catalog ID: `post-7838a0c6d5a2`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `count` | `string` | Yes |
+| `cover_id` | `string` | Yes |
+| `title` | `string` | Yes |
+| `user_name` | `string` | No |
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+
+</Accordion>
+
+<Accordion title="Get generation status and preview slides" description="GET · Presentations · Needs review">
+
+```http Route reference
+GET /apps/ppt-result
+```
+
+Catalog ID: `get-603c8493821d`. Status: **Needs review**.
+
+Request content types: Not specified in source.
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `id` | `query` | `string` | Yes |
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+
+</Accordion>
+
+<Accordion title="Generate a title and outline from a description" description="POST · Presentations · Needs review">
+
+```http Route reference
+POST /apps/ppt-structure
+```
+
+Catalog ID: `post-11cd412c89b6`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `text` | `string` | No |
+| `theme` | `string` | No |
+| `title` | `string` | No |
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+
+</Accordion>
+
+<Accordion title="Edit an outline" description="POST · Presentations · Needs review">
+
+```http Route reference
+POST /ppt/updateOutline
+```
+
+Catalog ID: `post-750f733dc02b`. Status: **Needs review**.
+
+Request content types: `text/plain`
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **historical-interface**: Historical interface; confirm current support before use.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+</AccordionGroup>
+
+## Image processing and presentation tools (34)
+
+<AccordionGroup>
+
+<Accordion title="Generate Cute images with a negative prompt" description="POST · MewXAI · Needs review">
+
+```http Route reference
+POST /api/v1/images/cute/generate
+```
+
+Catalog ID: `post-1a08efe21eca`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `args` | `object` | Yes |
+| `callback_url` | `string` | Yes |
+| `type` | `string` | Yes |
+
+Source issues:
+
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Query image details" description="GET · MewXAI · Protocol reference">
+
+```http Route reference
+GET /api/v1/images/detail
+```
+
+Catalog ID: `get-1195d0a68deb`. Status: **Protocol reference**.
+
+Request content types: Not specified in source.
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `img_uuid` | `query` | `string` | Yes |
+
+Body field definitions: not specified in source.
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Generate images with different versions" description="POST · MewXAI · Needs review">
+
+```http Route reference
+POST /api/v1/images/generate
+```
+
+Catalog ID: `post-02c3c069e690`. Status: **Needs review**.
+
+Request content types: `text/plain`
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Generate a blended image" description="POST · MewXAI · Needs review">
+
+```http Route reference
+POST /api/v1/images/neuralstyle/generate
+```
+
+Catalog ID: `post-7d7aa4cd0f96`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `callback_url` | `string` | Yes |
+| `cn_list` | `array` | Yes |
+| `engine` | `integer` | Yes |
+| `source_img` | `string` | Yes |
+| `source_mode` | `integer` | Yes |
+| `style_img` | `string` | Yes |
+| `type` | `string` | Yes |
+
+Source issues:
+
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Generate artistic text from a template" description="POST · MewXAI · Needs review">
+
+```http Route reference
+POST /api/v1/images/shadow/generate
+```
+
+Catalog ID: `post-b8c2e6c4c34f`. Status: **Needs review**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `callback_url` | `string` | Yes |
+| `prompt` | `string` | Yes |
+| `ratio` | `integer` | Yes |
+| `template_id` | `integer` | Yes |
+| `text_image` | `string` | Yes |
+| `type` | `string` | Yes |
+
+Source issues:
+
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="List models" description="GET · MewXAI · Protocol reference">
+
+```http Route reference
+GET /api/v1/model/list
+```
+
+Catalog ID: `get-c1ab7949b703`. Status: **Protocol reference**.
+
+Request content types: Not specified in source.
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `type` | `query` | `string` | Yes |
+
+Body field definitions: not specified in source.
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Calculate points" description="POST · MewXAI · Protocol reference">
+
+```http Route reference
+POST /api/v1/mx/images/computed
+```
+
+Catalog ID: `post-57fa8987f3d1`. Status: **Protocol reference**.
+
+Request content types: Not specified in source.
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="List Cute blend models" description="GET · MewXAI · Protocol reference">
+
+```http Route reference
+GET /api/v1/mx/images/cute/extraList
+```
+
+Catalog ID: `get-a4ddab4388e1`. Status: **Protocol reference**.
+
+Request content types: Not specified in source.
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Generate Cute images" description="POST · MewXAI · Protocol reference">
+
+```http Route reference
+POST /api/v1/mx/images/cute/generate
+```
+
+Catalog ID: `post-895d9e448821`. Status: **Protocol reference**.
+
+Request content types: `application/json`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `args` | `object` | Yes |
+| `type` | `string` | Yes |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="List blend models" description="GET · MewXAI · Protocol reference">
+
+```http Route reference
+GET /api/v1/mx/images/extraList
+```
+
+Catalog ID: `get-bdcc89212968`. Status: **Protocol reference**.
+
+Request content types: Not specified in source.
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Generate with multiple blend models" description="POST · MewXAI · Needs review">
+
+```http Route reference
+POST /api/v1/mx/images/generate
+```
+
+Catalog ID: `post-83efb40a6fb6`. Status: **Needs review**.
+
+Request content types: `text/plain`
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="List MX image models" description="GET · MewXAI · Protocol reference">
+
+```http Route reference
+GET /api/v1/mx/images/modelList
+```
+
+Catalog ID: `get-33683db3c942`. Status: **Protocol reference**.
+
+Request content types: Not specified in source.
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Validate a request payload" description="POST · MewXAI · Needs review">
+
+```http Route reference
+POST /api/v1/mx/validate/checkPayload
+```
+
+Catalog ID: `post-9236c2e441ed`. Status: **Needs review**.
+
+Request content types: Not specified in source.
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="List templates" description="GET · MewXAI · Protocol reference">
+
+```http Route reference
+GET /api/v1/template/list
+```
+
+Catalog ID: `get-84a8e43a69ee`. Status: **Protocol reference**.
+
+Request content types: Not specified in source.
+
+| Parameter | Location | Type | Required in source |
+| --- | --- | --- | --- |
+| `type` | `query` | `string` | Yes |
+
+Body field definitions: not specified in source.
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Query account balance" description="GET · MewXAI · Protocol reference">
+
+```http Route reference
+GET /api/v1/user/count
+```
+
+Catalog ID: `get-937a5d0f0503`. Status: **Protocol reference**.
+
+Request content types: Not specified in source.
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Example callback path" description="POST · MewXAI · Example path">
+
+```http Route reference
+POST /api/xxx/xxx
+```
+
+Catalog ID: `post-63e80f3073ef`. Status: **Example path**.
+
+Request content types: Not specified in source.
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **literal-example-path**: The source path contains a literal example or placeholder; confirm the actual route.
+- **response-schema-incomplete**: Response schema is incomplete.
+
+</Accordion>
+
+<Accordion title="Create an OCR task" description="POST · Image processing and OCR · Protocol reference">
+
+```http Route reference
+POST /api/tasks/document/ocr
+```
+
+Catalog ID: `post-664b499c9644`. Status: **Protocol reference**.
+
+Request content types: `multipart/form-data`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `format` | `string` | No |
+| `image_file` | `string` | No |
+| `image_url` | `string` | No |
+| `language` | `string` | No |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Get OCR results" description="GET · Image processing and OCR · Example path">
+
+```http Route reference
+GET /api/tasks/document/ocr/task_id
+```
+
+Catalog ID: `get-48da60c956be`. Status: **Example path**.
+
+Request content types: Not specified in source.
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **literal-example-path**: The source path contains a literal example or placeholder; confirm the actual route.
+
+</Accordion>
+
+<Accordion title="Create an image colorization task" description="POST · Image processing and OCR · Protocol reference">
+
+```http Route reference
+POST /api/tasks/visual/colorization
+```
+
+Catalog ID: `post-28292b30df3b`. Status: **Protocol reference**.
+
+Request content types: `multipart/form-data`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `format` | `string` | No |
+| `image_file` | `string` | No |
+| `image_url` | `string` | No |
+| `return_type` | `integer` | No |
+| `sync` | `integer` | No |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Get colorization results" description="GET · Image processing and OCR · Example path">
+
+```http Route reference
+GET /api/tasks/visual/colorization/task_id
+```
+
+Catalog ID: `get-1f17840dd61b`. Status: **Example path**.
+
+Request content types: Not specified in source.
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **literal-example-path**: The source path contains a literal example or placeholder; confirm the actual route.
+
+</Accordion>
+
+<Accordion title="Create a document edge-correction task" description="POST · Image processing and OCR · Protocol reference">
+
+```http Route reference
+POST /api/tasks/visual/correction
+```
+
+Catalog ID: `post-328dec39c15d`. Status: **Protocol reference**.
+
+Request content types: `multipart/form-data`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `image_file` | `string` | No |
+| `image_url` | `string` | No |
+| `return_type` | `integer` | No |
+| `sync` | `integer` | No |
+| `type` | `integer` | No |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Get edge-correction results" description="GET · Image processing and OCR · Example path">
+
+```http Route reference
+GET /api/tasks/visual/correction/task_id
+```
+
+Catalog ID: `get-75b693a7fbcf`. Status: **Example path**.
+
+Request content types: Not specified in source.
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **literal-example-path**: The source path contains a literal example or placeholder; confirm the actual route.
+
+</Accordion>
+
+<Accordion title="Create an ID photo task" description="POST · Image processing and OCR · Protocol reference">
+
+```http Route reference
+POST /api/tasks/visual/idphoto
+```
+
+Catalog ID: `post-32120abd1cf9`. Status: **Protocol reference**.
+
+Request content types: `multipart/form-data`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `bg_color` | `string` | No |
+| `format` | `string` | No |
+| `image_file` | `string` | No |
+| `image_url` | `string` | No |
+| `return_type` | `integer` | No |
+| `size` | `string` | No |
+| `sync` | `integer` | No |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Get ID photo results" description="GET · Image processing and OCR · Example path">
+
+```http Route reference
+GET /api/tasks/visual/idphoto/task_id
+```
+
+Catalog ID: `get-37bb6710e736`. Status: **Example path**.
+
+Request content types: Not specified in source.
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **literal-example-path**: The source path contains a literal example or placeholder; confirm the actual route.
+
+</Accordion>
+
+<Accordion title="Create an image compression task" description="POST · Image processing and OCR · Protocol reference">
+
+```http Route reference
+POST /api/tasks/visual/imgcompress
+```
+
+Catalog ID: `post-3d2828cabe87`. Status: **Protocol reference**.
+
+Request content types: `multipart/form-data`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `format` | `string` | No |
+| `height` | `integer` | No |
+| `image_file` | `string` | No |
+| `image_url` | `string` | No |
+| `kbyte` | `integer` | No |
+| `quality` | `integer` | No |
+| `return_type` | `integer` | No |
+| `sync` | `integer` | No |
+| `width` | `integer` | No |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Get compression results" description="GET · Image processing and OCR · Example path">
+
+```http Route reference
+GET /api/tasks/visual/imgcompress/task_id
+```
+
+Catalog ID: `get-a6ea87c2b1a8`. Status: **Example path**.
+
+Request content types: Not specified in source.
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **literal-example-path**: The source path contains a literal example or placeholder; confirm the actual route.
+
+</Accordion>
+
+<Accordion title="Create an image inpainting task" description="POST · Image processing and OCR · Protocol reference">
+
+```http Route reference
+POST /api/tasks/visual/inpaint
+```
+
+Catalog ID: `post-2eda79e6666d`. Status: **Protocol reference**.
+
+Request content types: `multipart/form-data`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `image_file` | `string` | No |
+| `image_url` | `string` | No |
+| `mask_file` | `string` | No |
+| `mask_url` | `string` | No |
+| `rectangles` | `string` | No |
+| `return_type` | `integer` | No |
+| `sync` | `integer` | No |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Get inpainting results" description="GET · Image processing and OCR · Example path">
+
+```http Route reference
+GET /api/tasks/visual/inpaint/task_id
+```
+
+Catalog ID: `get-94ca318aec2e`. Status: **Example path**.
+
+Request content types: Not specified in source.
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **literal-example-path**: The source path contains a literal example or placeholder; confirm the actual route.
+
+</Accordion>
+
+<Accordion title="Create a background generation task" description="POST · Image processing and OCR · Protocol reference">
+
+```http Route reference
+POST /api/tasks/visual/r-background
+```
+
+Catalog ID: `post-d067b5febe5e`. Status: **Protocol reference**.
+
+Request content types: `multipart/form-data`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `batch_size` | `integer` | No |
+| `image_file` | `string` | No |
+| `image_url` | `string` | No |
+| `prompt` | `string` | No |
+| `scene_type` | `integer` | No |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Get background results" description="GET · Image processing and OCR · Example path">
+
+```http Route reference
+GET /api/tasks/visual/r-background/task_id
+```
+
+Catalog ID: `get-479e4b68dc17`. Status: **Example path**.
+
+Request content types: Not specified in source.
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **literal-example-path**: The source path contains a literal example or placeholder; confirm the actual route.
+
+</Accordion>
+
+<Accordion title="Create an image enhancement task" description="POST · Image processing and OCR · Protocol reference">
+
+```http Route reference
+POST /api/tasks/visual/scale
+```
+
+Catalog ID: `post-b0a4a2a7e747`. Status: **Protocol reference**.
+
+Request content types: `multipart/form-data`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `image_file` | `string` | No |
+| `image_url` | `string` | No |
+| `return_type` | `integer` | No |
+| `scale_factor` | `integer` | No |
+| `sync` | `integer` | No |
+| `type` | `string` | No |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Get enhancement results" description="GET · Image processing and OCR · Example path">
+
+```http Route reference
+GET /api/tasks/visual/scale/task_id
+```
+
+Catalog ID: `get-895f212c8d71`. Status: **Example path**.
+
+Request content types: Not specified in source.
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **literal-example-path**: The source path contains a literal example or placeholder; confirm the actual route.
+
+</Accordion>
+
+<Accordion title="Create a background removal task" description="POST · Image processing and OCR · Protocol reference">
+
+```http Route reference
+POST /api/tasks/visual/segmentation
+```
+
+Catalog ID: `post-bfd4637a0912`. Status: **Protocol reference**.
+
+Request content types: `multipart/form-data`
+
+Path/query/header parameter definitions: not specified in source.
+
+| Body field | Type | Required in source |
+| --- | --- | --- |
+| `bg_color` | `string` | No |
+| `crop` | `integer` | No |
+| `format` | `string` | No |
+| `image_file` | `string` | No |
+| `image_url` | `string` | No |
+| `output_type` | `integer` | No |
+| `return_type` | `integer` | No |
+| `sync` | `integer` | No |
+| `type` | `string` | No |
+
+No structural issue is flagged in this export. Availability still requires confirmation.
+
+</Accordion>
+
+<Accordion title="Get background removal results" description="GET · Image processing and OCR · Example path">
+
+```http Route reference
+GET /api/tasks/visual/segmentation/task_id
+```
+
+Catalog ID: `get-8c8c434e1d99`. Status: **Example path**.
+
+Request content types: Not specified in source.
+
+Path/query/header parameter definitions: not specified in source.
+
+Body field definitions: not specified in source.
+
+Source issues:
+
+- **literal-example-path**: The source path contains a literal example or placeholder; confirm the actual route.
+
+</Accordion>
+
+</AccordionGroup>
+
+## Confirm before integrating
+
+When paths differ only by placeholder names, verify the actual route and response. For asynchronous tasks, confirm the matching query method and identifier before implementing [polling or callbacks](/en/guides/async-tasks).

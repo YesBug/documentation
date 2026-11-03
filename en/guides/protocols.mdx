@@ -1,0 +1,73 @@
+---
+title: "Choose the correct API format"
+description: "Distinguish OpenAI-compatible endpoints, unified tasks and provider-specific protocols so your base URL, request body and result handling stay aligned."
+keywords: ["MaxAPI", "Choose the correct API format", "API documentation"]
+sidebarTitle: "API formats"
+---
+
+A MaxAPI model may be accessible through more than one protocol. Choose the task and format first, then configure its base URL, model identifier and request fields together.
+
+## Compare the three integration styles
+
+| Format | Typical tasks | Address | Client |
+| --- | --- | --- | --- |
+| OpenAI-compatible | Chat, embeddings, images and audio | SDK base URL `https://api.maxapi.ai/v1` | Compatible SDK or HTTP |
+| Unified tasks | Submit and query unified video tasks | HTTP root `https://api.maxapi.ai` | HTTP requests to `/v2/videos/...` |
+| Provider-specific compatibility | Native inputs, video options or task workflows | HTTP root `https://api.maxapi.ai`, preserving the protocol prefix | HTTP or an adapted provider SDK |
+
+Availability depends on your account's enabled models and channels. Even for the same model name, requests and responses can differ between formats.
+
+## Configure compatible SDK requests
+
+Methods such as `chat.completions.create` append `/chat/completions`, so include `/v1` exactly once in the base URL:
+
+```python SDK configuration
+import os
+from openai import OpenAI
+
+client = OpenAI(
+    api_key=os.environ["MAXAPI_API_KEY"],
+    base_url="https://api.maxapi.ai/v1",
+)
+```
+
+Direct HTTP requests use the full endpoint:
+
+```http Full endpoint URLs
+POST https://api.maxapi.ai/v1/chat/completions
+POST https://api.maxapi.ai/v1/images/generations
+POST https://api.maxapi.ai/v1/embeddings
+```
+
+Avoid `/v1/v1`. The website and console domains are not API servers.
+
+## Keep task protocols separate
+
+Unified video uses `/v2/videos/generations`. Wan uses `/wan/api/v1/services/aigc/...`, while Veo uses long-running operation objects with `predictLongRunning` and `fetchPredictOperation`.
+
+Their inputs, IDs, query methods and terminal states differ:
+
+- Do not copy unified `images` into a provider-specific body unchanged.
+- Do not treat a native `operation.name` as a unified `task_id`.
+- Check whether the query endpoint uses GET or POST.
+- A task query URL and a file download URL serve different purposes. Submission usually does not return the final file.
+
+Follow [unified video](/en/media/videos), [provider video formats](/en/media/video-providers) and [asynchronous tasks](/en/guides/async-tasks) for complete workflows.
+
+## Encode JSON and uploaded files correctly
+
+JSON bodies normally use `Content-Type: application/json`. File endpoints such as image editing and audio transcription use `multipart/form-data`.
+
+Let `curl -F`, browser `FormData` or your SDK generate the multipart boundary. Do not manually set a multipart content type without its boundary.
+
+Responses are not always JSON. [Speech](/en/api-reference/audio-speech) can return audio bytes, while [images](/en/api-reference/images) can return URLs or Base64. Check the HTTP status, content type and protocol before parsing.
+
+## Verify an integration
+
+1. Confirm the model and channel are enabled in your console.
+2. Find the corresponding format in the [API overview](/en/api-reference/index).
+3. Run a minimal request, then add optional parameters gradually.
+4. Save the route, model ID, task ID and redacted errors.
+5. Check paths and schemas before using [catalog](/en/api-reference/catalog) entries marked **Needs review**.
+
+The presence of an optional field does not mean every model supports it. Resolution, duration, output format, context limits and billing follow the selected model and account configuration.

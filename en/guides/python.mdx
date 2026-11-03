@@ -1,0 +1,98 @@
+---
+title: "Integrate MaxAPI with Python"
+description: "Configure the OpenAI Python SDK for MaxAPI, send chat requests, preserve conversation history and distinguish connection failures from API errors."
+keywords: ["MaxAPI", "Integrate MaxAPI with Python", "API documentation"]
+sidebarTitle: "Python SDK"
+---
+
+Use the OpenAI Python SDK with a custom `base_url` to call MaxAPI's compatible endpoints. The examples below read your key and model from the process environment.
+
+## Install the SDK
+
+Use a virtual environment for your project:
+
+```bash Terminal
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install openai
+```
+
+The activation command above is for macOS and Linux. On Windows PowerShell, use `.venv\Scripts\Activate.ps1`.
+
+## Configure environment variables
+
+```bash Set your credentials and model
+export MAXAPI_API_KEY="YOUR_MAXAPI_API_KEY"
+export MAXAPI_MODEL="YOUR_MODEL_ID"
+```
+
+Get your key from the [console](https://platform.maxapi.ai) and confirm the model ID with [List models](/en/api-reference/models). These examples do not load a `.env` file automatically.
+
+## Send a chat request
+
+```python main.py
+import os
+from openai import OpenAI
+
+client = OpenAI(
+    api_key=os.environ["MAXAPI_API_KEY"],
+    base_url="https://api.maxapi.ai/v1",
+)
+
+completion = client.chat.completions.create(
+    model=os.environ["MAXAPI_MODEL"],
+    messages=[
+        {"role": "user", "content": "Explain APIs in three bullet points."},
+    ],
+)
+
+print(completion.choices[0].message.content or "")
+```
+
+```bash Run the example
+python main.py
+```
+
+The client adds authentication headers. The `base_url` ends in `/v1`; do not append `/chat/completions` to it.
+
+## Preserve conversation history
+
+Chat Completions receives history through `messages`. Include the relevant earlier turns when sending a follow-up question:
+
+```python Continue a conversation
+messages = [
+    {"role": "user", "content": "What is a REST API?"},
+    {"role": "assistant", "content": "A REST API organizes network operations around resources."},
+    {"role": "user", "content": "Give me a simple example."},
+]
+
+completion = client.chat.completions.create(
+    model=os.environ["MAXAPI_MODEL"],
+    messages=messages,
+)
+
+print(completion.choices[0].message.content or "")
+```
+
+History consumes context. Summarize a long conversation or retain relevant excerpts to control input length.
+
+## Handle failed requests
+
+Distinguish a connection failure from an HTTP error returned by the API:
+
+```python Handle errors with the configured client
+import openai
+
+try:
+    completion = client.chat.completions.create(
+        model=os.environ["MAXAPI_MODEL"],
+        messages=[{"role": "user", "content": "Hello!"}],
+    )
+    print(completion.choices[0].message.content or "")
+except openai.APIConnectionError:
+    print("Connection failed. Check the network and API URL.")
+except openai.APIStatusError as error:
+    print(f"Request failed with HTTP status {error.status_code}")
+```
+
+See [troubleshooting](/en/help/errors) for diagnosis or [streaming](/en/guides/streaming) to read content incrementally. The [official Python SDK repository](https://github.com/openai/openai-python) documents additional client options.

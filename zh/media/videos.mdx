@@ -1,0 +1,127 @@
+---
+title: "统一视频接口"
+description: "使用统一路由提交视频生成任务、查询状态并读取结果。"
+keywords: ["MaxAPI", "统一视频接口", "videos"]
+---
+
+统一视频格式使用同一组提交和查询路由，模型通过 `model` 指定。它适用于已支持该格式的视频渠道；可用模型、图像输入方式和可选参数需在 [控制台](https://platform.maxapi.ai) 确认。
+
+```http "Endpoints"
+POST https://api.maxapi.ai/v2/videos/generations
+GET  https://api.maxapi.ai/v2/videos/generations/{task_id}
+```
+
+如果你的应用已经使用厂商原生请求体，先查看 [视频专用协议](/zh/media/video-providers)。`/v2/videos/generations` 与 `/v1/videos` 是不同接口格式，不能只替换路径后复用全部参数。
+
+## 提交任务
+
+请求头使用 `Authorization: Bearer $MAXAPI_API_KEY` 和 `Content-Type: application/json`。
+
+| 字段 | 类型 | 使用条件 | 说明 |
+| --- | --- | --- | --- |
+| `model` | `string` | 必填 | 已开通且支持统一视频格式的模型 ID |
+| `prompt` | `string` | 必填 | 描述主体、动作、场景与镜头 |
+| `images` | `string[]` | 图生视频时按模型要求提供 | 参考图 URL 或 Base64；首帧、尾帧、参考主体的含义取决于模型 |
+| `aspect_ratio` | `string` | 部分模型支持 | 宽高比，如已支持的 `16:9` 或 `9:16` |
+| `duration` | `number` | 部分模型支持 | 秒数，允许值由模型决定 |
+| `enhance_prompt` | `boolean` | 部分 Veo 渠道支持 | 是否进行提示词增强 |
+
+不要把不同模型的可选字段一次性全部发送。例如，`images` 在图生视频分支可能必填，在文生视频分支则不需要；时长和分辨率也不存在适用于所有模型的统一组合。
+
+### 文生视频
+
+下面示例适用于已确认支持文生视频的统一格式模型。将 `MAXAPI_VIDEO_MODEL` 设置为该模型的准确 ID。
+
+```bash "提交并保存响应"
+: "${MAXAPI_VIDEO_MODEL:?请设置支持统一文生视频格式的模型 ID}"
+jq -n --arg model "$MAXAPI_VIDEO_MODEL" '{
+  model: $model,
+  prompt: "A paper boat floats slowly across a quiet pond, soft morning light, fixed camera."
+}' | curl --fail-with-body https://api.maxapi.ai/v2/videos/generations \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @- \
+  --output video-submit.json
+```
+
+### 图生视频
+
+把 `MAXAPI_IMAGE_URL` 设置为你有权使用、且生成服务能够访问的参考图 URL。参考图数量和用途以模型要求为准。
+
+```bash "携带一张参考图"
+: "${MAXAPI_IMAGE_URL:?请设置可访问的参考图 URL}"
+jq -n --arg model "$MAXAPI_VIDEO_MODEL" --arg image "$MAXAPI_IMAGE_URL" '{
+  model: $model,
+  prompt: "Keep the main subject consistent. A gentle breeze moves through the scene.",
+  images: [$image]
+}' | curl --fail-with-body https://api.maxapi.ai/v2/videos/generations \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @- \
+  --output video-submit.json
+```
+
+## 保存任务 ID
+
+本例处理提交响应以顶层 `task_id` 返回标识的统一视频分支。部分统一格式的 Wan 示例使用 `id` 与 `output.task_id`；接入这类分支时应先确认它们与查询接口的对应关系，再明确修改解析代码。不要将其他协议的任意 `id` 自动送到此查询路由。
+
+```json "任务标识示意"
+{
+  "task_id": "your-task-id"
+}
+```
+
+```bash "提取并检查任务 ID"
+TASK_ID="$(jq -er '.task_id // empty' video-submit.json)"
+: "${TASK_ID:?响应中没有任务 ID，请检查错误详情}"
+```
+
+业务数据库应同时记录模型、接口格式、原始响应和任务 ID。HTTP 200 可能只表示已受理；还需要检查返回中的业务错误。
+
+## 查询状态
+
+任务 ID 可能包含冒号等字符。将它编码为路径片段后再查询，避免直接拼接特殊字符。
+
+```bash "查询一次任务状态"
+TASK_ID_ESCAPED="$(printf '%s' "$TASK_ID" | jq -sRr @uri)"
+curl --fail-with-body \
+  "https://api.maxapi.ai/v2/videos/generations/$TASK_ID_ESCAPED" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  --output video-status.json
+```
+
+| 资料中出现的状态 | 常见含义 | 建议处理 |
+| --- | --- | --- |
+| `NOT_START`、`QUEUED`、`SUBMITTED` | 尚未完成、等待执行 | 保留任务并等待下次查询 |
+| `IN_PROGRESS` | 正在生成 | 继续查询，展示可用的进度信息 |
+| `SUCCESS` | 成功 | 检查结果字段，取得视频地址 |
+| `FAILURE` | 失败 | 读取 `fail_reason` 等错误详情 |
+| 其他值 | 当前渠道的其他状态或格式差异 | 记录原始值，并在有限期限内查询；不要自动视为成功 |
+
+这里汇总的是不同示例中出现的状态，**不是每个模型都返回的固定枚举**。状态可能位于顶层，也可能在协议包装对象中。按你所用渠道的真实响应建立解析规则。
+
+## 读取视频结果
+
+成功响应的常见结果字段包括 `data.video_url`、`data.output` 或顶层 `video_url`、`url`。下面只示意一种结构：
+
+```json "成功响应关键字段示意"
+{
+  "task_id": "your-task-id",
+  "status": "SUCCESS",
+  "progress": "100%",
+  "data": {
+    "video_url": "https://your-storage.example/generated-video.mp4"
+  }
+}
+```
+
+确认成功状态和结果地址后，由服务端下载并保存到自己的存储。不要把临时生成地址当作永久资源地址，也不要向任意结果下载域名附带 MaxAPI 密钥。
+
+## 超时、失败与重试
+
+- 提交超时且无法确定是否受理时，先排查已有任务，避免重复提交产生多份生成任务。
+- 查询请求遇到暂时性网络错误时，可延迟重试；设置查询间隔和总等待期限。
+- 明确生成失败时记录任务 ID、模型和失败原因，再决定是否修改输入后重新提交。
+- 到达本地等待期限只代表应用停止等待，不等于服务端任务被取消。
+
+轮询、回调去重和业务状态保存的完整建议见 [异步任务与回调](/zh/guides/async-tasks)。

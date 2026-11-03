@@ -1,0 +1,65 @@
+---
+title: "Build multimedia generation workflows"
+description: "Choose image, video, music and audio protocols, distinguish immediate output from asynchronous tasks, and preserve each format’s request and result semantics."
+keywords: ["MaxAPI", "Build multimedia generation workflows", "API documentation"]
+sidebarTitle: "Overview"
+---
+
+MaxAPI image, video and music integrations can use different request formats. Confirm the model's enabled protocol before choosing submission, query and download endpoints. A model name alone does not establish support for every route.
+
+All requests use `https://api.maxapi.ai`. Confirm model, group and channel access in the [console](https://platform.maxapi.ai). The formats described here are not a promise that every account has every capability enabled.
+
+## Choose a starting point
+
+| Task | Guide | Result pattern |
+| --- | --- | --- |
+| Generate or edit images | [Image generation](/en/api-reference/images), [editing](/en/api-reference/images-edits) | Commonly an image URL or Base64, depending on the model |
+| Gemini, Stable Diffusion or Ideogram images | [Image protocols](/en/media/image-providers) | Provider-specific request and output shapes |
+| Text-to-video or image-to-video | [Unified video](/en/media/videos) | Submit, then query by task ID |
+| Native video formats | [Video protocols](/en/media/video-providers) | Protocol-specific task, status and file resources |
+| Midjourney images and actions | [Midjourney](/en/media/midjourney) | Submit, query and select a returned action |
+| Suno music and continuation | [Music](/en/media/music) | Query a task or song clip after submission |
+| Speech, transcription and translation | [Speech](/en/api-reference/audio-speech), [transcription](/en/api-reference/audio-transcriptions), [translation](/en/api-reference/audio-translations) | Audio bytes or text output |
+
+## Distinguish synchronous and asynchronous results
+
+A synchronous endpoint returns its result in one request. Read the response according to its `Content-Type` and fields: an image may be a URL or Base64, while speech may be binary audio.
+
+An asynchronous endpoint first returns acceptance. Save the task identifier and query progress until success or failure. Receiving an ID does not mean generation is complete.
+
+```text Asynchronous workflow
+Submit request -> Save task ID and protocol -> Query status
+                                               | Processing: wait and query again
+                                               | Failed: record the reason
+                                               | Succeeded: retrieve and store output
+```
+
+Some endpoints support callbacks, but fields and states vary. Retain task information and a query path even when receiving callbacks. See [asynchronous tasks](/en/guides/async-tasks).
+
+## Preserve protocol differences
+
+| Detail | Possible forms | Integration rule |
+| --- | --- | --- |
+| Body | JSON, multipart, multimodal `parts` | Encode for the specific route; let your client generate multipart boundaries |
+| Prompt | `prompt`, `user_prompt`, `promptText`, `input.prompt` | Preserve field name and nesting |
+| Model | `model`, `mv`, model in URL | Do not replace every form with one JSON field |
+| Task identifier | `id`, `task_id`, `result`, `operationName` | Save both the value and protocol |
+| Result identifier | Task ID, song clip ID, `file_id` | Keep them separately |
+| State | Uppercase, lowercase, numbers or boolean `done` | Map states separately per protocol |
+| Callback | `notifyHook`, `notify_hook`, `callback_url` | Send only when supported by that route |
+
+OpenAI-compatible SDKs suit the routes they support. Changing `base_url` does not convert a body into a provider-specific format. See [API formats](/en/guides/protocols).
+
+## Prepare the examples
+
+These multimedia guides use `jq` to construct JSON. Set `MAXAPI_API_KEY` on your server, then configure each guide's model variables with confirmed available IDs:
+
+```bash Check the key variable
+: "${MAXAPI_API_KEY:?Set MAXAPI_API_KEY first}"
+```
+
+Keep keys on your backend. Let your frontend submit and query through your application service.
+
+## Locate additional operations
+
+The [extended catalog](/en/api-reference/catalog) preserves additional routes, fields and protocol branches. If source examples and schemas disagree, confirm the channel's accepted format before testing a minimal request.

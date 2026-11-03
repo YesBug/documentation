@@ -1,0 +1,157 @@
+---
+title: "视频专用协议"
+description: "对照 Veo、Wan、Seedance、Vidu、Hailuo、Luma、Kling 和 Runway 的路由与任务结构。"
+keywords: ["MaxAPI", "视频专用协议", "video-providers"]
+---
+
+厂商专用协议保留各自的字段名称、任务对象和下载流程。它们适合已经使用对应格式的应用；希望采用共同提交入口时，可先查看 [统一视频接口](/zh/media/videos)。
+
+以下路由以 `https://api.maxapi.ai` 为请求域名，并使用 `Authorization: Bearer $MAXAPI_API_KEY`。每一类能力均需单独确认渠道是否开通；共享一套 API 系统不意味着所有模型、协议版本和功能都已启用。
+
+## 路由速查
+
+| 协议 | 提交路由 | 查询方式 | 主要请求结构 |
+| --- | --- | --- | --- |
+| Veo AI Studio | `POST /aistudio/v1beta/models/{model}:predictLongRunning` | 同前缀的 `:fetchPredictOperation`，POST 提交 `operationName` | `instances[]`、`parameters` |
+| Veo Vertex | `POST /vertex/v1/publishers/google/models/{model}:predictLongRunning` | 同前缀的 `:fetchPredictOperation` | `instances[]`、`parameters` |
+| Wan | `POST /wan/api/v1/services/aigc/video-generation/video-synthesis` | `GET /wan/api/v1/tasks/{task_id}` | `model`、`input`、`parameters` |
+| Seedance | `POST /seedance/api/v3/contents/generations/tasks` | `GET /seedance/api/v3/contents/generations/tasks/{id}` | 资料有冲突，见下文 |
+| Vidu | `POST /vidu/ent/v2/text2video` 或 `/vidu/ent/v2/img2video` | `GET /vidu/ent/v2/tasks/{id}/creations` | 文本、参考图等参数由具体操作决定 |
+| Hailuo | `POST /hailuo/v1/video_generation` | `GET /hailuo/v1/query/video_generation?task_id=...` | `model`、`prompt`、可选帧图 |
+| Luma v2 | `POST /luma/v2/generations` | 按生成 ID 查询同一资源，见下文 | `user_prompt`、可选参考图 |
+| Kling | `POST /kling/v1/videos/text2video` 或 `/kling/v1/videos/image2video` | `GET /kling/v1/{action}/{action2}/{task_id}` | `prompt`、`model` 和该操作的参数 |
+| Runway | `POST /runwayml/v1/image_to_video` | 当前接口资料未给出查询路由 | `promptImage`、`promptText`、`model` |
+
+完整参数和其他分支可在 [接口目录](/zh/api-reference/catalog) 检索。不要根据某个厂商的官方路径，自行推断 MaxAPI 一定提供相同的所有路由。
+
+## Veo：保存 operation 名称
+
+AI Studio 与 Vertex 格式以长任务操作对象表示生成请求。模型在 URL 中，提交体使用 `instances`；查询体使用返回的 operation 名称。两种前缀需要分别确认权限，并保持提交与查询前缀一致。
+
+| 字段 | 位置 | 作用 |
+| --- | --- | --- |
+| `model` | URL | 已开通的 Veo 模型 ID |
+| `instances[].prompt` | 请求体 | 场景描述 |
+| `parameters` | 请求体 | 当前模型支持的时长、宽高比等参数 |
+| `name` | 提交响应 | 需要完整保存的 operation 名称 |
+| `operationName` | 查询请求体 | 上一步返回的 operation 名称 |
+| `done` | 查询响应 | 任务是否结束；结束后仍要检查结果或错误 |
+
+下面示例只演示已开通的 AI Studio 文生视频分支：
+
+```bash "Veo AI Studio 提交"
+: "${MAXAPI_VEO_MODEL:?请设置已开通的 AI Studio Veo 模型 ID}"
+VEO_MODEL_ESCAPED="$(printf '%s' "$MAXAPI_VEO_MODEL" | jq -sRr @uri)"
+jq -n '{instances: [{prompt: "A small sailboat crosses a calm lake at sunrise."}]}' \
+  | curl --fail-with-body \
+    "https://api.maxapi.ai/aistudio/v1beta/models/$VEO_MODEL_ESCAPED:predictLongRunning" \
+    -H "Authorization: Bearer $MAXAPI_API_KEY" \
+    -H "Content-Type: application/json" \
+    --data-binary @- \
+    --output veo-operation.json
+```
+
+```bash "查询同一个 operation"
+OPERATION_NAME="$(jq -er '.name // empty' veo-operation.json)"
+: "${OPERATION_NAME:?响应缺少 operation 名称}"
+jq -n --arg operation "$OPERATION_NAME" '{operationName: $operation}' \
+  | curl --fail-with-body \
+    "https://api.maxapi.ai/aistudio/v1beta/models/$VEO_MODEL_ESCAPED:fetchPredictOperation" \
+    -H "Authorization: Bearer $MAXAPI_API_KEY" \
+    -H "Content-Type: application/json" \
+    --data-binary @-
+```
+
+`done: true` 不等于一定生成成功，还需检查 `error` 或 `response`。不同分支可能返回文件引用或 Base64 视频数据，不应统一解析为顶层 `video_url`。
+
+## Wan：input 与 parameters 分层
+
+Wan 格式通常把生成内容放在 `input`，把时长、分辨率等控制项放在 `parameters`。该协议还包含独立的文生视频与图生视频路径：
+
+```http "Wan 分支"
+POST /wan/api/v1/services/aigc/text2video/text-to-video
+POST /wan/api/v1/services/aigc/image2video/image-to-video
+GET  /wan/api/v1/tasks/{task_id}
+```
+
+当前接口资料中，文生视频的字段定义混入了图生视频的 `image_url` 要求，而示例使用 `input.prompt`。因此不要按字段表给纯文本请求强行添加图片，也不要将图生视频的模型枚举当作文生视频可用列表。确认所用模型的字段后再构造请求；也可检查它是否提供 [统一视频格式](/zh/media/videos)。
+
+Wan 查询响应还可能包含业务包装层。应区分 HTTP 成功、查询业务成功和生成任务成功，并按所用分支读取任务状态。
+
+## Seedance 与 Vidu：先核对字段冲突
+
+这两类路由已出现在接口资料中，但部分字段定义与示例存在不一致，尚不能据此给出通用可运行请求体。
+
+| 协议 | 已观察到的不一致 | 接入前需要确认 |
+| --- | --- | --- |
+| Seedance | 路由属于 Seedance，部分 schema 却包含 Wan 模型与 `input`；另一示例使用 `content[]`，包含文本和图像内容块 | 模型 ID、`content` 结构和媒体引用方式 |
+| Vidu | 文生视频 schema 包含 Hailuo 模型名称，示例却使用 Vidu；部分其他操作缺少 `/vidu` 前缀 | 该操作的准确路径、模型与字段定义 |
+
+不要将这些冲突部分生成的请求示例直接用于生产。先在 [接口目录](/zh/api-reference/catalog) 找到具体操作，并确认对应渠道的可用请求格式。此处保留路径供定位，避免把另一个厂商的参数当成可用参数。
+
+## Hailuo：任务完成后取得文件
+
+Hailuo 格式把生成任务和文件下载分为两步资源查询。是否支持文生、首帧、首尾帧或主体参考，取决于具体模型。
+
+| 字段 | 使用方式 |
+| --- | --- |
+| `model` | 指定已开通的模型 |
+| `prompt` | 描述视频内容 |
+| `first_frame_image` | 支持图生视频时使用的首帧 |
+| `last_frame_image` | 支持首尾帧模式时配合首帧使用 |
+| `subject_image` | 支持主体参考的模型使用 |
+| `callback_url` | 已支持回调时使用的通知地址 |
+
+```bash "Hailuo 文生视频最小结构"
+: "${MAXAPI_HAILUO_MODEL:?请设置支持文生视频的 Hailuo 模型 ID}"
+jq -n --arg model "$MAXAPI_HAILUO_MODEL" '{
+  model: $model,
+  prompt: "A white paper plane glides slowly through a bright room."
+}' | curl --fail-with-body https://api.maxapi.ai/hailuo/v1/video_generation \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @- \
+  --output hailuo-submit.json
+```
+
+保存有效的 `task_id` 后，以 query 参数查询。资料示例中处理中为 `Processing`、成功为 `Success`，大小写与统一视频不同；业务错误还可能放在 `base_resp`。
+
+```http "后续查询"
+GET /hailuo/v1/query/video_generation?task_id={task_id}
+GET /hailuo/v1/files/retrieve?file_id={file_id}
+```
+
+任务成功后保存 `file_id`，再通过文件接口读取 `file.download_url`。`file_id` 不是任务 ID，不能代替 `task_id` 去查询生成进度。
+
+## Luma：user_prompt 与生成资源
+
+Luma v2 使用 `user_prompt`，而不是统一视频的 `prompt`。可选字段包括 `image_url`、`image_end_url`、`expand_prompt` 和 `notify_hook`；使用前确认当前渠道支持的模式。
+
+```bash "Luma v2 提交"
+jq -n '{user_prompt: "A red kite floats over a sunlit meadow."}' \
+  | curl --fail-with-body https://api.maxapi.ai/luma/v2/generations \
+    -H "Authorization: Bearer $MAXAPI_API_KEY" \
+    -H "Content-Type: application/json" \
+    --data-binary @- \
+    --output luma-submit.json
+```
+
+提交示例返回 `id` 和 `state`。接口资料把查询路径记为 `/luma/v2/generations/task_id`，其中 `task_id` 表示待替换的任务位置；接入时应确认最终路径是否为 `/luma/v2/generations/{id}`，不要直接发送字面量 `task_id`。扩展视频、下载等相关路径也需要同样核对。
+
+## Kling：按操作查询
+
+Kling 文生视频和图生视频使用不同的操作路径。查询模板中的 `action` 和 `action2` 应与提交操作相匹配，例如 `videos` 和 `text2video`。
+
+```http "文生视频查询路径"
+GET /kling/v1/videos/text2video/{task_id}
+```
+
+资料中的 `data.task_status` 包含 `submitted`、`processing`、`succeed` 和 `failed`，成功内容在任务结果对象中。`callback_url` 是可选字段；它与 Midjourney 的 `notifyHook` 名称不同。模型、时长和参考图参数应按具体操作选用。
+
+## Runway：保留驼峰字段
+
+Runway 图生视频示例使用 `promptImage`、`promptText`、`model`、`ratio` 等字段；`promptImage` 还可能通过包含 `uri`、`position` 的对象表达首尾帧。这与统一格式的 `images` 数组不同。
+
+当前接口资料未包含对应任务查询操作，也没有完整定义各版本的请求字段。因此这里不补造查询路径或完整请求示例。确认所用模型的提交与查询契约后，再接入 `/runwayml/v1/image_to_video`；其他动作可在 [接口目录](/zh/api-reference/catalog) 检索。
+
+所有专用协议都建议保存原始响应、模型、协议类型和任务标识。通用的有限轮询、错误处理和回调去重方案见 [异步任务与回调](/zh/guides/async-tasks)。

@@ -1,0 +1,75 @@
+---
+title: "快速开始"
+description: "获取 API Key，选择模型，发送你的第一个 MaxAPI 请求。"
+keywords: ["MaxAPI", "快速开始", "quickstart"]
+---
+
+只需一个 API Key，就可以通过 OpenAI 兼容的接口将模型接入你的应用。本教程从终端发送一次对话请求，再带你使用熟悉的 SDK 继续开发。
+
+## 1. 准备 API Key
+
+登录 [MaxAPI 控制台](https://platform.maxapi.ai)，获取用于调用接口的 API Key，并确认账户具备所选模型的调用权限。
+
+将密钥保存为服务端环境变量。下方的值是占位符，请替换为你自己的密钥。
+
+```bash "终端"
+export MAXAPI_API_KEY="替换为你的 API Key"
+```
+
+API Key 具有账户访问权限。不要把它写入前端代码、公开仓库或客户端安装包。更多说明见 [身份验证](/zh/authentication)。
+
+## 2. 选择一个模型
+
+查询当前密钥可见的模型列表：
+
+```bash "获取模型列表"
+curl --fail-with-body https://api.maxapi.ai/v1/models \
+  -H "Authorization: Bearer $MAXAPI_API_KEY"
+```
+
+从响应中复制一个适合文本对话的模型 `id`，保存为环境变量。模型名称需要与返回的 ID 完全一致。
+
+```bash "设置模型"
+export MAXAPI_MODEL="替换为模型 ID"
+```
+
+如果列表为空或请求失败，请先检查密钥、账户权限及返回的错误信息。可用模型和具体能力以控制台及实时接口结果为准。
+
+## 3. 发送第一次请求
+
+下面使用 `jq` 构建 JSON，避免模型 ID 中的特殊字符影响请求体；请先确保本机已安装 `jq`。
+
+```bash "创建一条对话"
+jq -n --arg model "$MAXAPI_MODEL" '{
+  model: $model,
+  messages: [
+    {role: "user", content: "用一句话介绍你自己。"}
+  ]
+}' | curl --fail-with-body https://api.maxapi.ai/v1/chat/completions \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @-
+```
+
+在兼容的非流式响应中，生成的文本位于 `choices[0].message.content`。完整响应还可能包含模型信息、结束原因与用量统计，具体字段随模型和响应类型变化。
+
+## 4. 接入你的应用
+
+MaxAPI 的 SDK Base URL 为：
+
+```text
+https://api.maxapi.ai/v1
+```
+
+在 OpenAI 兼容 SDK 中设置该地址和你的 MaxAPI API Key，就可以调用 `chat.completions.create`。
+
+| 接下来做什么 | 阅读文档 |
+| --- | --- |
+| 用 Python 构建应用 | [Python SDK](/zh/guides/python) |
+| 用 JavaScript 或 TypeScript 构建应用 | [Node.js SDK](/zh/guides/nodejs) |
+| 逐步显示生成的内容 | [流式响应](/zh/guides/streaming) |
+| 了解请求字段和返回结构 | [创建对话](/zh/api-reference/chat-completions) |
+
+## 请求没有成功？
+
+先确认请求地址包含且仅包含一段 `/v1`，再检查 API Key 和模型 ID。发生错误时保留 HTTP 状态码及已脱敏的响应内容，按照 [错误排查](/zh/help/errors) 逐项检查。

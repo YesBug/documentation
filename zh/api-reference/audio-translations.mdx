@@ -1,0 +1,30 @@
+---
+title: "翻译音频"
+description: "使用 POST /v1/audio/translations 将音频翻译为英文文本，理解文件上传、语言限制与返回格式。"
+keywords: ["MaxAPI", "翻译音频", "audio-translations"]
+openapi: "openapi/zh.json POST /v1/audio/translations"
+---
+
+音频翻译接口将上传的语音转换为英文文本。它接收实际音频文件，需使用支持该端点的模型；若希望保留原语言，请使用 [音频转录](/zh/api-reference/audio-transcriptions)。
+
+## 翻译为英文
+
+将 `MAXAPI_AUDIO_MODEL` 切换为支持翻译端点的模型。该端点不是任意目标语言转换器，不要通过 `language` 指定输出语言。
+
+```bash "cURL：音频翻译"
+curl --fail-with-body https://api.maxapi.ai/v1/audio/translations \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -F "model=$MAXAPI_AUDIO_MODEL" \
+  -F "file=@meeting.mp3" \
+  -F "response_format=json"
+```
+
+JSON 格式的英文结果同样位于 `text`。如果需要其他目标语言，可以先转录，再通过 [对话接口](/zh/api-reference/chat-completions) 翻译得到的文字。
+
+## 文件与返回格式
+
+使用 `multipart/form-data` 上传实际音频，不要将本地文件名或网页 URL 当作文件正文。文件格式、大小与时长限制以所用模型要求为准。
+
+需要英文术语提示时，按模型支持情况传入 `prompt`。模型支持 `srt` 或 `vtt` 时，返回内容应作为字幕文本保存；选择 JSON 输出时，从 `text` 读取翻译结果。
+
+上传失败或字幕格式不受支持时，先使用一段有效短音频和最小参数验证，再恢复其他设置。更多排查步骤见 [错误排查](/zh/help/errors)。

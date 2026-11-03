@@ -1,0 +1,101 @@
+---
+title: "流式响应"
+description: "在支持的模型中逐段接收内容，为对话应用提供更及时的反馈。"
+keywords: ["MaxAPI", "流式响应", "streaming"]
+---
+
+流式响应会在生成过程中持续返回数据，适合聊天界面和较长文本的生成。在支持流式输出的模型上，将请求中的 `stream` 设置为 `true` 即可启用。
+
+## Python 示例
+
+准备好 `MAXAPI_API_KEY` 和 `MAXAPI_MODEL` 环境变量后运行：
+
+```python "stream.py"
+import os
+from openai import OpenAI
+
+client = OpenAI(
+    api_key=os.environ["MAXAPI_API_KEY"],
+    base_url="https://api.maxapi.ai/v1",
+)
+
+stream = client.chat.completions.create(
+    model=os.environ["MAXAPI_MODEL"],
+    messages=[{"role": "user", "content": "写一段关于探索的短文。"}],
+    stream=True,
+)
+
+try:
+    for chunk in stream:
+        if not chunk.choices:
+            continue
+        text = chunk.choices[0].delta.content
+        if text:
+            print(text, end="", flush=True)
+finally:
+    stream.close()
+
+print()
+```
+
+## Node.js 示例
+
+```javascript "stream.mjs"
+import OpenAI from "openai";
+
+const apiKey = process.env.MAXAPI_API_KEY;
+const model = process.env.MAXAPI_MODEL;
+if (!apiKey || !model) {
+  throw new Error("请设置 MAXAPI_API_KEY 和 MAXAPI_MODEL。");
+}
+
+const client = new OpenAI({
+  apiKey,
+  baseURL: "https://api.maxapi.ai/v1",
+});
+
+const stream = await client.chat.completions.create({
+  model,
+  messages: [{ role: "user", content: "写一段关于探索的短文。" }],
+  stream: true,
+});
+
+for await (const chunk of stream) {
+  const text = chunk.choices[0]?.delta.content;
+  if (text) process.stdout.write(text);
+}
+
+process.stdout.write("\n");
+```
+
+## 理解增量内容
+
+非流式文本通常读取 `choices[0].message.content`；流式文本则读取每个数据块中的 `choices[0].delta.content`，并按顺序拼接。
+
+并非每个数据块都包含文本。有的数据块只携带角色、结束状态或其他元信息，所以示例会跳过空的 `choices` 和没有文本的增量。
+
+## 使用原始 HTTP
+
+OpenAI 兼容的流式接口使用 Server-Sent Events（SSE）传输数据。使用 `curl -N` 可以关闭 curl 的输出缓冲，便于在终端观察数据逐步到达。
+
+```bash "cURL · 需要 jq"
+jq -n --arg model "$MAXAPI_MODEL" '{
+  model: $model,
+  messages: [{role: "user", content: "写一段关于探索的短文。"}],
+  stream: true
+}' | curl -N --fail-with-body https://api.maxapi.ai/v1/chat/completions \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @-
+```
+
+自行实现 SSE 客户端时，应按事件边界解析数据。网络读取的一次分块不一定对应一个完整 JSON，也不一定对应一个完整字符。使用 SDK 可以减少这部分处理工作。
+
+## 接入界面时的建议
+
+- 在收到第一段内容前显示加载状态，收到内容后按顺序追加文本。
+- 将完成、用户取消和网络中断作为不同状态处理，避免把中断的文本标记为完整回答。
+- 用户离开页面或取消生成时，关闭对应连接。
+- 检查服务端、反向代理和托管平台的响应缓冲及连接超时配置。
+
+流式传输改善的是内容展示时机。模型能力、输出限制和计费应以当前模型及控制台说明为准。

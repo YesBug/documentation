@@ -1,0 +1,49 @@
+---
+title: "Create a chat completion"
+description: "POST /v1/chat/completions: send text or multimodal messages, read generated content and usage, and request streaming or tool calls on supported models."
+keywords: ["MaxAPI", "Create a chat completion", "API documentation"]
+sidebarTitle: "Chat completions"
+openapi: "openapi/en.json POST /v1/chat/completions"
+---
+
+Chat Completions generates the next reply from a message history. Use it for conversations, summaries, translation and code generation. Vision input and tool calling require support from your selected model and channel.
+
+## Start with a minimal request
+
+Begin with only `model` and `messages`, then add supported options. Avoid passing both output-length parameters together. A visible model does not necessarily support every field shown in the generated reference.
+
+Set `MAXAPI_API_KEY` and `MAXAPI_MODEL` as described in the [quickstart](/en/quickstart). This cURL example requires `jq`:
+
+```bash Create a reply
+jq -n --arg model "$MAXAPI_MODEL" '{
+  model: $model,
+  messages: [{role: "user", content: "Explain what an API is in three sentences."}],
+  stream: false
+}' | curl --fail-with-body https://api.maxapi.ai/v1/chat/completions \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @-
+```
+
+For a multi-turn conversation, send the relevant earlier user and assistant messages again. A previous response `id` alone does not restore history. See [Python](/en/guides/python) or [Node.js](/en/guides/nodejs) for SDK examples.
+
+## Read the result
+
+Generated text is in `choices[].message.content`; it can be empty when the assistant returns `tool_calls`. Your application executes those tools. Common finish reasons include `stop`, `length` and `tool_calls`.
+
+When present, `usage` describes returned token usage. Additional details vary by model; use the console for billing information.
+
+## Streaming and multimodal requests
+
+Set `stream: true` to receive SSE text in `choices[].delta.content`. Tool arguments can arrive in fragments and need assembly before JSON parsing. Follow [streaming](/en/guides/streaming), [vision](/en/guides/vision) and [tool calling](/en/guides/tools) for complete examples.
+
+## Troubleshooting
+
+| Symptom | Action |
+| --- | --- |
+| Unsupported parameter | Return to `model` and `messages`, then restore options individually |
+| Missing earlier context | Include relevant history in the current `messages` |
+| Empty content | Inspect tool calls, finish reason and other returned fields |
+| Truncated reply | Check `finish_reason` and a model-supported output limit or reduce context |
+
+See [troubleshooting](/en/help/errors) for authentication, rate and upstream errors.

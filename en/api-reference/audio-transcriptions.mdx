@@ -1,0 +1,63 @@
+---
+title: "Transcribe audio"
+description: "POST /v1/audio/transcriptions: upload an audio file to produce text in its original language, choose supported output formats, and diagnose recognition issues."
+keywords: ["MaxAPI", "Transcribe audio", "API documentation"]
+sidebarTitle: "Transcribe audio"
+openapi: "openapi/en.json POST /v1/audio/transcriptions"
+---
+
+Audio transcription returns text in the recording's original language. Upload a real file and choose a MaxAPI model supporting the transcription endpoint. File formats, sizes and duration limits depend on the enabled channel.
+
+## Upload a recording
+
+Save a recording as `meeting.mp3`, set `MAXAPI_API_KEY` and choose a transcription model in `MAXAPI_AUDIO_MODEL`:
+
+<CodeGroup>
+
+```bash cURL
+curl --fail-with-body https://api.maxapi.ai/v1/audio/transcriptions \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -F "model=$MAXAPI_AUDIO_MODEL" \
+  -F "file=@meeting.mp3" \
+  -F "response_format=json"
+```
+
+```python Python
+import os
+from openai import OpenAI
+
+client = OpenAI(
+    api_key=os.environ["MAXAPI_API_KEY"],
+    base_url="https://api.maxapi.ai/v1",
+)
+with open("meeting.mp3", "rb") as audio:
+    result = client.audio.transcriptions.create(
+        model=os.environ["MAXAPI_AUDIO_MODEL"],
+        file=audio,
+        response_format="json",
+    )
+print(result.text)
+```
+
+</CodeGroup>
+
+Install `openai` for Python. Let the client generate the multipart boundary. The JSON transcription text is returned in `text`.
+
+## Choose language and output options
+
+Where supported, `language` is an ISO 639-1 input language code, such as `en` or `zh`. A transcription `prompt` can provide terminology and context in the source language.
+
+Some channels accept MP3, MP4, MPEG, MPGA, M4A, WAV or WebM. Confirm the format and limits for your model, and ensure the file extension matches the actual encoding.
+
+Supported output formats can include `json`, `text`, `srt`, `verbose_json` and `vtt`. Save subtitle formats as text rather than parsing them as JSON. Extra timing and segment fields in `verbose_json` depend on the model.
+
+## Troubleshoot recognition
+
+| Symptom | Action |
+| --- | --- |
+| Missing file | Use `-F "file=@meeting.mp3"` to upload file content |
+| Empty or inaccurate text | Check that audio contains speech and review recording quality and language settings |
+| Unsupported subtitle format | Start with a model-supported format such as `json` |
+| Oversized upload | Split audio by time and record segment order and time offsets |
+
+To translate speech into English, use [audio translation](/en/api-reference/audio-translations). Other authentication or upstream failures are covered in [troubleshooting](/en/help/errors).

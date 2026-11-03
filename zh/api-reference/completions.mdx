@@ -1,0 +1,23 @@
+---
+title: "文本补全"
+description: "使用 prompt 格式接入兼容传统 Completions 接口的模型。"
+keywords: ["MaxAPI", "文本补全", "completions"]
+openapi: "openapi/zh.json POST /v1/completions"
+---
+
+文本补全接口接收 `prompt` 并续写文本，适合已有 Completions 集成。它与接收 `messages` 的 [对话接口](/zh/api-reference/chat-completions) 使用不同的请求和响应结构。请先确认模型支持该端点。
+
+## 读取结果
+
+生成内容位于 `choices[].text`。流式响应继续使用该字段提供增量文本，不使用 Chat Completions 的 `delta.content`。SSE 分帧方式可参考 [流式响应](/zh/guides/streaming)。
+
+## 接入注意事项
+
+| 问题 | 建议 |
+| --- | --- |
+| 模型可见但调用失败 | 模型列表只说明可见性，确认其是否支持 `/v1/completions` |
+| 返回文本读取不到 | 读取 `choices[].text`，而非 `choices[].message.content` |
+| 使用聊天消息报错 | 此端点使用 `prompt`；对话场景改用 Chat Completions |
+| 生成被截断 | 检查 `finish_reason: "length"` 和模型上下文限制 |
+
+其他 HTTP 错误见 [错误排查](/zh/help/errors)。

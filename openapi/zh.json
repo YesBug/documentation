@@ -1,0 +1,1744 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MaxAPI API 参考",
+    "version": "1.0.0",
+    "description": "通过统一接口接入文本、图像和音频模型。选择接口，查看请求参数、响应结构和代码示例，并使用在线调试发送请求。\n\n**开始调用**：在 [控制台](https://platform.maxapi.ai) 创建 API Key，填入认证设置，再将请求中的 `YOUR_MODEL_ID` 替换为当前账户可用且支持该接口的模型 ID。SDK Base URL 为 `https://api.maxapi.ai/v1`。\n\n[快速开始](/zh/quickstart) · [身份验证](/zh/authentication) · [模型与能力](/zh/models) · [错误排查](/zh/help/errors)\n\n本参考收录 9 个常用兼容端点。可选参数、输入限制和模型能力以当前账户通道为准；示例内容及用量仅作结构演示。视频、音乐等异步接口请参阅 [视频生成](/zh/media/videos)、[音乐生成](/zh/media/music) 和 [异步任务](/zh/guides/async-tasks)。\n\n切换文档语言会切换说明与示例文字，接口路径、参数名及枚举值保持不变。"
+  },
+  "servers": [
+    {
+      "url": "https://api.maxapi.ai",
+      "description": "MaxAPI 接口地址"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "文本",
+      "description": "创建对话、续写文本和生成向量。对话、补全与嵌入需要不同能力的模型。"
+    },
+    {
+      "name": "图像",
+      "description": "通过文字生成图片，或上传文件进行图片编辑。"
+    },
+    {
+      "name": "音频",
+      "description": "文本转语音、语音转录与英文翻译。"
+    },
+    {
+      "name": "模型",
+      "description": "查询当前 API Key 可见的模型标识。"
+    }
+  ],
+  "paths": {
+    "/v1/chat/completions": {
+      "post": {
+        "operationId": "createChatCompletion",
+        "summary": "创建对话",
+        "tags": [
+          "文本"
+        ],
+        "description": "根据消息列表生成下一条回复，适合聊天、摘要、翻译与代码生成。\n\n- 普通回复读取 `choices[].message.content`。\n- `stream: true` 时返回 SSE，读取 `choices[].delta.content`。\n- 图片消息和函数工具需要模型支持。多轮对话需在本次 `messages` 中带上历史。\n\n[流式响应](/zh/guides/streaming) · [视觉理解](/zh/guides/vision) · [工具调用](/zh/guides/tools)",
+        "responses": {
+          "200": {
+            "description": "非流式返回 JSON；stream 为 true 时返回 SSE。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatResponse"
+                },
+                "examples": {
+                  "text": {
+                    "summary": "文本回复",
+                    "value": {
+                      "id": "chatcmpl-example",
+                      "object": "chat.completion",
+                      "choices": [
+                        {
+                          "index": 0,
+                          "message": {
+                            "role": "assistant",
+                            "content": "API 是应用之间交换信息的接口。"
+                          },
+                          "finish_reason": "stop"
+                        }
+                      ],
+                      "usage": {
+                        "prompt_tokens": 18,
+                        "completion_tokens": 24,
+                        "total_tokens": 42
+                      }
+                    }
+                  },
+                  "tool": {
+                    "summary": "工具调用",
+                    "value": {
+                      "id": "chatcmpl-example",
+                      "object": "chat.completion",
+                      "choices": [
+                        {
+                          "index": 0,
+                          "message": {
+                            "role": "assistant",
+                            "content": null,
+                            "tool_calls": [
+                              {
+                                "id": "call-example",
+                                "type": "function",
+                                "function": {
+                                  "name": "get_delivery_days",
+                                  "arguments": "{\"region\":\"east\"}"
+                                }
+                              }
+                            ]
+                          },
+                          "finish_reason": "tool_calls"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string",
+                  "description": "SSE 事件流，以空行划分事件，data: [DONE] 表示结束。对话增量文字位于 choices[].delta.content；文本补全位于 choices[].text。详见 [流式响应](/zh/guides/streaming)。"
+                },
+                "examples": {
+                  "stream": {
+                    "summary": "SSE 事件序列",
+                    "value": "data: {\"id\":\"chatcmpl-example\",\"object\":\"chat.completion.chunk\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-example\",\"object\":\"chat.completion.chunk\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"API 是应用之间交换信息的接口。\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-example\",\"object\":\"chat.completion.chunk\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n",
+                    "description": "按空行划分完整事件，再解析每个 data 字段；一次网络读取不一定对应一个完整事件。"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequest"
+              },
+              "examples": {
+                "basic": {
+                  "summary": "文本对话",
+                  "value": {
+                    "model": "YOUR_MODEL_ID",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "用三句话解释什么是 API。"
+                      }
+                    ],
+                    "stream": false
+                  }
+                },
+                "stream": {
+                  "summary": "流式对话",
+                  "value": {
+                    "model": "YOUR_MODEL_ID",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "写一段关于探索的短文。"
+                      }
+                    ],
+                    "stream": true
+                  }
+                },
+                "tools": {
+                  "summary": "函数工具",
+                  "value": {
+                    "model": "YOUR_MODEL_ID",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "请查询演示数据，华东配送预计需要几天？"
+                      }
+                    ],
+                    "tools": [
+                      {
+                        "type": "function",
+                        "function": {
+                          "name": "get_delivery_days",
+                          "description": "查询演示数据中的配送天数。",
+                          "parameters": {
+                            "type": "object",
+                            "properties": {
+                              "region": {
+                                "type": "string",
+                                "enum": [
+                                  "east",
+                                  "west"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "region"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      }
+                    ],
+                    "tool_choice": "auto"
+                  },
+                  "description": "需要支持工具调用的模型。模型仅返回调用请求，工具由应用执行。"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/completions": {
+      "post": {
+        "operationId": "createCompletion",
+        "summary": "文本补全",
+        "tags": [
+          "文本"
+        ],
+        "description": "使用 `prompt` 续写文本，适合已集成传统 Completions 的应用。请选用支持该端点的模型。\n\n结果读取 `choices[].text`，流式模式也使用该字段。聊天场景使用创建对话接口及 `messages` 参数。",
+        "responses": {
+          "200": {
+            "description": "非流式返回 JSON；流式增量文本位于 choices[].text。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompletionResponse"
+                },
+                "examples": {
+                  "text": {
+                    "summary": "结构示意",
+                    "value": {
+                      "id": "cmpl-example",
+                      "object": "text_completion",
+                      "choices": [
+                        {
+                          "index": 0,
+                          "text": "以统一接口连接模型。",
+                          "finish_reason": "stop"
+                        }
+                      ],
+                      "usage": {
+                        "prompt_tokens": 12,
+                        "completion_tokens": 10,
+                        "total_tokens": 22
+                      }
+                    }
+                  }
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string",
+                  "description": "SSE 事件流，以空行划分事件，data: [DONE] 表示结束。对话增量文字位于 choices[].delta.content；文本补全位于 choices[].text。详见 [流式响应](/zh/guides/streaming)。"
+                },
+                "examples": {
+                  "stream": {
+                    "summary": "SSE 事件序列",
+                    "value": "data: {\"id\":\"cmpl-example\",\"object\":\"text_completion\",\"choices\":[{\"index\":0,\"text\":\"以统一接口连接模型。\",\"finish_reason\":null}]}\n\ndata: [DONE]\n\n",
+                    "description": "按空行划分完整事件，再解析每个 data 字段；一次网络读取不一定对应一个完整事件。"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompletionRequest"
+              },
+              "examples": {
+                "basic": {
+                  "summary": "文本补全",
+                  "value": {
+                    "model": "YOUR_MODEL_ID",
+                    "prompt": "请续写这段介绍：MaxAPI 帮助开发者",
+                    "stream": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/embeddings": {
+      "post": {
+        "operationId": "createEmbeddings",
+        "summary": "向量嵌入",
+        "tags": [
+          "文本"
+        ],
+        "description": "将单段或批量文本编码为向量，用于语义检索、相似度匹配和知识库。\n\n使用 `data[].index` 对应输入顺序。文档与查询应使用相同模型和维数；更换模型后应重建索引。",
+        "responses": {
+          "200": {
+            "description": "每条输入对应的向量及可用的用量信息。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmbeddingResponse"
+                },
+                "examples": {
+                  "vectors": {
+                    "summary": "浮点向量",
+                    "value": {
+                      "object": "list",
+                      "data": [
+                        {
+                          "object": "embedding",
+                          "index": 0,
+                          "embedding": [
+                            0.12,
+                            -0.04,
+                            0.08
+                          ]
+                        },
+                        {
+                          "object": "embedding",
+                          "index": 1,
+                          "embedding": [
+                            0.07,
+                            0.11,
+                            -0.02
+                          ]
+                        }
+                      ],
+                      "usage": {
+                        "prompt_tokens": 20,
+                        "total_tokens": 20
+                      }
+                    },
+                    "description": "仅保留三个示意值，不表示实际模型维数或用量。"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmbeddingRequest"
+              },
+              "examples": {
+                "batch": {
+                  "summary": "批量文本",
+                  "value": {
+                    "model": "YOUR_MODEL_ID",
+                    "input": [
+                      "如何创建 API 密钥？",
+                      "如何查询模型列表？"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/images/generations": {
+      "post": {
+        "operationId": "generateImages",
+        "summary": "生成图像",
+        "tags": [
+          "图像"
+        ],
+        "description": "根据文字描述生成图片。首次请求建议仅提供 `model` 和 `prompt`，再按模型能力设置尺寸、数量与质量。\n\n结果位于 `data` 数组，使用 `url` 或 `b64_json`，具体由模型和请求格式决定。",
+        "responses": {
+          "200": {
+            "description": "图片 URL 或 Base64 数据，具体格式由模型和请求决定。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageResponse"
+                },
+                "examples": {
+                  "base64": {
+                    "summary": "Base64 图像",
+                    "value": {
+                      "data": [
+                        {
+                          "b64_json": "BASE64_IMAGE_DATA"
+                        }
+                      ]
+                    },
+                    "description": "BASE64_IMAGE_DATA 为图片数据占位符；部分模型返回 url 字段。"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImageGenerationRequest"
+              },
+              "examples": {
+                "basic": {
+                  "summary": "文字生成图像",
+                  "value": {
+                    "model": "YOUR_MODEL_ID",
+                    "prompt": "清晨的极简工作室，桌面上有一盏白色台灯，自然光，干净的产品摄影构图"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/images/edits": {
+      "post": {
+        "operationId": "editImage",
+        "summary": "编辑图像",
+        "tags": [
+          "图像"
+        ],
+        "description": "上传原图并描述需要进行的修改。本定义提供单张图片上传；遮罩仅适用于支持该能力的模型。\n\n使用 `multipart/form-data` 上传文件内容，由客户端自动设置 boundary。文件路径字符串不能代替文件上传。",
+        "responses": {
+          "200": {
+            "description": "编辑后图片的 URL 或 Base64 数据。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageResponse"
+                },
+                "examples": {
+                  "base64": {
+                    "summary": "Base64 图像",
+                    "value": {
+                      "data": [
+                        {
+                          "b64_json": "BASE64_IMAGE_DATA"
+                        }
+                      ]
+                    },
+                    "description": "BASE64_IMAGE_DATA 为图片数据占位符；部分模型返回 url 字段。"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/ImageEditRequest"
+              },
+              "encoding": {
+                "image": {
+                  "contentType": "application/octet-stream"
+                },
+                "mask": {
+                  "contentType": "application/octet-stream"
+                }
+              },
+              "examples": {
+                "basic": {
+                  "summary": "上传图片",
+                  "description": "模型 ID 为占位符；运行代码前准备相应的本地文件，在线发送时使用文件选择器上传。",
+                  "value": {
+                    "model": "YOUR_MODEL_ID",
+                    "image": "@image.png",
+                    "prompt": "保留主体外观，将背景改为浅灰色摄影棚背景。"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/audio/speech": {
+      "post": {
+        "operationId": "createSpeech",
+        "summary": "文本转语音",
+        "tags": [
+          "音频"
+        ],
+        "description": "将文本合成为音频。请设置模型实际支持的音色 ID，示例中的 `YOUR_VOICE_ID` 需要替换。\n\n成功响应是音频字节，`Content-Type` 取决于输出格式。先检查 HTTP 状态，再将结果保存或播放；错误时可能返回 JSON。",
+        "responses": {
+          "200": {
+            "description": "音频二进制内容，Content-Type 取决于输出格式。",
+            "content": {
+              "audio/mpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "audio/ogg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "audio/aac": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "audio/flac": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "audio/wav": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpeechRequest"
+              },
+              "examples": {
+                "basic": {
+                  "summary": "合成 MP3",
+                  "value": {
+                    "model": "YOUR_MODEL_ID",
+                    "input": "欢迎使用 MaxAPI，开始构建你的智能应用。",
+                    "voice": "YOUR_VOICE_ID",
+                    "response_format": "mp3"
+                  },
+                  "description": "模型与音色为待替换的占位符，MP3 输出需模型支持。"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/audio/transcriptions": {
+      "post": {
+        "operationId": "createTranscription",
+        "summary": "语音转录",
+        "tags": [
+          "音频"
+        ],
+        "description": "上传音频，生成原语言文字。可用 `language` 提供输入语言提示；输出格式由 `response_format` 和模型能力决定。\n\n上传实际文件，由客户端自动生成 multipart boundary。JSON 格式读取 `text`；文本和字幕格式直接保存响应主体。",
+        "responses": {
+          "200": {
+            "description": "按 response_format 返回文字、JSON 或字幕。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AudioTextResponse"
+                },
+                "examples": {
+                  "text": {
+                    "summary": "转录文本",
+                    "value": {
+                      "text": "我们将在本周完成接口接入。"
+                    }
+                  }
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "text": {
+                    "summary": "纯文本",
+                    "value": "我们将在本周完成接口接入。"
+                  },
+                  "srt": {
+                    "summary": "SRT 字幕",
+                    "value": "1\n00:00:00,000 --> 00:00:03,000\n我们将在本周完成接口接入。\n"
+                  }
+                }
+              },
+              "text/vtt": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "vtt": {
+                    "summary": "VTT 字幕",
+                    "value": "WEBVTT\n\n00:00:00.000 --> 00:00:03.000\n我们将在本周完成接口接入。\n"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/TranscriptionRequest"
+              },
+              "encoding": {
+                "file": {
+                  "contentType": "application/octet-stream"
+                }
+              },
+              "examples": {
+                "basic": {
+                  "summary": "上传音频",
+                  "description": "模型 ID 为占位符；运行代码前准备相应的本地文件，在线发送时使用文件选择器上传。",
+                  "value": {
+                    "model": "YOUR_MODEL_ID",
+                    "file": "@audio.wav",
+                    "response_format": "json"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/audio/translations": {
+      "post": {
+        "operationId": "createTranslation",
+        "summary": "语音翻译",
+        "tags": [
+          "音频"
+        ],
+        "description": "上传音频并翻译为英文文字。此端点不支持通过 `language` 指定任意目标语言。\n\n需要其他目标语言时，可先转录，再通过对话接口翻译文字。文件、模型与输出格式限制取决于当前通道。",
+        "responses": {
+          "200": {
+            "description": "英文文字，按 response_format 返回 JSON、文本或字幕。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AudioTextResponse"
+                },
+                "examples": {
+                  "text": {
+                    "summary": "英文翻译",
+                    "value": {
+                      "text": "We will complete the API integration this week."
+                    }
+                  }
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "text": {
+                    "summary": "纯文本",
+                    "value": "We will complete the API integration this week."
+                  },
+                  "srt": {
+                    "summary": "SRT 字幕",
+                    "value": "1\n00:00:00,000 --> 00:00:03,000\nWe will complete the API integration this week.\n"
+                  }
+                }
+              },
+              "text/vtt": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "vtt": {
+                    "summary": "VTT 字幕",
+                    "value": "WEBVTT\n\n00:00:00.000 --> 00:00:03.000\nWe will complete the API integration this week.\n"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/TranslationRequest"
+              },
+              "encoding": {
+                "file": {
+                  "contentType": "application/octet-stream"
+                }
+              },
+              "examples": {
+                "basic": {
+                  "summary": "上传音频",
+                  "description": "模型 ID 为占位符；运行代码前准备相应的本地文件，在线发送时使用文件选择器上传。",
+                  "value": {
+                    "model": "YOUR_MODEL_ID",
+                    "file": "@audio.wav",
+                    "response_format": "json"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/models": {
+      "get": {
+        "operationId": "listModels",
+        "summary": "查询模型",
+        "tags": [
+          "模型"
+        ],
+        "description": "获取当前 API Key 可见的模型，将响应中的 `data[].id` 用作其他接口的 `model` 参数。此接口无需请求体。\n\n模型可见不代表支持所有端点、输入类型或可选参数。账户权限与模型状态可能变化，以当前请求为准。\n\n[模型与能力](/zh/models)",
+        "responses": {
+          "200": {
+            "description": "当前密钥可见的模型列表。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelList"
+                },
+                "examples": {
+                  "models": {
+                    "summary": "模型列表",
+                    "value": {
+                      "object": "list",
+                      "data": [
+                        {
+                          "id": "YOUR_MODEL_ID",
+                          "object": "model"
+                        }
+                      ]
+                    },
+                    "description": "YOUR_MODEL_ID 是占位符，请使用实时响应返回的准确标识。"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "在 [MaxAPI 控制台](https://platform.maxapi.ai) 创建 API Key。认证输入框只填写密钥本身，客户端会生成 `Authorization: Bearer YOUR_MAXAPI_API_KEY` 请求头。"
+      }
+    },
+    "responses": {
+      "Error": {
+        "description": "请求失败。常见排查方向：400 检查请求参数，401 检查密钥，403 检查访问权限，429 检查用量与限流，5xx 检查服务或上游错误。具体状态和错误体以实际响应为准，参阅 [错误排查](/zh/help/errors)。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "examples": {
+              "error": {
+                "summary": "结构示意",
+                "value": {
+                  "error": {
+                    "message": "请求未通过验证，请检查密钥和请求参数。",
+                    "type": "request_error",
+                    "code": null
+                  }
+                },
+                "description": "仅展示兼容错误体的读取方式，不代表完整的错误码规范。"
+              }
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "ModelID": {
+        "type": "string",
+        "description": "当前账户可用且支持该接口的模型 ID。先调用 GET /v1/models 获取准确标识；模型可见不代表支持所有端点和参数。`YOUR_MODEL_ID` 为待替换的占位符。",
+        "example": "YOUR_MODEL_ID"
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string",
+                "description": "错误说明。"
+              },
+              "type": {
+                "type": "string",
+                "description": "错误类别。"
+              },
+              "code": {
+                "description": "错误代码，具体类型由服务返回。",
+                "oneOf": [
+                  {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ]
+              },
+              "param": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "与错误相关的请求参数，可能为空。"
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": true,
+        "description": "常见兼容错误结构。上游通道也可能返回其他错误字段；先判断 HTTP 状态，再读取错误详情。"
+      },
+      "Usage": {
+        "type": "object",
+        "properties": {
+          "prompt_tokens": {
+            "type": "integer",
+            "description": "输入 token 数。"
+          },
+          "completion_tokens": {
+            "type": "integer",
+            "description": "输出 token 数，适用时返回。"
+          },
+          "total_tokens": {
+            "type": "integer",
+            "description": "总 token 数。"
+          }
+        },
+        "additionalProperties": true,
+        "description": "接口返回的 token 用量；详细字段因模型而异，账单以控制台为准。"
+      },
+      "ModelList": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "列表对象类型。",
+            "example": "list"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Model"
+            },
+            "description": "当前 API Key 可见的模型。"
+          }
+        },
+        "additionalProperties": true
+      },
+      "ChatMessage": {
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "description": "消息角色，如 system、user、assistant、developer 或 tool，按模型支持情况使用。",
+            "example": "user"
+          },
+          "content": {
+            "description": "普通文本使用字符串。视觉输入使用文本与图片内容项数组。携带工具调用的 assistant 消息可以为 null。",
+            "oneOf": [
+              {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "example": "用三句话解释什么是 API。"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/TextContentPart"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ImageContentPart"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "tool_calls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ToolCall"
+            },
+            "description": "assistant 提出的工具调用；续接对话时保留完整结构。"
+          },
+          "tool_call_id": {
+            "type": "string",
+            "description": "role 为 tool 时，对应的工具调用 ID。"
+          }
+        },
+        "additionalProperties": true,
+        "description": "一条对话消息。多轮对话需按顺序提交历史消息，工具结果需关联原调用 ID。"
+      },
+      "ChatRequest": {
+        "type": "object",
+        "required": [
+          "model",
+          "messages"
+        ],
+        "properties": {
+          "model": {
+            "$ref": "#/components/schemas/ModelID"
+          },
+          "messages": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            },
+            "description": "按时间顺序排列的消息列表。多轮对话时同时提交所需的历史消息。"
+          },
+          "stream": {
+            "type": "boolean",
+            "description": "为 true 时返回 SSE 流；按完整事件解析数据。",
+            "default": false
+          },
+          "temperature": {
+            "type": "number",
+            "description": "采样随机性；支持情况与范围取决于模型。"
+          },
+          "top_p": {
+            "type": "number",
+            "description": "核采样参数；通常只调整它或 temperature 中的一个。"
+          },
+          "max_tokens": {
+            "type": "integer",
+            "description": "部分模型使用的输出 token 上限，不与 max_completion_tokens 同时设置。"
+          },
+          "max_completion_tokens": {
+            "type": "integer",
+            "description": "部分模型使用的生成 token 上限，可能包含推理 token。"
+          },
+          "stop": {
+            "description": "遇到这些序列时停止生成；部分模型不支持。",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
+          },
+          "n": {
+            "type": "integer",
+            "description": "候选回复数量；支持情况与数量限制取决于模型。"
+          },
+          "presence_penalty": {
+            "type": "number",
+            "description": "对已出现 token 的采样惩罚，需要模型支持。"
+          },
+          "frequency_penalty": {
+            "type": "number",
+            "description": "根据 token 出现频率调整采样，需要模型支持。"
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FunctionTool"
+            },
+            "description": "本次允许模型使用的工具定义，需要模型支持。"
+          },
+          "tool_choice": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "additionalProperties": true
+              }
+            ],
+            "description": "控制工具选择。常用 auto 允许模型自行选择；其他字符串或对象策略需模型支持。"
+          }
+        },
+        "additionalProperties": true,
+        "description": "首次调用建议只提交 model 和 messages。确认模型支持后再添加可选参数；max_tokens 与 max_completion_tokens 不要同时设置。"
+      },
+      "ChatResponse": {
+        "type": "object",
+        "required": [
+          "choices"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "响应 ID。"
+          },
+          "object": {
+            "type": "string",
+            "description": "响应对象类型。",
+            "example": "chat.completion"
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatChoice"
+            },
+            "description": "候选回复列表。"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/Usage"
+          }
+        },
+        "additionalProperties": true,
+        "description": "非流式对话结果。文本读取 choices[].message.content；工具调用读取 choices[].message.tool_calls。"
+      },
+      "CompletionRequest": {
+        "type": "object",
+        "required": [
+          "model",
+          "prompt"
+        ],
+        "properties": {
+          "model": {
+            "$ref": "#/components/schemas/ModelID"
+          },
+          "prompt": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ],
+            "description": "待补全的文本；批量输入需要模型支持。",
+            "example": "请续写这段介绍：MaxAPI 帮助开发者"
+          },
+          "stream": {
+            "type": "boolean",
+            "description": "为 true 时返回 SSE 流，增量文本位于 choices[].text。",
+            "default": false
+          },
+          "temperature": {
+            "type": "number",
+            "description": "采样随机性，需模型支持。"
+          },
+          "max_tokens": {
+            "type": "integer",
+            "description": "输出 token 上限，需模型支持。"
+          },
+          "top_p": {
+            "type": "number",
+            "description": "核采样参数，通常与 temperature 选择一个调整。"
+          },
+          "n": {
+            "type": "integer",
+            "description": "每个输入的候选结果数量，需要模型支持。"
+          },
+          "stop": {
+            "description": "遇到这些序列时停止生成；部分模型不支持。",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
+          },
+          "logprobs": {
+            "type": "integer",
+            "description": "请求 token 对数概率信息，需要模型支持。"
+          }
+        },
+        "additionalProperties": true,
+        "description": "传统 Completions 接口使用 prompt，不接收聊天 messages。本定义提供文本输入，token ID 输入需模型支持。"
+      },
+      "CompletionResponse": {
+        "type": "object",
+        "required": [
+          "choices"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "响应 ID。"
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "integer",
+                  "description": "候选结果索引。"
+                },
+                "text": {
+                  "type": "string",
+                  "description": "生成的补全文本；流式模式中为当前事件的增量文本。"
+                },
+                "finish_reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "生成结束原因，例如 stop 或 length。"
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "usage": {
+            "$ref": "#/components/schemas/Usage"
+          },
+          "object": {
+            "type": "string",
+            "description": "补全响应对象类型。",
+            "example": "text_completion"
+          }
+        },
+        "additionalProperties": true
+      },
+      "EmbeddingRequest": {
+        "type": "object",
+        "required": [
+          "model",
+          "input"
+        ],
+        "properties": {
+          "model": {
+            "$ref": "#/components/schemas/ModelID"
+          },
+          "input": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ],
+            "description": "单段文本或非空文本列表。本定义描述文本输入，token ID 输入需模型支持。单条长度与批次数量取决于模型。"
+          },
+          "encoding_format": {
+            "type": "string",
+            "enum": [
+              "float",
+              "base64"
+            ],
+            "description": "向量编码格式，需模型支持。"
+          },
+          "dimensions": {
+            "type": "integer",
+            "description": "输出向量维数，仅支持可调整维数的模型。"
+          }
+        },
+        "additionalProperties": true
+      },
+      "EmbeddingResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "object": {
+                  "type": "string",
+                  "description": "向量对象类型。",
+                  "example": "embedding"
+                },
+                "index": {
+                  "type": "integer",
+                  "description": "该向量对应的输入索引。"
+                },
+                "embedding": {
+                  "oneOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      }
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ],
+                  "description": "浮点向量数组，或按请求格式返回的 Base64 数据。"
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "usage": {
+            "$ref": "#/components/schemas/Usage"
+          },
+          "object": {
+            "type": "string",
+            "description": "列表对象类型。",
+            "example": "list"
+          }
+        },
+        "additionalProperties": true,
+        "description": "向量结构示意。使用 data[].index 对应输入顺序；向量维数由模型和请求参数决定。"
+      },
+      "ImageGenerationRequest": {
+        "type": "object",
+        "required": [
+          "model",
+          "prompt"
+        ],
+        "properties": {
+          "model": {
+            "$ref": "#/components/schemas/ModelID"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "图片的主体、场景、构图和风格。"
+          },
+          "n": {
+            "type": "integer",
+            "description": "生成数量；允许数量取决于模型。"
+          },
+          "size": {
+            "type": "string",
+            "description": "输出尺寸，需要模型支持。"
+          },
+          "quality": {
+            "type": "string",
+            "description": "质量档位，需要模型支持。"
+          },
+          "response_format": {
+            "type": "string",
+            "description": "部分模型可选 url 或 b64_json；部分模型固定返回格式。"
+          }
+        },
+        "additionalProperties": true
+      },
+      "ImageEditRequest": {
+        "type": "object",
+        "required": [
+          "model",
+          "image",
+          "prompt"
+        ],
+        "properties": {
+          "model": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ModelID"
+              }
+            ],
+            "example": "YOUR_MODEL_ID"
+          },
+          "image": {
+            "type": "string",
+            "format": "binary",
+            "description": "实际图片文件；格式、尺寸与大小限制取决于模型。客户端自动生成 multipart boundary。",
+            "contentMediaType": "application/octet-stream"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "编辑指令，并说明需要保留的内容。",
+            "example": "保留主体外观，将背景改为浅灰色摄影棚背景。"
+          },
+          "mask": {
+            "type": "string",
+            "format": "binary",
+            "description": "可选 PNG 遮罩；透明区域表示编辑位置。仅适用于支持遮罩的模型。",
+            "contentMediaType": "image/png"
+          },
+          "n": {
+            "type": "integer",
+            "description": "生成数量，需要模型支持。"
+          },
+          "size": {
+            "type": "string",
+            "description": "输出尺寸，需要模型支持。"
+          },
+          "response_format": {
+            "type": "string",
+            "description": "输出格式，需要模型支持。"
+          }
+        }
+      },
+      "ImageResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "created": {
+            "type": "integer",
+            "description": "生成时间戳，单位为秒。"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "format": "uri",
+                  "description": "生成图片的下载地址，可能具有有效期。按需及时保存文件。"
+                },
+                "b64_json": {
+                  "type": "string",
+                  "description": "Base64 编码的图片数据。"
+                },
+                "revised_prompt": {
+                  "type": "string",
+                  "description": "部分模型返回改写后的提示词。"
+                }
+              },
+              "additionalProperties": true
+            },
+            "description": "生成的图片列表。URL 与 Base64 返回方式取决于模型和 response_format。"
+          }
+        },
+        "additionalProperties": true
+      },
+      "SpeechRequest": {
+        "type": "object",
+        "required": [
+          "model",
+          "input",
+          "voice"
+        ],
+        "properties": {
+          "model": {
+            "$ref": "#/components/schemas/ModelID"
+          },
+          "input": {
+            "type": "string",
+            "description": "要合成语音的文本，长度限制以模型为准。"
+          },
+          "voice": {
+            "type": "string",
+            "description": "所选模型支持的音色 ID。YOUR_VOICE_ID 是占位符，应替换为该模型确认支持的音色。",
+            "example": "YOUR_VOICE_ID"
+          },
+          "response_format": {
+            "type": "string",
+            "description": "模型支持的音频格式，例如 mp3、opus、aac 或 flac。"
+          },
+          "speed": {
+            "type": "number",
+            "description": "语速，支持范围以模型为准。"
+          }
+        },
+        "additionalProperties": true
+      },
+      "TranscriptionRequest": {
+        "type": "object",
+        "required": [
+          "model",
+          "file"
+        ],
+        "properties": {
+          "model": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ModelID"
+              }
+            ],
+            "example": "YOUR_MODEL_ID"
+          },
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "description": "上传文件内容；文件格式、大小和时长限制以所选模型为准。",
+            "contentMediaType": "application/octet-stream"
+          },
+          "language": {
+            "type": "string",
+            "description": "可选输入语言 ISO 639-1 代码，例如 zh 或 en。"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "可选的术语、风格或上下文提示，与原语言一致。"
+          },
+          "response_format": {
+            "type": "string",
+            "description": "模型支持的输出格式，例如 json、text、srt、verbose_json 或 vtt。",
+            "example": "json"
+          },
+          "temperature": {
+            "type": "number",
+            "description": "采样设置，需要模型支持。"
+          }
+        }
+      },
+      "TranslationRequest": {
+        "type": "object",
+        "required": [
+          "model",
+          "file"
+        ],
+        "properties": {
+          "model": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ModelID"
+              }
+            ],
+            "example": "YOUR_MODEL_ID"
+          },
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "description": "上传文件内容；文件格式、大小和时长限制以所选模型为准。",
+            "contentMediaType": "application/octet-stream"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "可选英文上下文提示。此端点输出英文，不能通过 language 指定任意目标语言。"
+          },
+          "response_format": {
+            "type": "string",
+            "description": "模型支持的输出格式，例如 json、text、srt、verbose_json 或 vtt。",
+            "example": "json"
+          },
+          "temperature": {
+            "type": "number",
+            "description": "采样设置，需要模型支持。"
+          }
+        }
+      },
+      "AudioTextResponse": {
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "识别或翻译后的文字。verbose_json 等格式可能返回额外字段。"
+          }
+        },
+        "additionalProperties": true,
+        "description": "JSON 格式的识别或翻译结果。verbose_json 等格式可能额外返回分段与时间信息，具体字段由模型决定。"
+      },
+      "Model": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "发起请求时使用的准确模型标识。",
+            "example": "YOUR_MODEL_ID"
+          },
+          "object": {
+            "type": "string",
+            "description": "模型对象类型。",
+            "example": "model"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": true,
+        "description": "当前密钥可见的模型。可能包含其他元信息。"
+      },
+      "TextContentPart": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "文本内容项。",
+            "enum": [
+              "text"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "description": "用户发送的文字或对图片提出的问题。"
+          }
+        },
+        "required": [
+          "type",
+          "text"
+        ],
+        "additionalProperties": true,
+        "description": "多模态消息中的文本部分。"
+      },
+      "ImageContentPart": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "图片内容项。",
+            "enum": [
+              "image_url"
+            ]
+          },
+          "image_url": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "description": "可被 API 服务端直接读取的图片 URL，或完整的 data:image/...;base64,... 数据 URL。不能使用本地路径或需要登录的页面。"
+              },
+              "detail": {
+                "type": "string",
+                "description": "图片细节等级，需要模型支持。",
+                "enum": [
+                  "auto",
+                  "low",
+                  "high"
+                ]
+              }
+            },
+            "required": [
+              "url"
+            ],
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "type",
+          "image_url"
+        ],
+        "additionalProperties": true,
+        "description": "多模态消息中的图片部分，需要模型支持视觉输入。"
+      },
+      "ToolCall": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "工具调用 ID；提交工具结果时写入 tool_call_id。",
+            "example": "call-example"
+          },
+          "type": {
+            "type": "string",
+            "description": "工具类型。",
+            "enum": [
+              "function"
+            ]
+          },
+          "function": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "应用应执行的函数名。",
+                "example": "get_delivery_days"
+              },
+              "arguments": {
+                "type": "string",
+                "description": "JSON 字符串形式的函数参数。由应用解析、校验后执行；流式返回时先拼接完整分片。",
+                "example": "{\"region\":\"east\"}"
+              }
+            },
+            "required": [
+              "name",
+              "arguments"
+            ],
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "function"
+        ],
+        "additionalProperties": true,
+        "description": "模型提出的函数调用，执行和权限校验由应用完成。"
+      },
+      "FunctionTool": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "本定义描述函数工具。",
+            "enum": [
+              "function"
+            ]
+          },
+          "function": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "应用能识别的函数名。",
+                "example": "get_delivery_days"
+              },
+              "description": {
+                "type": "string",
+                "description": "描述工具用途和适用场景，帮助模型选择工具。"
+              },
+              "parameters": {
+                "type": "object",
+                "description": "函数参数的 JSON Schema。应在应用中再次校验模型返回的参数。",
+                "additionalProperties": true,
+                "example": {
+                  "type": "object",
+                  "properties": {
+                    "region": {
+                      "type": "string",
+                      "enum": [
+                        "east",
+                        "west"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "region"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "name",
+              "parameters"
+            ],
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "type",
+          "function"
+        ],
+        "additionalProperties": true,
+        "description": "允许模型使用的函数定义。详见 [工具调用](/zh/guides/tools)。"
+      },
+      "AssistantMessage": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "description": "回复消息角色。",
+            "enum": [
+              "assistant"
+            ]
+          },
+          "content": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "生成的文本；携带工具调用时可能为空。"
+          },
+          "tool_calls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ToolCall"
+            },
+            "description": "模型提出的工具调用。应用执行后追加 role 为 tool 的结果消息。"
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "additionalProperties": true,
+        "description": "非流式生成的完整 assistant 消息。"
+      },
+      "ChatChoice": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "description": "候选回复在 choices 中的索引。",
+            "example": 0
+          },
+          "message": {
+            "$ref": "#/components/schemas/AssistantMessage"
+          },
+          "finish_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "结束原因。常见值：stop 表示正常结束，length 表示达到上限，tool_calls 表示需要工具结果。",
+            "example": "stop"
+          }
+        },
+        "additionalProperties": true,
+        "description": "一个候选回复。"
+      }
+    }
+  }
+}

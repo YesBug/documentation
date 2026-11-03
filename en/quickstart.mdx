@@ -1,0 +1,69 @@
+---
+title: "Get started with MaxAPI"
+description: "Create an API key, find an available model, and send your first MaxAPI chat request from a terminal before integrating a compatible application SDK."
+keywords: ["MaxAPI", "Get started with MaxAPI", "API documentation"]
+sidebarTitle: "Quickstart"
+---
+
+Send a chat request through MaxAPI's OpenAI-compatible interface with an API key and an available model. This guide starts in your terminal and links to complete SDK examples.
+
+<Steps>
+  <Step title="Prepare an API key">
+    Sign in to the [MaxAPI console](https://platform.maxapi.ai), create an API key and confirm that your account can access the model you intend to use.
+
+    Save the key as a server-side environment variable. Replace this placeholder with your own key:
+
+    ```bash Terminal
+    export MAXAPI_API_KEY="YOUR_MAXAPI_API_KEY"
+    ```
+
+    Keep your key out of browser code, public repositories and client packages. See [authentication](/en/authentication) for storage and rotation guidance.
+  </Step>
+  <Step title="Choose a model">
+    Query the models visible to your key:
+
+    ```bash List models
+    curl --fail-with-body https://api.maxapi.ai/v1/models \
+      -H "Authorization: Bearer $MAXAPI_API_KEY"
+    ```
+
+    Copy the exact `id` of a model suitable for text chat:
+
+    ```bash Set the model
+    export MAXAPI_MODEL="YOUR_CHAT_MODEL_ID"
+    ```
+
+    An empty list or failed request requires checking the key, account access and returned error. Available models and their capabilities are determined by the console and live API response.
+  </Step>
+  <Step title="Send a chat request">
+    Install `jq` before running this example. It constructs JSON safely when the model ID contains special characters.
+
+    ```bash Create a chat response
+    jq -n --arg model "$MAXAPI_MODEL" '{
+      model: $model,
+      messages: [
+        {role: "user", content: "Introduce yourself in one sentence."}
+      ]
+    }' | curl --fail-with-body https://api.maxapi.ai/v1/chat/completions \
+      -H "Authorization: Bearer $MAXAPI_API_KEY" \
+      -H "Content-Type: application/json" \
+      --data-binary @-
+    ```
+
+    In a compatible non-streaming response, generated text is in `choices[0].message.content`. The response can also include model information, a finish reason and usage. Exact fields depend on the model and response type.
+  </Step>
+  <Step title="Connect your application">
+    Set your compatible SDK's base URL to `https://api.maxapi.ai/v1` and use your MaxAPI key. You can then call `chat.completions.create`.
+
+    <Columns cols={2}>
+      <Card title="Python" icon="python" href="/en/guides/python">Create a client and handle responses and errors.</Card>
+      <Card title="Node.js" icon="node-js" href="/en/guides/nodejs">Integrate from JavaScript or TypeScript on your server.</Card>
+    </Columns>
+  </Step>
+</Steps>
+
+## Check a failed request
+
+Confirm that the final request URL contains `/v1` exactly once, then check your API key and model ID. Preserve the HTTP status and a redacted error response and follow [troubleshooting](/en/help/errors).
+
+Continue with [streaming](/en/guides/streaming) for incremental text or [Chat Completions](/en/api-reference/chat-completions) for request fields and response schemas.

@@ -1,0 +1,137 @@
+---
+title: "Generate and extend Suno music"
+description: "Choose between Suno v2 and NewAPI-compatible music workflows, preserve song clip and task identifiers, query completion and handle continuation results."
+keywords: ["MaxAPI", "Generate and extend Suno music", "API documentation"]
+sidebarTitle: "Suno music"
+---
+
+Suno offers multiple compatible formats. Choose an enabled format for the entire workflow and save task IDs separately from song clip IDs. The music model version uses `mv`; valid values come from your [console](https://platform.maxapi.ai) or channel configuration.
+
+## Compare the two common formats
+
+| Detail | Suno v2 | NewAPI-compatible |
+| --- | --- | --- |
+| Submit | `POST /suno/v2/generate` | `POST /suno/submit/music` |
+| Query | `GET /suno/v2/feed?ids=...` | `GET /suno/fetch/{task_id}` |
+| Query identifier | `clips[].id`, a song clip ID | `data.task_id`, a task ID |
+| Query result | `clips[]` | Task object `data` and song list `data.data[]` |
+| Completion check | Check every clip | Check task state, then songs |
+
+The `feed` query takes clip IDs, not a generation response's top-level `id` or a NewAPI `task_id`.
+
+## Generate a song with Suno v2
+
+| Field | Type | Use | Meaning |
+| --- | --- | --- | --- |
+| `mv` | `string` | Required | Enabled music model version |
+| `prompt` | `string` | Required | Content for the chosen mode; custom songs commonly use lyrics |
+| `tags` | `string` | Optional | Musical style |
+| `title` | `string` | Optional | Song title |
+| `continue_clip_id` | `string` | Continuation | Original clip to extend |
+| `continue_at` | `number` | As required for continuation | Position in seconds |
+
+Audio uploads, instrumental modes and other advanced tasks can need additional fields or model versions. This example demonstrates a custom song, not every generation mode together:
+
+```bash Generate a custom song
+: "${MAXAPI_SUNO_MODEL:?Set an enabled Suno mv value}"
+jq -n --arg mv "$MAXAPI_SUNO_MODEL" '{
+  mv: $mv,
+  prompt: "[Verse]\nMorning light across the floor\nA new road waits beyond the door\n[Chorus]\nLet the quiet melody\nCarry us where we can see",
+  tags: "acoustic pop, warm vocals",
+  title: "A new road"
+}' | curl --fail-with-body https://api.maxapi.ai/suno/v2/generate \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @- \
+  --output suno-generate.json
+```
+
+### Save each clip ID
+
+A generation response can contain both top-level `id` and `clips[].id`:
+
+```json Illustrative submission structure
+{
+  "id": "generation-id",
+  "clips": [
+    {"id": "song-clip-id", "status": "submitted", "audio_url": ""}
+  ]
+}
+```
+
+Acceptance or completion of an outer wrapper does not mean every audio clip is ready. Query by the song clip IDs:
+
+```bash Query clip IDs
+CLIP_IDS="$(jq -er '[.clips[]?.id] | if length > 0 then join(",") else error("Response has no clip IDs") end' suno-generate.json)"
+curl --fail-with-body --get https://api.maxapi.ai/suno/v2/feed \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  --data-urlencode "ids=$CLIP_IDS" \
+  --output suno-clips.json
+```
+
+`ids` accepts comma-separated clip IDs. Inspect each `clips[].status`. The source uses `submitted` for acceptance and `complete` for a finished clip. Verify a usable `audio_url` before delivery, and check cover or video URLs separately.
+
+Preserve unknown states and query within a deadline. Stop on explicit failure or error information. A nonempty `audio_url` alone does not establish that the full song is complete.
+
+## Submit and query a NewAPI task
+
+This format wraps generation in a task. The example below extends an existing song. Set `MAXAPI_SUNO_CLIP_ID` to an extendable clip in your channel and `MAXAPI_CONTINUE_AT` to the desired start time in seconds. It is not a first-song minimal request.
+
+```bash Extend an existing song
+: "${MAXAPI_SUNO_CLIP_ID:?Set an extendable song clip ID}"
+: "${MAXAPI_CONTINUE_AT:?Set the continuation position in seconds}"
+jq -n \
+  --arg mv "$MAXAPI_SUNO_MODEL" \
+  --arg clip "$MAXAPI_SUNO_CLIP_ID" \
+  --argjson at "$MAXAPI_CONTINUE_AT" '{
+    mv: $mv,
+    task: "extend",
+    prompt: "[Verse]\nFollow the light a little more\nSing the story waiting at the door",
+    tags: "acoustic pop, warm vocals",
+    title: "A new road: continuation",
+    continue_clip_id: $clip,
+    continue_at: $at
+  }' | curl --fail-with-body https://api.maxapi.ai/suno/submit/music \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @- \
+  --output suno-task.json
+```
+
+The referenced response uses `code: "success"` and stores the task ID in `data.task_id`. Check that result before querying:
+
+```bash Query the NewAPI task
+TASK_ID="$(jq -er '
+  if .code == "success" then (.data.task_id // empty)
+  else error(.message // "Suno task submission failed") end
+' suno-task.json)"
+: "${TASK_ID:?Response has no task ID}"
+TASK_ID_ESCAPED="$(printf '%s' "$TASK_ID" | jq -sRr @uri)"
+curl --fail-with-body \
+  "https://api.maxapi.ai/suno/fetch/$TASK_ID_ESCAPED" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  --output suno-task-status.json
+```
+
+| Response field | Meaning |
+| --- | --- |
+| `code`, `message` | Business result of the query |
+| `data.task_id` | Task ID |
+| `data.status` | Task state, including `SUBMITTED` and `SUCCESS` in examples |
+| `data.fail_reason` | Failure detail |
+| `data.data[]` | Songs or clips produced by the task |
+| `data.data[].audio_url` | Audio URL when available |
+
+Do not apply v2 lowercase clip rules directly to NewAPI task states. Lyrics, generation and continuation tasks can return different output types.
+
+## Track continuation identifiers
+
+1. Obtain the original clip ID from generation or a supported upload flow.
+2. Submit continuation with `continue_clip_id` and the selected position.
+3. Save the new task ID and any new clip IDs.
+4. Query through that format until the new segment finishes.
+5. If you need a combined song, confirm a supported concatenation action before processing the complete audio.
+
+A continuation result may contain only the added segment. Do not assume one call returns the entire song or that an upload suffix rule applies to every `mv` version.
+
+See the [catalog](/en/api-reference/catalog) for upload and lyric operations, and [asynchronous tasks](/en/guides/async-tasks) for polling, persistence and duplicate-request handling.

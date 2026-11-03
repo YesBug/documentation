@@ -1,72 +1,549 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Mintlify Starter Kit",
+  "name": "MaxAPI",
+  "description": "MaxAPI developer documentation: API reference, integration guides, and interactive examples in English and Chinese.",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
-  },
-  "favicon": "/favicon.svg",
-  "navigation": {
-    "pages": [
-      {
-        "group": "Getting Started",
-        "pages": [
-          "index",
-          "quickstart"
-        ]
-      }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
+    "primary": "#2563EB",
+    "light": "#60A5FA",
+    "dark": "#1D4ED8"
   },
   "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
+    "light": "/images/logo-light.svg",
+    "dark": "/images/logo-dark.svg"
   },
-  "navbar": {
-    "links": [
+  "favicon": "/images/favicon.svg",
+  "appearance": {
+    "default": "light"
+  },
+  "navigation": {
+    "languages": [
       {
-        "label": "Support",
-        "href": "mailto:support@mintlify.com"
+        "language": "zh",
+        "default": true,
+        "navbar": {
+          "links": [
+            {
+              "label": "官网",
+              "href": "https://maxapi.ai"
+            }
+          ],
+          "primary": {
+            "type": "button",
+            "label": "控制台",
+            "href": "https://platform.maxapi.ai"
+          }
+        },
+        "tabs": [
+          {
+            "tab": "开发指南",
+            "icon": "book-open",
+            "groups": [
+              {
+                "group": "开始使用",
+                "pages": [
+                  "zh/index",
+                  "zh/quickstart",
+                  "zh/authentication",
+                  "zh/models"
+                ]
+              },
+              {
+                "group": "开发接入",
+                "pages": [
+                  "zh/guides/python",
+                  "zh/guides/nodejs",
+                  "zh/guides/streaming",
+                  "zh/guides/vision",
+                  "zh/guides/tools",
+                  "zh/guides/protocols",
+                  "zh/guides/async-tasks"
+                ]
+              },
+              {
+                "group": "图像、视频与音乐",
+                "pages": [
+                  "zh/media/index",
+                  "zh/media/image-providers",
+                  "zh/media/videos",
+                  "zh/media/video-providers",
+                  "zh/media/midjourney",
+                  "zh/media/music"
+                ]
+              },
+              {
+                "group": "帮助与支持",
+                "pages": [
+                  "zh/help/errors",
+                  "zh/help/faq"
+                ]
+              }
+            ]
+          },
+          {
+            "tab": "API 参考",
+            "icon": "code",
+            "groups": [
+              {
+                "group": "接口接入",
+                "pages": [
+                  "zh/api-reference/index",
+                  "zh/playground"
+                ]
+              },
+              {
+                "group": "文本",
+                "pages": [
+                  "zh/api-reference/chat-completions",
+                  "zh/api-reference/completions",
+                  "zh/api-reference/embeddings"
+                ]
+              },
+              {
+                "group": "图像",
+                "pages": [
+                  "zh/api-reference/images",
+                  "zh/api-reference/images-edits"
+                ]
+              },
+              {
+                "group": "音频",
+                "pages": [
+                  "zh/api-reference/audio-speech",
+                  "zh/api-reference/audio-transcriptions",
+                  "zh/api-reference/audio-translations"
+                ]
+              },
+              {
+                "group": "模型与扩展",
+                "pages": [
+                  "zh/api-reference/models",
+                  "zh/api-reference/catalog"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "language": "en",
+        "default": false,
+        "navbar": {
+          "links": [
+            {
+              "label": "Website",
+              "href": "https://maxapi.ai"
+            }
+          ],
+          "primary": {
+            "type": "button",
+            "label": "Console",
+            "href": "https://platform.maxapi.ai"
+          }
+        },
+        "tabs": [
+          {
+            "tab": "Guides",
+            "icon": "book-open",
+            "groups": [
+              {
+                "group": "Get started",
+                "pages": [
+                  "en/index",
+                  "en/quickstart",
+                  "en/authentication",
+                  "en/models"
+                ]
+              },
+              {
+                "group": "Build with MaxAPI",
+                "pages": [
+                  "en/guides/python",
+                  "en/guides/nodejs",
+                  "en/guides/streaming",
+                  "en/guides/vision",
+                  "en/guides/tools",
+                  "en/guides/protocols",
+                  "en/guides/async-tasks"
+                ]
+              },
+              {
+                "group": "Images, video and music",
+                "pages": [
+                  "en/media/index",
+                  "en/media/image-providers",
+                  "en/media/videos",
+                  "en/media/video-providers",
+                  "en/media/midjourney",
+                  "en/media/music"
+                ]
+              },
+              {
+                "group": "Help and support",
+                "pages": [
+                  "en/help/errors",
+                  "en/help/faq"
+                ]
+              }
+            ]
+          },
+          {
+            "tab": "API reference",
+            "icon": "code",
+            "groups": [
+              {
+                "group": "Using the API",
+                "pages": [
+                  "en/api-reference/index",
+                  "en/playground"
+                ]
+              },
+              {
+                "group": "Text",
+                "pages": [
+                  "en/api-reference/chat-completions",
+                  "en/api-reference/completions",
+                  "en/api-reference/embeddings"
+                ]
+              },
+              {
+                "group": "Images",
+                "pages": [
+                  "en/api-reference/images",
+                  "en/api-reference/images-edits"
+                ]
+              },
+              {
+                "group": "Audio",
+                "pages": [
+                  "en/api-reference/audio-speech",
+                  "en/api-reference/audio-transcriptions",
+                  "en/api-reference/audio-translations"
+                ]
+              },
+              {
+                "group": "Models and extensions",
+                "pages": [
+                  "en/api-reference/models",
+                  "en/api-reference/catalog"
+                ]
+              }
+            ]
+          }
+        ]
       }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://app.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-      "copy",
-      "view",
-      "chatgpt",
-      "claude",
-      "perplexity",
-      "mcp",
-      "cursor",
-      "vscode"
     ]
   },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
+  "api": {
+    "playground": {
+      "display": "interactive",
+      "proxy": true
+    },
+    "examples": {
+      "languages": [
+        "bash",
+        "python",
+        "javascript"
+      ],
+      "defaults": "required",
+      "prefill": true
+    },
+    "url": "full"
+  },
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/zh/index"
+    },
+    {
+      "source": "/docs/api-reference/audio-speech",
+      "destination": "/zh/api-reference/audio-speech",
+      "permanent": true
+    },
+    {
+      "source": "/docs/api-reference/audio-speech/",
+      "destination": "/zh/api-reference/audio-speech",
+      "permanent": true
+    },
+    {
+      "source": "/docs/api-reference/audio-transcriptions",
+      "destination": "/zh/api-reference/audio-transcriptions",
+      "permanent": true
+    },
+    {
+      "source": "/docs/api-reference/audio-transcriptions/",
+      "destination": "/zh/api-reference/audio-transcriptions",
+      "permanent": true
+    },
+    {
+      "source": "/docs/api-reference/catalog",
+      "destination": "/zh/api-reference/catalog",
+      "permanent": true
+    },
+    {
+      "source": "/docs/api-reference/catalog/",
+      "destination": "/zh/api-reference/catalog",
+      "permanent": true
+    },
+    {
+      "source": "/docs/api-reference/chat-completions",
+      "destination": "/zh/api-reference/chat-completions",
+      "permanent": true
+    },
+    {
+      "source": "/docs/api-reference/chat-completions/",
+      "destination": "/zh/api-reference/chat-completions",
+      "permanent": true
+    },
+    {
+      "source": "/docs/api-reference/completions",
+      "destination": "/zh/api-reference/completions",
+      "permanent": true
+    },
+    {
+      "source": "/docs/api-reference/completions/",
+      "destination": "/zh/api-reference/completions",
+      "permanent": true
+    },
+    {
+      "source": "/docs/api-reference/embeddings",
+      "destination": "/zh/api-reference/embeddings",
+      "permanent": true
+    },
+    {
+      "source": "/docs/api-reference/embeddings/",
+      "destination": "/zh/api-reference/embeddings",
+      "permanent": true
+    },
+    {
+      "source": "/docs/api-reference/images",
+      "destination": "/zh/api-reference/images",
+      "permanent": true
+    },
+    {
+      "source": "/docs/api-reference/images/",
+      "destination": "/zh/api-reference/images",
+      "permanent": true
+    },
+    {
+      "source": "/docs/api-reference",
+      "destination": "/zh/api-reference/index",
+      "permanent": true
+    },
+    {
+      "source": "/docs/api-reference/",
+      "destination": "/zh/api-reference/index",
+      "permanent": true
+    },
+    {
+      "source": "/docs/api-reference/models",
+      "destination": "/zh/api-reference/models",
+      "permanent": true
+    },
+    {
+      "source": "/docs/api-reference/models/",
+      "destination": "/zh/api-reference/models",
+      "permanent": true
+    },
+    {
+      "source": "/docs/authentication",
+      "destination": "/zh/authentication",
+      "permanent": true
+    },
+    {
+      "source": "/docs/authentication/",
+      "destination": "/zh/authentication",
+      "permanent": true
+    },
+    {
+      "source": "/docs/guides/async-tasks",
+      "destination": "/zh/guides/async-tasks",
+      "permanent": true
+    },
+    {
+      "source": "/docs/guides/async-tasks/",
+      "destination": "/zh/guides/async-tasks",
+      "permanent": true
+    },
+    {
+      "source": "/docs/guides/nodejs",
+      "destination": "/zh/guides/nodejs",
+      "permanent": true
+    },
+    {
+      "source": "/docs/guides/nodejs/",
+      "destination": "/zh/guides/nodejs",
+      "permanent": true
+    },
+    {
+      "source": "/docs/guides/protocols",
+      "destination": "/zh/guides/protocols",
+      "permanent": true
+    },
+    {
+      "source": "/docs/guides/protocols/",
+      "destination": "/zh/guides/protocols",
+      "permanent": true
+    },
+    {
+      "source": "/docs/guides/python",
+      "destination": "/zh/guides/python",
+      "permanent": true
+    },
+    {
+      "source": "/docs/guides/python/",
+      "destination": "/zh/guides/python",
+      "permanent": true
+    },
+    {
+      "source": "/docs/guides/streaming",
+      "destination": "/zh/guides/streaming",
+      "permanent": true
+    },
+    {
+      "source": "/docs/guides/streaming/",
+      "destination": "/zh/guides/streaming",
+      "permanent": true
+    },
+    {
+      "source": "/docs/guides/tools",
+      "destination": "/zh/guides/tools",
+      "permanent": true
+    },
+    {
+      "source": "/docs/guides/tools/",
+      "destination": "/zh/guides/tools",
+      "permanent": true
+    },
+    {
+      "source": "/docs/guides/vision",
+      "destination": "/zh/guides/vision",
+      "permanent": true
+    },
+    {
+      "source": "/docs/guides/vision/",
+      "destination": "/zh/guides/vision",
+      "permanent": true
+    },
+    {
+      "source": "/docs/help/errors",
+      "destination": "/zh/help/errors",
+      "permanent": true
+    },
+    {
+      "source": "/docs/help/errors/",
+      "destination": "/zh/help/errors",
+      "permanent": true
+    },
+    {
+      "source": "/docs/help/faq",
+      "destination": "/zh/help/faq",
+      "permanent": true
+    },
+    {
+      "source": "/docs/help/faq/",
+      "destination": "/zh/help/faq",
+      "permanent": true
+    },
+    {
+      "source": "/docs",
+      "destination": "/zh/index",
+      "permanent": true
+    },
+    {
+      "source": "/docs/",
+      "destination": "/zh/index",
+      "permanent": true
+    },
+    {
+      "source": "/docs/media/image-providers",
+      "destination": "/zh/media/image-providers",
+      "permanent": true
+    },
+    {
+      "source": "/docs/media/image-providers/",
+      "destination": "/zh/media/image-providers",
+      "permanent": true
+    },
+    {
+      "source": "/docs/media",
+      "destination": "/zh/media/index",
+      "permanent": true
+    },
+    {
+      "source": "/docs/media/",
+      "destination": "/zh/media/index",
+      "permanent": true
+    },
+    {
+      "source": "/docs/media/midjourney",
+      "destination": "/zh/media/midjourney",
+      "permanent": true
+    },
+    {
+      "source": "/docs/media/midjourney/",
+      "destination": "/zh/media/midjourney",
+      "permanent": true
+    },
+    {
+      "source": "/docs/media/music",
+      "destination": "/zh/media/music",
+      "permanent": true
+    },
+    {
+      "source": "/docs/media/music/",
+      "destination": "/zh/media/music",
+      "permanent": true
+    },
+    {
+      "source": "/docs/media/video-providers",
+      "destination": "/zh/media/video-providers",
+      "permanent": true
+    },
+    {
+      "source": "/docs/media/video-providers/",
+      "destination": "/zh/media/video-providers",
+      "permanent": true
+    },
+    {
+      "source": "/docs/media/videos",
+      "destination": "/zh/media/videos",
+      "permanent": true
+    },
+    {
+      "source": "/docs/media/videos/",
+      "destination": "/zh/media/videos",
+      "permanent": true
+    },
+    {
+      "source": "/docs/models",
+      "destination": "/zh/models",
+      "permanent": true
+    },
+    {
+      "source": "/docs/models/",
+      "destination": "/zh/models",
+      "permanent": true
+    },
+    {
+      "source": "/docs/playground",
+      "destination": "/zh/playground",
+      "permanent": true
+    },
+    {
+      "source": "/docs/playground/",
+      "destination": "/zh/playground",
+      "permanent": true
+    },
+    {
+      "source": "/docs/quickstart",
+      "destination": "/zh/quickstart",
+      "permanent": true
+    },
+    {
+      "source": "/docs/quickstart/",
+      "destination": "/zh/quickstart",
+      "permanent": true
     }
-  }
+  ]
 }

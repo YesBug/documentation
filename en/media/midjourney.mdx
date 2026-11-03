@@ -1,0 +1,125 @@
+---
+title: "Generate images with Midjourney tasks"
+description: "Submit a Midjourney image task, inspect business status, query results, and use returned action identifiers for follow-up generation workflows."
+keywords: ["MaxAPI", "Generate images with Midjourney tasks", "API documentation"]
+sidebarTitle: "Midjourney"
+---
+
+Midjourney uses task-based requests. Submit an image prompt, save the task ID, then query images and available actions. Confirm that the group associated with your key has Midjourney enabled; modes and actions depend on the channel.
+
+## Common routes
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| POST | `/mj/submit/imagine` | Create an image task from a prompt |
+| GET | `/mj/task/{id}/fetch` | Query task status and result |
+| POST | `/mj/submit/action` | Execute an action on an existing task |
+| POST | `/mj/submit/blend` | Blend reference images |
+| POST | `/mj/submit/describe` | Describe an image |
+| POST | `/mj/submit/modal` | Submit an interaction requiring additional input |
+
+All examples use MaxAPI's host and Bearer key. See the [catalog](/en/api-reference/catalog) for additional fields.
+
+## Submit an Imagine task
+
+| Field | Type | Requirement | Meaning |
+| --- | --- | --- | --- |
+| `prompt` | `string` | Required | Image prompt |
+| `base64Array` | `string[]` | Optional | Reference images; confirm exact encoding for the channel |
+| `notifyHook` | `string` | Optional | Callback URL |
+| `state` | `string` | Optional | Business correlation value; do not store secrets here |
+
+```bash Create the task
+jq -n '{
+  prompt: "A tiny observatory on a green hill, watercolor illustration",
+  state: "illustration-job-001"
+}' | curl --fail-with-body https://api.maxapi.ai/mj/submit/imagine \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @- \
+  --output mj-submit.json
+```
+
+### Inspect the business code
+
+```json Illustrative submission response
+{
+  "code": 1,
+  "description": "Submission accepted",
+  "result": "your-mj-task-id"
+}
+```
+
+| Code | Meaning in the source | Action |
+| --- | --- | --- |
+| `1` | Submitted | Save the task ID in `result` |
+| `21` | Already exists | Inspect the returned task rather than creating a duplicate |
+| `22` | Queued | Save a valid ID and query later |
+| Other | Error | Read `description` and do not treat it as a successful task |
+
+These codes differ from HTTP status codes and later task states. This protocol puts the task ID in `result`:
+
+```bash Extract a usable task ID
+TASK_ID="$(jq -er '
+  if (.code == 1 or .code == 21 or .code == 22)
+  then (.result // empty | tostring)
+  else error(.description // "Midjourney submission failed")
+  end
+' mj-submit.json)"
+: "${TASK_ID:?Response has no task ID}"
+```
+
+## Query the task
+
+```bash Query once
+TASK_ID_ESCAPED="$(printf '%s' "$TASK_ID" | jq -sRr @uri)"
+curl --fail-with-body \
+  "https://api.maxapi.ai/mj/task/$TASK_ID_ESCAPED/fetch" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  --output mj-task.json
+```
+
+| Field | Meaning |
+| --- | --- |
+| `id` | Current task ID |
+| `status` | Common source values: `NOT_START`, `SUBMITTED`, `IN_PROGRESS`, `SUCCESS`, `FAILURE` |
+| `progress` | Available progress information |
+| `imageUrl` | Check for an image URL after success |
+| `failReason` | Failure details |
+| `state` | Business correlation value |
+| `buttons` | Available actions returned by some channels |
+
+Stop polling at success or failure. Preserve unknown states and set an overall deadline. See [asynchronous tasks](/en/guides/async-tasks).
+
+## Perform a follow-up action
+
+Upscale, variation and other actions refer to the original `taskId` and a specific `customId`. The action ID normally comes from returned button data such as `buttons[].customId`; do not invent it by concatenating a number.
+
+| Field | Type | Requirement | Meaning |
+| --- | --- | --- | --- |
+| `taskId` | `string` | Required | Original task ID |
+| `customId` | `string` | Required | Action actually offered for this task |
+| `notifyHook` | `string` | Optional | Callback for the action task |
+| `state` | `string` | Optional | Business correlation for this action |
+
+Set `MAXAPI_MJ_ACTION_ID` to the available action the user selected:
+
+```bash Execute the selected action
+: "${MAXAPI_MJ_ACTION_ID:?Set an available customId from the query response}"
+jq -n --arg task "$TASK_ID" --arg action "$MAXAPI_MJ_ACTION_ID" '{
+  taskId: $task,
+  customId: $action
+}' | curl --fail-with-body https://api.maxapi.ai/mj/submit/action \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @- \
+  --output mj-action.json
+```
+
+The action returns its own submission result. Check its business code, save the new `result` and query the new task. Do not keep querying the original task for a new image. Actions requiring additional input may need a corresponding interaction endpoint.
+
+## Callbacks and execution modes
+
+Use `notifyHook` only on a channel supporting callbacks. Correlate by task ID and deduplicate notifications. This field alone establishes no signature scheme, retry count or delivery order; see [asynchronous tasks](/en/guides/async-tasks).
+
+Related protocols include `/mj-turbo/mj` and `/mj-relax/mj` prefixes. Availability, relation to default mode and pricing depend on your channel. The `/mj` examples do not imply access to those modes.
