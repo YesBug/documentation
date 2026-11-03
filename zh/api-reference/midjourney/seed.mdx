@@ -1,0 +1,35 @@
+---
+title: "Seed：查询图片种子"
+description: "按任务 ID 查询可用的图片 seed，区分返回的种子字符串与任务 ID，并处理渠道不可用情况。"
+keywords: ["MaxAPI", "Midjourney", "seed"]
+openapi: "openapi/midjourney-zh.json GET /mj/task/{id}/image-seed"
+---
+
+图片 seed 接口读取指定 Midjourney 图片任务的种子信息。它不会创建新的绘图任务；响应中的 `result` 是 seed 字符串，不是另一个任务 ID。
+
+## 查询前提
+
+先 [查询任务](/zh/api-reference/midjourney/fetch)，确认对应图片已生成。seed 获取依赖渠道配置；图片成功生成不代表该渠道一定提供 seed。
+
+路径中的 `id` 使用要查询的图片任务 ID。如果你要查询放大或变化后的图片，使用对应结果任务，而不是无条件使用最初的 Imagine ID。
+
+## 处理返回值
+
+检查响应的 `code` 与 `description`。成功响应以 `code: 1` 标识，并在 `result` 中提供种子值；不要把 HTTP 200 单独作为读取成功的条件。
+
+```python 读取已保存的 seed 响应
+import json
+from pathlib import Path
+
+response = json.loads(Path("mj-seed.json").read_text(encoding="utf-8"))
+if response.get("code") != 1:
+    raise RuntimeError(response.get("description") or "Seed lookup failed")
+seed = response.get("result")
+if not isinstance(seed, str) or not seed:
+    raise ValueError("The response does not contain a seed string")
+print(seed)
+```
+
+保留返回的字符串，不把 seed 当作路径中的任务标识。即使获取到 seed，也不要承诺换模型、提示词或其他参数后会得到完全相同的图片。
+
+若渠道不支持查询，保留原图与已有任务信息即可，不需要重新绘图来修复 seed 查询。

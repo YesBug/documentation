@@ -1,0 +1,37 @@
+---
+title: "Blend: combine reference images"
+description: "Combine encoded reference images in a Midjourney Blend task, choose the output aspect ratio, and retrieve the generated image through its task ID."
+keywords: ["MaxAPI", "Midjourney", "blend"]
+openapi: "openapi/midjourney-en.json POST /mj/submit/blend"
+---
+
+Blend uses several reference images to create a new Midjourney image task. To guide the result with text as well as images, use [Imagine with reference images](/en/api-reference/midjourney/imagine).
+
+## Prepare the images and aspect ratio
+
+Prepare 2–5 reference images, encode each image as a Data URI, and add it to `base64Array`. This field contains separate strings, not local file paths or several images concatenated into one string. See [Image inputs](/en/media/midjourney/inputs) for a complete encoding example.
+
+| `dimensions` | Aspect ratio |
+| --- | --- |
+| `PORTRAIT` | Portrait, 2:3 |
+| `SQUARE` | Square, 1:1 |
+| `LANDSCAPE` | Landscape, 3:2 |
+
+Use these enum names, not a ratio string such as `"1:1"`. Set the value explicitly when your application needs a particular shape; this page does not assume an omitted default.
+
+```json Request structure, replace image placeholders before sending
+{
+  "base64Array": [
+    "data:image/png;base64,YOUR_FIRST_IMAGE_BASE64",
+    "data:image/png;base64,YOUR_SECOND_IMAGE_BASE64"
+  ],
+  "dimensions": "SQUARE",
+  "state": "blend-job-001"
+}
+```
+
+## Retrieve the blended image
+
+The response's `result` is a new task ID, not image bytes. Save it with the mode prefix, then [retrieve the task](/en/api-reference/midjourney/fetch). Read `imageUrl` after success and use the returned `buttons` to determine which follow-up actions to offer.
+
+On failure, verify that each image decodes correctly and its MIME type matches the file, then read `description`. Blend accepts 2–5 images; per-image size and other limits depend on channel configuration.

@@ -1,0 +1,146 @@
+---
+title: "Midjourney 任务状态与回调"
+sidebarTitle: "任务与回调"
+description: "区分提交业务码与任务状态，处理 MODAL、取消、结果下载和状态回调，并用有限轮询恢复查询。"
+keywords: ["Midjourney", "任务查询", "MODAL", "CANCEL", "notifyHook", "回调"]
+---
+
+Midjourney 的提交响应告诉你“请求是否被接收”，任务查询告诉你“任务当前进行到哪一步”。本页解释两类状态的区别，并提供可以直接运行的轮询脚本。
+
+## 提交业务码与任务状态是两回事
+
+| 提交 `code` | 意义 | 下一步 |
+| --- | --- | --- |
+| `1` | 已接收 | 保存 `result`，查询任务 |
+| `22` | 已接收并排队 | 保存 `result`，查询队列中的同一任务 |
+| `21`，动作提示等待交互 | Action 需要额外确认 | 保存待确认任务 ID；按 Modal 流程继续 |
+| 其他结果 | 本次操作未按普通提交路径完成 | 读取 `description`，不要只因存在 `result` 就认定成功 |
+
+`21` 在不同操作或旧版响应描述中的含义可能不同。对于后续动作，结合 `description` 和查询到的 `MODAL` 状态判断，不能统一当作“任务已存在”，也不能一律当作普通排队成功。
+
+## 七种任务状态
+
+| `status` | 页面可以显示 | 应用怎么处理 |
+| --- | --- | --- |
+| `NOT_START` | 等待启动 | 保留任务 ID，继续查询 |
+| `SUBMITTED` | 已提交 | 继续查询 |
+| `IN_PROGRESS` | 生成中 | 展示 `progress`，继续查询 |
+| `MODAL` | 等待补充输入 | 停止自动等待，提示用户完成 [交互参数](/zh/media/midjourney/actions) |
+| `SUCCESS` | 完成 | 按任务类型读取图片或文字结果 |
+| `FAILURE` | 失败 | 停止查询，读取 `failReason` |
+| `CANCEL` | 已取消 | 停止查询，不展示为成功 |
+
+`progress` 是展示信息，不应作为成功判断依据。`imageUrl` 可能在生成中出现；Describe 和 Shorten 则主要读取 `properties.finalPrompt`，以及存在时的 `properties.finalZhPrompt`。
+
+## 自动等待一个已提交的任务
+
+先按 [快速开始](/zh/media/midjourney) 设置 `MAXAPI_API_KEY`、`MAXAPI_MJ_BASE_URL` 和 `TASK_ID`。下面的脚本只查询现有任务，不创建新任务。
+
+```bash
+python3 -m pip install requests
+```
+
+保存为 `wait_for_mj.py`：
+
+```python wait_for_mj.py
+import json
+import os
+import sys
+import time
+from pathlib import Path
+from urllib.parse import quote
+
+import requests
+
+
+def wait_for_task(task_id, budget=600, interval=5):
+    base = os.environ.get("MAXAPI_MJ_BASE_URL", "https://api.maxapi.ai/mj").rstrip("/")
+    url = f"{base}/task/{quote(str(task_id), safe='')}/fetch"
+    headers = {"Authorization": f"Bearer {os.environ['MAXAPI_API_KEY']}"}
+    deadline = time.monotonic() + budget
+    while time.monotonic() < deadline:
+        response = requests.get(url, headers=headers, timeout=(10, 30))
+        response.raise_for_status()
+        task = response.json()
+        Path("mj-task.json").write_text(
+            json.dumps(task, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        status = task.get("status")
+        print(status, task.get("progress", ""))
+        if status == "SUCCESS":
+            return task
+        if status == "MODAL":
+            raise RuntimeError("Input required: submit /submit/modal with this pending task ID")
+        if status in {"FAILURE", "CANCEL"}:
+            raise RuntimeError(task.get("failReason") or f"Task ended: {status}")
+        if status not in {"NOT_START", "SUBMITTED", "IN_PROGRESS"}:
+            raise RuntimeError(f"Unknown status {status!r}; inspect mj-task.json")
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            time.sleep(min(interval, remaining))
+    raise TimeoutError("Polling budget expired; retain the ID and resume later")
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        raise SystemExit("Usage: python3 wait_for_mj.py TASK_ID")
+    completed = wait_for_task(sys.argv[1])
+    print("Completed task:", completed["id"])
+    print("Response saved to mj-task.json")
+```
+
+```bash
+python3 wait_for_mj.py "$TASK_ID"
+```
+
+5 秒间隔和 600 秒等待预算是示例的客户端策略；单次 HTTP 请求还受连接与读取超时限制，所以它不是严格的总时长保证。超时后可用相同任务 ID 重跑查询。不要因为等待超时就重新提交绘图。
+
+## 完成后读取哪种结果
+
+| 任务类型 | 主要读取字段 |
+| --- | --- |
+| Imagine、Blend、选择单图、变体、缩放、平移 | `imageUrl`，以及下一步可用的 `buttons` |
+| Describe | `properties.finalPrompt`；中文翻译存在时读取 `finalZhPrompt` |
+| Shorten | `properties.finalPrompt` 中的分析内容；下一步按钮可能包括选择提示词或详情 |
+| Seed 查询 | 独立接口响应的 `result` 是 seed，**不是任务 ID** |
+
+图片下载使用返回的 HTTPS 地址，不向图片域名附加 MaxAPI 的 Bearer 密钥。下面先保存到待检查文件：
+
+```bash
+IMAGE_URL="$(jq -er 'select(.status == "SUCCESS") | .imageUrl | select(type == "string" and startswith("https://"))' mj-task.json)"
+: "${IMAGE_URL:?成功任务中没有 HTTPS 图片地址}"
+curl --fail --location --proto '=https' --proto-redir '=https' \
+  --connect-timeout 10 --max-time 120 \
+  --dump-header mj-image.headers \
+  --output mj-image.download "$IMAGE_URL"
+```
+
+检查最终响应的 `Content-Type` 后再按真实格式重命名，图片不一定是 PNG。下载失败先重试下载或重新查询结果地址，无需再次生成图片。
+
+## 接收状态回调
+
+提交时可填写 `notifyHook`，由平台向你的接收地址发送 `POST application/json`。状态或进度发生变化时都可能回调，所以一次任务不一定只有一条通知。任务级 `notifyHook` 用于覆盖该任务的默认回调地址。
+
+```json 回调内容结构示意
+{
+  "id": "TASK_A",
+  "action": "IMAGINE",
+  "status": "SUCCESS",
+  "progress": "100%",
+  "imageUrl": "https://example.com/generated.png",
+  "state": "product-photo-001",
+  "buttons": []
+}
+```
+
+接收端按 `id` 关联任务，按 `state` 关联业务记录。处理重复通知，并防止迟到的进度更新把完成结果覆盖成生成中。不要从字段名推断签名算法、重试次数或投递顺序；当通知来源或状态有疑问时，使用自己的 API Key 主动查询任务确认。
+
+回调只用于更新已有任务。不要在收到每条通知时自动重新调用 Imagine。
+
+## 批量、队列、取消和 Seed
+
+- 已保存一组任务 ID：用 [按 ID 查询](/zh/api-reference/midjourney/list-by-condition)，返回任务数组。
+- 查看等待执行的任务：用 [队列查询](/zh/api-reference/midjourney/queue)。
+- 浏览记录：用 [全部任务](/zh/api-reference/midjourney/list) 或 [分页查询](/zh/api-reference/midjourney/query)。分页从 `0` 开始，读取 `content` 和分页信息。
+- 停止不需要的任务：调用 [取消任务](/zh/api-reference/midjourney/cancel)，再查询状态。取消响应不是图片，也不构成退款或计费承诺。
+- 获取种子：使用 [Seed 查询](/zh/api-reference/midjourney/seed)。它依赖通道的相关配置，不需要终端用户在自己的应用中配置 Discord 管理参数。

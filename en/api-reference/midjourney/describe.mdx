@@ -1,0 +1,35 @@
+---
+title: "Describe: get prompts from an image"
+description: "Submit an encoded image to a Midjourney Describe task, retrieve its text suggestions, and use a selected prompt to start a separate image generation."
+keywords: ["MaxAPI", "Midjourney", "describe"]
+openapi: "openapi/midjourney-en.json POST /mj/submit/describe"
+---
+
+Describe produces descriptions or prompt suggestions from one image. Its result helps you develop a prompt; it is not an Imagine request that generates a new image.
+
+## Supply one image
+
+The request uses the singular field `base64`, unlike Blend and Imagine, which use `base64Array`. Encode a real file following [Image inputs](/en/media/midjourney/inputs), then submit it:
+
+```json Request structure, replace the image placeholder before sending
+{
+  "base64": "data:image/png;base64,YOUR_IMAGE_BASE64",
+  "state": "describe-job-001"
+}
+```
+
+Do not put an image URL or a local filename directly into `base64`.
+
+## Read the text result
+
+Save the submitted `result` and [retrieve the task](/en/api-reference/midjourney/fetch) until it completes. Inspect `description`, `properties.finalPrompt`, and `properties.finalZhPrompt` when present. Preserve the original result instead of forcing it into an image-only output model.
+
+```bash Inspect the text result
+jq '{status, description, finalPrompt: .properties.finalPrompt, finalZhPrompt: .properties.finalZhPrompt, buttons}' mj-task.json
+```
+
+If the task succeeds without an `imageUrl`, check its type first. Describe produces text suggestions, so a new image URL should not be your only success condition.
+
+## Generate from a suggestion
+
+Let the user select and edit a suggestion, then send it as the `prompt` for [Imagine](/en/api-reference/midjourney/imagine). If the task returns interactive buttons, you can instead submit an actual `customId` through [Action](/en/api-reference/midjourney/action). Track the task ID returned by whichever follow-up you choose.

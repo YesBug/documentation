@@ -1,0 +1,32 @@
+---
+title: "Shorten：精简提示词"
+description: "提交文本提示词创建 Shorten 任务，读取精简建议，再把选定文字用于后续绘图。"
+keywords: ["MaxAPI", "Midjourney", "shorten"]
+openapi: "openapi/midjourney-zh.json POST /mj/submit/shorten"
+---
+
+Shorten 对已有提示词生成精简建议。它是独立的异步任务，不会直接修改某张已完成的图片，也不会自动提交下一次绘图。
+
+## 提交要精简的文字
+
+```json 精简提示词
+{
+  "prompt": "A small observatory on a green hill, soft morning light, watercolor illustration, delicate paper texture, quiet countryside",
+  "botType": "MID_JOURNEY",
+  "state": "shorten-job-001"
+}
+```
+
+需要显式选择 `botType` 时，使用参数中的 `MID_JOURNEY` 或 `NIJI_JOURNEY` 枚举值，不使用 `mj` 或 `niji` 作为请求值。可用机器人与渠道权限有关。
+
+## 获取并使用建议
+
+保存响应的 `result`，然后 [查询任务](/zh/api-reference/midjourney/fetch)。任务完成后查看 `description`、`properties.finalPrompt` 与可用时的 `properties.finalZhPrompt`。
+
+```bash 查看精简结果
+jq '{status, description, finalPrompt: .properties.finalPrompt, finalZhPrompt: .properties.finalZhPrompt, buttons}' mj-task.json
+```
+
+向用户展示返回的建议并允许编辑。将选定文字传给 [Imagine](/zh/api-reference/midjourney/imagine) 才会创建新的绘图任务；保留前后任务之间的业务关联即可，不要把 Shorten 的 ID 填进 Imagine 的 `prompt`。
+
+如果结果返回了按钮，使用该结果中的实际 `customId`，按 [Action](/zh/api-reference/midjourney/action) 继续。不要要求每个 Shorten 成功响应都包含图片地址或按钮。

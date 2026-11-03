@@ -1,0 +1,42 @@
+---
+title: "Action：执行图片按钮动作"
+description: "使用任务返回的 customId 执行放大、变化等操作，并区分生成新任务和等待 Modal 输入。"
+keywords: ["MaxAPI", "Midjourney", "action"]
+openapi: "openapi/midjourney-zh.json POST /mj/submit/action"
+---
+
+Action 对已有 Midjourney 任务执行一个实际可用的按钮。先查询原任务，再把它的 `id` 和选中按钮的 `customId` 一起提交。完整的放大、变化和交互流程见 [按钮动作与局部重绘](/zh/media/midjourney/actions)。
+
+## 从原任务选择按钮
+
+下面的命令读取已保存的 `mj-task.json`，显示按钮标签与动作标识。标签可能为空，此时结合 `emoji` 展示；提交值始终使用 `customId`。
+
+```bash 查看实际可用的按钮
+jq -r '.buttons[]? | [(.label // ""), (.emoji // ""), .customId] | @tsv' mj-task.json
+```
+
+不要把 `U1`、`V2` 等显示标签直接当作 `customId`，也不要复制其他任务的动作标识。`taskId` 和 `customId` 必须来自同一个任务。
+
+```json 请求结构示意
+{
+  "taskId": "YOUR_SOURCE_TASK_ID",
+  "customId": "YOUR_SELECTED_BUTTON_CUSTOM_ID",
+  "state": "illustration-upscale-001"
+}
+```
+
+## 分清两种后续流程
+
+| 返回情况 | 下一步 |
+| --- | --- |
+| 动作已提交或排队，并返回任务 ID | 保存新的 `result`，查询该任务，等待动作结果 |
+| 返回 `code: 21`，等待补充输入 | 保存返回的交互任务 ID，查询确认 `MODAL` 状态，再提交 [Modal](/zh/api-reference/midjourney/modal) |
+| 错误或没有可继续使用的任务 ID | 查看 `description`，不要继续轮询旧任务 |
+
+动作返回的任务 ID 可能与原图任务不同。应用应保存“原图任务 → 选中的按钮 → 动作任务”的关联，后续显示新图片时查询动作任务。
+
+## 常见失败原因
+
+按钮过期、任务不匹配或当前渠道不支持对应动作时，重新 [查询原任务](/zh/api-reference/midjourney/fetch) 并查看当前返回的按钮。重试时保留原任务和选中的动作，不要改用自己拼接的 `customId`。
+
+所有后续请求沿用原任务的模式前缀。跨模式查不到任务时，不代表应该重新创建原图。

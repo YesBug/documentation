@@ -1,0 +1,32 @@
+---
+title: "Shorten: simplify a prompt"
+description: "Submit a text prompt to a Midjourney Shorten task, inspect its suggested revisions, and use selected wording in a separate image-generation request."
+keywords: ["MaxAPI", "Midjourney", "shorten"]
+openapi: "openapi/midjourney-en.json POST /mj/submit/shorten"
+---
+
+Shorten creates concise alternatives to an existing prompt. It runs as a separate asynchronous task; it does not modify a completed image or automatically start another generation.
+
+## Submit the text to simplify
+
+```json Simplify a prompt
+{
+  "prompt": "A small observatory on a green hill, soft morning light, watercolor illustration, delicate paper texture, quiet countryside",
+  "botType": "MID_JOURNEY",
+  "state": "shorten-job-001"
+}
+```
+
+When specifying `botType`, use the enum value `MID_JOURNEY` or `NIJI_JOURNEY`, not `mj` or `niji`. Available bots depend on channel permissions.
+
+## Retrieve and use the suggestions
+
+Save `result`, then [retrieve the task](/en/api-reference/midjourney/fetch). After completion, inspect `description`, `properties.finalPrompt`, and `properties.finalZhPrompt` when present.
+
+```bash Inspect the shortened prompt
+jq '{status, description, finalPrompt: .properties.finalPrompt, finalZhPrompt: .properties.finalZhPrompt, buttons}' mj-task.json
+```
+
+Show the suggestions to the user and allow editing. Send selected text to [Imagine](/en/api-reference/midjourney/imagine) to create a new image task. Associate the two tasks in your application; do not put the Shorten task ID into Imagine's `prompt`.
+
+If the result contains buttons, continue through [Action](/en/api-reference/midjourney/action) using the actual returned `customId`. Do not require every successful Shorten task to contain an image URL or buttons.

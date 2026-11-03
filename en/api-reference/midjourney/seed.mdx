@@ -1,0 +1,35 @@
+---
+title: "Seed: retrieve an image seed"
+description: "Retrieve an available image seed for a Midjourney task, distinguish the returned seed from a task ID, and handle channels that cannot provide this value."
+keywords: ["MaxAPI", "Midjourney", "seed"]
+openapi: "openapi/midjourney-en.json GET /mj/task/{id}/image-seed"
+---
+
+The image seed endpoint retrieves seed information for a Midjourney image task. It does not create another generation. Its `result` is a seed string, not a new task ID.
+
+## Before retrieving a seed
+
+[Retrieve the task](/en/api-reference/midjourney/fetch) first to confirm that the image has been generated. Seed retrieval depends on channel configuration; successful image generation does not guarantee seed availability.
+
+Use the task ID for the image you want to inspect. For an upscale or variation, use that result's task rather than always falling back to the original Imagine ID.
+
+## Handle the response
+
+Check `code` and `description`. A successful response uses `code: 1` and provides the seed in `result`. HTTP 200 alone is not sufficient.
+
+```python Read a saved seed response
+import json
+from pathlib import Path
+
+response = json.loads(Path("mj-seed.json").read_text(encoding="utf-8"))
+if response.get("code") != 1:
+    raise RuntimeError(response.get("description") or "Seed lookup failed")
+seed = response.get("result")
+if not isinstance(seed, str) or not seed:
+    raise ValueError("The response does not contain a seed string")
+print(seed)
+```
+
+Preserve the returned string and do not treat it as a task identifier. Obtaining a seed does not guarantee an identical image after changing the model, prompt, or other parameters.
+
+If the channel cannot provide a seed, keep the existing image and task record. Regenerating the image is not a remedy for an unsupported seed lookup.

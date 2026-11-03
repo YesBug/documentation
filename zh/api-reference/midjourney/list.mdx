@@ -1,0 +1,34 @@
+---
+title: "查看任务列表"
+description: "读取当前鉴权与渠道范围内的 Midjourney 任务列表，并选择适合的历史查询方式。"
+keywords: ["MaxAPI", "Midjourney", "list"]
+openapi: "openapi/midjourney-zh.json GET /mj/task/list"
+---
+
+任务列表接口返回当前鉴权与渠道范围内可见的 Midjourney 任务。响应直接是任务数组。不要把“列表”理解为跨账户的全平台记录，也不要把它当作永久历史存储。
+
+## 读取列表
+
+```bash 保存可见任务
+curl --fail-with-body \
+  "${MAXAPI_MJ_BASE_URL:-https://api.maxapi.ai/mj}/task/list" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  --output mj-list.json
+```
+
+```bash 查看任务概况
+jq -r '.[] | [.id, .action, .status, (.state // "")] | @tsv' mj-list.json
+```
+
+`state` 可以帮助你关联业务记录，但任务标识仍使用 `id`。长期需要的任务 ID、模式和生成结果应保存在你自己的应用中。
+
+## 选择更具体的查询
+
+| 场景 | 建议接口 |
+| --- | --- |
+| 打开一张图片的详情 | [查询单个任务](/zh/api-reference/midjourney/fetch) |
+| 刷新页面上已知的几项任务 | [按 ID 批量查询](/zh/api-reference/midjourney/list-by-condition) |
+| 按状态筛选并分多页展示 | [分页查询](/zh/api-reference/midjourney/query) |
+| 查看正在排队的记录 | [查看队列](/zh/api-reference/midjourney/queue) |
+
+列表没有返回某项记录时，先检查模式前缀、任务 ID 和访问权限。不要仅凭列表缺失就删除本地结果或重新提交生成。

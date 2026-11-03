@@ -1,0 +1,35 @@
+---
+title: "Modal：提交交互输入"
+description: "为等待输入的 Midjourney 交互任务补充提示词或局部重绘蒙版，并继续查询生成结果。"
+keywords: ["MaxAPI", "Midjourney", "modal"]
+openapi: "openapi/midjourney-zh.json POST /mj/submit/modal"
+---
+
+Modal 用于补充交互动作所需的输入，例如新提示词或局部重绘蒙版。它接在 [Action](/zh/api-reference/midjourney/action) 之后；不要把它当作修改任意已完成任务的接口。
+
+## 先取得交互任务
+
+1. 查询原图，选择当前可用的交互按钮。
+2. 调用 Action，并保存它返回的交互任务 ID。
+3. 查询该交互任务，确认正在等待输入，再将这个 ID 作为 `taskId` 提交 Modal。
+
+`taskId` 应来自当前交互流程，不要固定复用最初的 Imagine ID。
+
+```json 补充提示词
+{
+  "taskId": "YOUR_MODAL_TASK_ID",
+  "prompt": "A small observatory under a starry night sky"
+}
+```
+
+## 什么时候需要蒙版
+
+只有选中的操作需要局部重绘时，才提交 `maskBase64`。它是蒙版图片的 Base64 数据，不是原图地址，也不是普通文字描述。蒙版的生成与编码见 [按钮动作与局部重绘](/zh/media/midjourney/actions)。
+
+请求结构中 `prompt` 和 `maskBase64` 是可选字段，但具体动作可能需要其中一项。不能根据“字段可选”推断所有交互都接受空输入。
+
+## 提交后的处理
+
+检查响应的业务码与 `description`，保存返回的 `result`，然后 [查询任务](/zh/api-reference/midjourney/fetch)。等待图片生成时使用服务端本次返回的任务 ID，并沿用相同模式前缀。
+
+如果提示任务没有等待输入，先重新查询交互任务状态。它可能已被处理或对应了另一次动作；不要把相同 Modal 请求无限重发。

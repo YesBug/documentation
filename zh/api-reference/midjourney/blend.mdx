@@ -1,0 +1,37 @@
+---
+title: "Blend：混合参考图片"
+description: "提交多张 Base64 图片创建混图任务，选择输出比例，并通过任务查询取得结果。"
+keywords: ["MaxAPI", "Midjourney", "blend"]
+openapi: "openapi/midjourney-zh.json POST /mj/submit/blend"
+---
+
+Blend 把多张参考图片作为输入，创建新的 Midjourney 绘图任务。如果还需要用提示词约束画面，使用 [Imagine 的垫图输入](/zh/api-reference/midjourney/imagine)。
+
+## 准备图片与比例
+
+准备 2–5 张参考图片，把每张真实图片编码为 Data URI 后放进 `base64Array`。它是字符串数组，不能放入本地文件路径或把多张图片拼成一个字符串。完整编码示例见 [图片输入](/zh/media/midjourney/inputs)。
+
+| `dimensions` | 画幅 |
+| --- | --- |
+| `PORTRAIT` | 竖幅，2:3 |
+| `SQUARE` | 方形，1:1 |
+| `LANDSCAPE` | 横幅，3:2 |
+
+`dimensions` 使用上面的枚举名称，不使用 `"1:1"` 这样的比例字符串。本文不假设未填写时的比例，需固定画幅时显式设置。
+
+```json 请求结构示意，替换图片占位符后发送
+{
+  "base64Array": [
+    "data:image/png;base64,YOUR_FIRST_IMAGE_BASE64",
+    "data:image/png;base64,YOUR_SECOND_IMAGE_BASE64"
+  ],
+  "dimensions": "SQUARE",
+  "state": "blend-job-001"
+}
+```
+
+## 取得混图结果
+
+响应的 `result` 是新任务 ID，不是图片内容。保存 ID 与本次模式前缀，再调用 [查询任务](/zh/api-reference/midjourney/fetch)。成功后读取 `imageUrl`，并根据实际返回的 `buttons` 决定是否展示后续动作。
+
+若提交失败，先检查每张图片能否单独解码、Data URI 的 MIME 类型是否与文件一致，再查看响应中的 `description`。Blend 接收 2–5 张图片；单张图片大小等限制以当前渠道返回与配置为准。

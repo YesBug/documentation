@@ -1,0 +1,40 @@
+---
+title: "Query and paginate tasks"
+description: "Filter Midjourney tasks by status, application state, or IDs, retrieve a zero-based page, and read task objects from the paginated content array."
+keywords: ["MaxAPI", "Midjourney", "query"]
+openapi: "openapi/midjourney-en.json POST /mj/task/query"
+---
+
+Use Query tasks to build a filtered Midjourney history view. Unlike the list endpoints, its response is a pagination object with task records inside `content`.
+
+## Request the first page
+
+`pageNumber` starts at `0`. This example explicitly requests 10 records; that number is an example choice, not a documented default or maximum.
+
+```json First page of successful tasks
+{
+  "pageNumber": 0,
+  "pageSize": 10,
+  "sort": "id,desc",
+  "status": "SUCCESS"
+}
+```
+
+Increment `pageNumber` for the next page. Return to page 0 when filters change so an old page number does not make the new results appear empty.
+
+## Select filters
+
+- Use `ids` for known tasks. For simple refreshes, [Get tasks by ID list](/en/api-reference/midjourney/list-by-condition) is also available.
+- Use `state` to associate the business marker saved during submission.
+- Use `status` for one state or `statusSet` for several. Do not rely on undocumented precedence when sending both.
+- Follow the parameter reference for `action`, `prompt`, and other fields. Do not assume string filters support regular expressions or fuzzy matching.
+
+## Read the paginated response
+
+```bash Inspect page contents and navigation
+jq '{number, size, totalElements, totalPages, first, last, content}' mj-page.json
+```
+
+`content` holds this page's tasks. `number` is its page index, while `totalElements` and `totalPages` describe the current query. Use the returned `last` flag to decide whether to offer another page. One empty page does not mean no history exists.
+
+Handle each task's status and output as described in [Get task](/en/api-reference/midjourney/fetch). When records change during browsing, merge by task `id`, not page number or array position.

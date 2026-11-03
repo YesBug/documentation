@@ -1,0 +1,40 @@
+---
+title: "Get tasks by ID list"
+description: "Retrieve several saved Midjourney tasks by their IDs, match each returned object to its own ID, and handle tasks absent from a batch response."
+keywords: ["MaxAPI", "Midjourney", "list-by-condition"]
+openapi: "openapi/midjourney-en.json POST /mj/task/list-by-condition"
+---
+
+Use this batch lookup to refresh a known set of Midjourney tasks in your application. Send an `ids` array; the response is directly an array of task objects, not a paginated response with `content`.
+
+## Query the IDs that need refreshing
+
+```json Retrieve two saved tasks
+{
+  "ids": ["YOUR_FIRST_TASK_ID", "YOUR_SECOND_TASK_ID"]
+}
+```
+
+Replace the placeholders with real task IDs. Deduplicate them in your application and group them by their saved mode prefix before requesting. Do not mix records from different modes arbitrarily.
+
+Although `ids` is optional in the protocol structure, explicitly send a nonempty list when retrieving known tasks. Do not rely on the behavior of an omitted field or empty array.
+
+## Match results by ID
+
+Do not assume the response has the same order or one item per requested ID. Update your records using each returned task's `id`.
+
+```python Index returned tasks
+import json
+from pathlib import Path
+
+tasks = json.loads(Path("mj-batch.json").read_text(encoding="utf-8"))
+if not isinstance(tasks, list):
+    raise ValueError("Expected a task array")
+by_id = {task["id"]: task for task in tasks if isinstance(task, dict) and task.get("id")}
+for task_id, task in by_id.items():
+    print(task_id, task.get("status"), task.get("progress"))
+```
+
+If an ID is absent, keep its existing record and use [Get task](/en/api-reference/midjourney/fetch) to check the ID, mode, and permissions. A missing record does not establish generation failure and should not automatically trigger resubmission.
+
+For filtered, paginated results, use [Query tasks](/en/api-reference/midjourney/query).

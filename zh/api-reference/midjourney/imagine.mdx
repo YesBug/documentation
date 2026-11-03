@@ -1,0 +1,40 @@
+---
+title: "Imagine：创建绘图任务"
+description: "使用提示词创建 Midjourney 图片，理解提交结果、任务 ID 与可继续操作的生成结果。"
+keywords: ["MaxAPI", "Midjourney", "imagine"]
+openapi: "openapi/midjourney-zh.json POST /mj/submit/imagine"
+---
+
+Imagine 是 Midjourney 绘图的起点。请求返回任务 ID，图片在后续查询中取得；不要把提交成功当成图片已经生成。第一次接入请先完成 [Midjourney 快速开始](/zh/media/midjourney)。
+
+## 选择输入方式
+
+| 你的目标 | 请求内容 |
+| --- | --- |
+| 只按文字生成图片 | 发送 `prompt` |
+| 参考现有图片再生成 | 发送 `prompt` 和 `base64Array` |
+| 混合多张图片 | 使用 [Blend](/zh/api-reference/midjourney/blend) |
+| 从图片获取提示词建议 | 使用 [Describe](/zh/api-reference/midjourney/describe) |
+
+```json 纯文字绘图
+{
+  "prompt": "A small observatory on a green hill, watercolor illustration",
+  "state": "illustration-job-001"
+}
+```
+
+`state` 用于关联你自己的业务记录，例如订单中的某张插图。它不代替任务 ID，也不构成防重复提交机制。垫图的编码与完整文件示例见 [图片输入](/zh/media/midjourney/inputs)。
+
+## 处理提交结果
+
+保存成功响应的 `result`，并同时保存本次使用的模式前缀。常见提交码 `1` 表示已提交，`22` 表示排队中；两者都还需要查询任务。其他业务码先结合 `description` 判断，不要仅凭 HTTP 200 认定成功。
+
+后续调用 [查询任务](/zh/api-reference/midjourney/fetch)，使用这个 `result` 作为路径中的 `id`。任务成功后读取 `imageUrl`；需要放大或变化时，从该任务的 `buttons` 中选择动作，见 [执行动作](/zh/api-reference/midjourney/action)。
+
+## 请求失败时检查
+
+- 路径从 `/mj` 或你已开通的模式前缀开始，不在前面增加 `/v1`。
+- `prompt` 应为非空文字。图片输入放进 `base64Array`，不要把文件路径当成 Base64。
+- 请求超时后先检查已有任务记录，不立即重复提交同一绘图。
+
+排队、回调和恢复处理见 [任务生命周期](/zh/media/midjourney/tasks)。

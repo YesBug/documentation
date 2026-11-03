@@ -1,202 +1,149 @@
 ---
-title: "Midjourney 绘图"
-description: "提交绘图任务，查询生成结果，再执行放大、变化等关联动作。"
-keywords: ["MaxAPI", "Midjourney 绘图", "midjourney"]
+title: "Midjourney 快速开始"
+sidebarTitle: "快速开始"
+description: "从提交 Imagine 到查询图片、读取按钮和执行下一步，理解 Midjourney 的任务 ID、动作 ID 与运行模式。"
+keywords: ["MaxAPI", "Midjourney", "Imagine", "绘图", "taskId", "customId"]
 ---
 
-Midjourney 使用任务接口。先提交绘图，取得任务 ID，再查询图片和可执行动作。调用前需确认你的密钥所在分组已开通 Midjourney；可用模式和动作由渠道决定。
+MaxAPI 的 Midjourney 接口采用异步任务流程：**提交提示词 → 得到任务 ID → 查询完成结果 → 选择图片动作**。它不使用 Chat Completions，也不在请求体里填写聊天模型的 `model`。
 
-## 常用接口
+## 先找到你要做的事
 
-| 方法 | 路径 | 用途 |
+| 你想做什么 | 使用的接口 | 接下来做什么 |
 | --- | --- | --- |
-| `POST` | `/mj/submit/imagine` | 根据提示词创建绘图任务 |
-| `GET` | `/mj/task/{id}/fetch` | 查询任务状态与结果 |
-| `POST` | `/mj/submit/action` | 对现有任务执行按钮动作 |
-| `POST` | `/mj/submit/blend` | 混合参考图 |
-| `POST` | `/mj/submit/describe` | 根据图片生成描述 |
-| `POST` | `/mj/submit/modal` | 提交需要额外输入的交互动作 |
+| 文字生成图片，或参考图片加文字 | [Imagine](/zh/api-reference/midjourney/imagine) | 查询任务，读取图片和按钮 |
+| 混合多张图片 | [Blend](/zh/api-reference/midjourney/blend) | 查询生成结果 |
+| 从图片提取提示词 | [Describe](/zh/api-reference/midjourney/describe) | 读取描述，再选提示词生成图片 |
+| 分析、精简提示词 | [Shorten](/zh/api-reference/midjourney/shorten) | 读取分析结果，再选择生成 |
+| 选择单张图、变化、重新生成、缩放或平移 | [Action](/zh/api-reference/midjourney/action) | 根据返回结果继续查询，或进入 Modal |
+| 修改提示词、局部重绘、确认交互 | [Modal](/zh/api-reference/midjourney/modal) | 提交交互参数后，查询最终任务 |
 
-本页演示常用流程。更多参数见 [完整接口目录](/zh/api-reference/catalog)。示例均使用 `https://api.maxapi.ai` 和 Bearer 密钥。
+图片输入的完整示例见 [参考图、混图与反推](/zh/media/midjourney/inputs)；U/V、Remix 和局部重绘见 [后续动作](/zh/media/midjourney/actions)。
+
+## 准备配置
+
+在 [控制台](https://platform.maxapi.ai) 获取可调用 Midjourney 的密钥。下面的终端示例使用 Bash、`curl`、Python 3 和 `jq`。
+
+```bash
+export MAXAPI_API_KEY="替换为你的 MaxAPI API Key"
+export MAXAPI_MJ_BASE_URL="https://api.maxapi.ai/mj"
+```
+
+| 模式 | Base URL |
+| --- | --- |
+| Fast | `https://api.maxapi.ai/mj` |
+| Turbo | `https://api.maxapi.ai/mj-turbo/mj` |
+| Relax | `https://api.maxapi.ai/mj-relax/mj` |
+
+选择你账户可用的模式，并在提交、查询和后续动作中保持一致。**这些地址不加 `/v1`**。不同模式的价格、配额与可用性以账户配置为准。
 
 ## 1. 提交绘图
 
-```http Endpoint
-POST https://api.maxapi.ai/mj/submit/imagine
-```
+下面的提示词生成一张用于产品展示的陶瓷杯图片。`botType` 选择 `MID_JOURNEY`；使用 Niji 时，对应值为 `NIJI_JOURNEY`。
 
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `prompt` | `string` | 是 | 绘图提示词 |
-| `base64Array` | `string[]` | 否 | 使用参考图时提供的 Base64 数组；具体编码要求按渠道确认 |
-| `notifyHook` | `string` | 否 | 该任务的回调地址 |
-| `state` | `string` | 否 | 关联业务记录的自定义值，避免存放密钥等敏感信息 |
-
-```bash 创建 Imagine 任务
-jq -n '{
-  prompt: "A tiny observatory on a green hill, watercolor illustration",
-  state: "illustration-job-001"
-}' | curl --fail-with-body https://api.maxapi.ai/mj/submit/imagine \
+```bash
+curl --fail-with-body "$MAXAPI_MJ_BASE_URL/submit/imagine" \
   -H "Authorization: Bearer $MAXAPI_API_KEY" \
   -H "Content-Type: application/json" \
-  --data-binary @- \
+  --data '{
+    "botType": "MID_JOURNEY",
+    "prompt": "A handmade ceramic cup on a clean studio background, soft side lighting, product photography",
+    "state": "product-photo-001"
+  }' \
   --output mj-submit.json
 ```
 
-### 先检查业务状态
+成功提交后的结构如下。这里的 `TASK_A` 是说明用的占位符：
 
-```json 提交响应示意
+```json
 {
   "code": 1,
   "description": "提交成功",
-  "result": "your-mj-task-id"
+  "result": "TASK_A"
 }
 ```
 
-| `code` | 资料中的含义 | 处理方式 |
-| --- | --- | --- |
-| `1` | 提交成功 | 保存 `result` 中的任务 ID |
-| `21` | 已存在 | 检查返回的任务信息，避免重复创建 |
-| `22` | 排队中 | 保存有效任务 ID，并查询后续状态 |
-| 其他值 | 错误 | 读取 `description`，不要当作成功任务 |
+`code: 1` 表示提交成功，`code: 22` 表示已进入队列；二者都不代表图片已经生成。`result` 是需要保存的任务 ID，HTTP `200` 本身不能证明业务成功。
 
-这些是提交结果的业务码，和 HTTP 状态码、后续任务状态不同。`result` 才是此接口返回任务 ID 的位置。
+命令成功后，提取自己的任务 ID。Python 会保留 JSON 整数的精度，再将 ID 转成字符串：
 
-```bash 取得可继续查询的任务 ID
-TASK_ID="$(jq -er '
-  if (.code == 1 or .code == 21 or .code == 22)
-  then (.result // empty | tostring)
-  else error(.description // "Midjourney 提交失败")
-  end
-' mj-submit.json)"
-: "${TASK_ID:?响应缺少任务 ID}"
+```bash
+TASK_ID="$(python3 - <<'PY'
+import json
+from pathlib import Path
+
+result = json.loads(Path("mj-submit.json").read_text(encoding="utf-8"))
+if result.get("code") not in (1, 22):
+    raise SystemExit(result.get("description", "Submission was not accepted"))
+task_id = result.get("result")
+if isinstance(task_id, bool) or not isinstance(task_id, (str, int)) or str(task_id) == "":
+    raise SystemExit("No valid task ID in result")
+print(str(task_id))
+PY
+)"
+: "${TASK_ID:?请先检查 mj-submit.json 中的业务结果}"
+export TASK_ID
 ```
 
-## 2. 查询任务
+## 2. 查询到任务完成
 
-```bash 查询一次
-TASK_ID_ESCAPED="$(printf '%s' "$TASK_ID" | jq -sRr @uri)"
-curl --fail-with-body \
-  "https://api.maxapi.ai/mj/task/$TASK_ID_ESCAPED/fetch" \
+```bash
+TASK_ID_ESCAPED="$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["TASK_ID"], safe=""))')"
+curl --fail-with-body "$MAXAPI_MJ_BASE_URL/task/$TASK_ID_ESCAPED/fetch" \
   -H "Authorization: Bearer $MAXAPI_API_KEY" \
   --output mj-task.json
+
+jq '{id, status, progress, imageUrl, failReason}' mj-task.json
 ```
 
-| 字段 | 含义 |
+查询过程中可能看到 `NOT_START`、`SUBMITTED` 或 `IN_PROGRESS`。稍后再次查询**同一个任务**，不要重新提交 `imagine`。可运行的自动轮询脚本见 [任务状态与回调](/zh/media/midjourney/tasks)。
+
+成功任务示意：
+
+```json
+{
+  "id": "TASK_A",
+  "action": "IMAGINE",
+  "status": "SUCCESS",
+  "progress": "100%",
+  "imageUrl": "https://example.com/generated-grid.png",
+  "buttons": [
+    {"label": "U1", "customId": "COPY_THE_ACTUAL_CUSTOM_ID_FROM_THIS_TASK"}
+  ]
+}
+```
+
+以 `status: "SUCCESS"` 判断成功，再读取 `imageUrl`。生成过程中也可能出现预览图片地址，因此不能只检查 URL 是否存在。`FAILURE` 时读取 `failReason`；`CANCEL` 表示已取消。
+
+## 3. 看懂图片和按钮
+
+普通绘图结果可能是四宫格。`buttons` 告诉你这一次结果可执行哪些操作：`label` 是展示给人的名称，`customId` 才是提交给 API 的动作标识。
+
+```bash
+jq -r '.buttons[]? | [.label, .emoji, .customId] | @tsv' mj-task.json
+```
+
+例如，想选择第一张图时，在当前任务返回的按钮中寻找 `U1`，将它的完整 `customId` 与任务的 `id` 一起提交给 Action。不要把字符串 `"U1"` 直接填进 `customId`，也不要从别的任务复制动作标识。
+
+| 标识 | 从哪里取得 | 用在哪里 |
+| --- | --- | --- |
+| 原任务 ID | Imagine 返回的 `result`，或查询结果的 `id` | Action 请求的 `taskId` |
+| 动作标识 | 当前任务的 `buttons[].customId` | Action 请求的 `customId` |
+| 后续任务 ID | Action 或 Modal 返回的 `result` | 后续的任务查询；不要继续查询原任务 |
+
+<Columns cols={2}>
+  <Card title="继续：选择单图、变体和局部重绘" icon="wand-magic-sparkles" href="/zh/media/midjourney/actions">完整演示 Action → 新任务，以及 Action → Modal → 查询两条路径。</Card>
+  <Card title="查阅每个接口" icon="code" href="/zh/api-reference/midjourney/index">查看 13 个接口的参数、响应、示例和在线调试入口。</Card>
+</Columns>
+
+## 最容易接错的地方
+
+| 现象 | 正确处理 |
 | --- | --- |
-| `id` | 当前任务 ID |
-| `status` | 常见为 `NOT_START`、`SUBMITTED`、`IN_PROGRESS`、`SUCCESS`、`FAILURE` |
-| `progress` | 接口提供的进度信息 |
-| `imageUrl` | 生成图片地址，成功后检查是否存在 |
-| `failReason` | 失败原因 |
-| `state` | 任务关联的自定义值 |
-| `buttons` | 部分渠道返回的可执行按钮列表，以实际响应为准 |
+| 返回任务 ID，却没有图片 | 提交和查询是两个请求，继续查询直到成功 |
+| 放大后仍显示原图 | 保存 Action 返回的任务 ID，查询后续任务 |
+| 动作返回 `code: 21` 且提示等待输入，或任务状态为 `MODAL` | 这是需要交互确认的动作分支，按 [Modal 流程](/zh/media/midjourney/actions) 补充输入 |
+| 查询不到任务 | 检查密钥、完整 ID 和模式前缀是否与提交一致 |
+| 用 JavaScript 保存 ID 后对不上 | 保持 ID 为字符串，不要转换为 `Number`；过长数值 ID 应用无损 JSON 解析处理 |
 
-等待成功或失败后停止轮询。遇到其他状态时记录原始响应，并设置总等待期限；不要无限请求。通用实现建议见 [异步任务与回调](/zh/guides/async-tasks)。
-
-### 等待完成并保存图片
-
-[异步任务指南](/zh/guides/async-tasks) 提供完整的 `wait_for_midjourney.py`。保存脚本后，可直接使用刚才取得的任务 ID：
-
-```bash 等待同一任务完成
-python -m pip install requests
-python wait_for_midjourney.py "$TASK_ID"
-```
-
-成功时 `mj-task.json` 中应包含 `status: "SUCCESS"` 与非空的 `imageUrl`。下面的脚本检查状态、下载图片并根据实际 MIME 类型选择扩展名；下载中断时保留 `.part` 文件，不会把半张图片当作成功结果。
-
-```python save_mj_image.py
-import json
-import mimetypes
-from pathlib import Path
-from urllib.parse import urlparse
-
-import requests
-
-
-task = json.loads(Path("mj-task.json").read_text(encoding="utf-8"))
-if task.get("status") != "SUCCESS":
-    raise RuntimeError("The Midjourney task has not succeeded")
-url = task.get("imageUrl", "")
-if urlparse(url).scheme != "https":
-    raise RuntimeError("Expected an HTTPS imageUrl in the completed task")
-
-# This download deliberately has no Authorization header.
-with requests.get(url, stream=True, timeout=(10, 60)) as response:
-    response.raise_for_status()
-    media_type = response.headers.get("Content-Type", "").split(";", 1)[0]
-    if not media_type.startswith("image/"):
-        raise RuntimeError(f"Expected image bytes, received {media_type!r}")
-    extension = mimetypes.guess_extension(media_type) or ".img"
-    output = Path("mj-image" + extension)
-    partial = output.with_suffix(output.suffix + ".part")
-    with partial.open("wb") as file:
-        for chunk in response.iter_content(chunk_size=64 * 1024):
-            if chunk:
-                file.write(chunk)
-    if partial.stat().st_size == 0:
-        raise RuntimeError("Downloaded image is empty")
-    partial.replace(output)
-print(f"Saved {output}")
-```
-
-```bash 下载已完成的图片
-python save_mj_image.py
-```
-
-下载使用图片地址自身的访问方式，不把 MaxAPI 的 Bearer 密钥转发给图片域名。如果图片链接失效，先重新查询这个任务，再尝试其当前结果地址。
-
-## 3. 执行后续动作
-
-放大、变化等操作通过 `taskId` 关联原任务，通过 `customId` 指定具体动作。`customId` 通常由返回的按钮信息提供，例如可用时读取 `buttons[].customId`；它不是让开发者自行拼接的固定编号。
-
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `taskId` | `string` | 是 | 原任务 ID |
-| `customId` | `string` | 是 | 当前任务实际提供的动作标识 |
-| `notifyHook` | `string` | 否 | 此次动作任务的回调地址 |
-| `state` | `string` | 否 | 此次动作关联的业务值 |
-
-将 `MAXAPI_MJ_ACTION_ID` 设置为用户选中的可用动作标识后提交：
-
-```bash 执行选中的动作
-: "${MAXAPI_MJ_ACTION_ID:?请设置查询结果中可用的 customId}"
-jq -n --arg task "$TASK_ID" --arg action "$MAXAPI_MJ_ACTION_ID" '{
-  taskId: $task,
-  customId: $action
-}' | curl --fail-with-body https://api.maxapi.ai/mj/submit/action \
-  -H "Authorization: Bearer $MAXAPI_API_KEY" \
-  -H "Content-Type: application/json" \
-  --data-binary @- \
-  --output mj-action.json
-```
-
-动作提交会返回自己的提交结果。检查业务码、保存新的 `result`，然后查询新任务；不要继续用原任务 ID 等待新图片。如果动作要求额外输入，按该动作对应的交互接口提交，不能假定一次 `action` 请求就完成所有步骤。
-
-### 让用户选择真实可用的动作
-
-只展示当前成功任务返回的按钮。可先查看可用标识，再把用户选中的一个值赋给 `MAXAPI_MJ_ACTION_ID`：
-
-```bash 列出当前任务的动作标识
-jq -r '.buttons[]?.customId // empty' mj-task.json
-```
-
-若列表为空，不能据此构造 `U1`、`V1` 或其他假定动作 ID。保留已生成的图片，并确认该渠道是否返回交互按钮。跟踪后续任务时，建议把“原任务 ID → 动作标识 → 新任务 ID”一起保存，便于用户回到原图或查看某次变化的结果。
-
-## 按症状排查
-
-| 现象 | 检查顺序 |
-| --- | --- |
-| HTTP 200，但没有任务 ID | 检查提交响应 `code` 和 `description`，不要只看 HTTP 状态 |
-| 一直显示原图 | 检查动作返回的新 `result`，查询新任务而不是原任务 |
-| 图片存在，但放大或变化失败 | 重新获取原任务的当前按钮；确认 `taskId` 和 `customId` 来自同一任务 |
-| `SUCCESS`，下载却失败 | 检查 `imageUrl`、下载 HTTP 状态和 `Content-Type`；重新查询结果地址 |
-| 刷新页面后出现重复任务 | 让页面读取已保存的任务记录，避免在页面加载时自动调用 `imagine` |
-| 查询任务找不到 | 检查任务 ID、密钥所属渠道，以及提交与查询是否使用同一运行模式前缀 |
-
-
-## 回调和运行模式
-
-`notifyHook` 只在已支持回调的渠道使用。收到通知后按任务 ID 关联记录，并处理重复通知；签名、重试次数和投递顺序不能从这个字段推断。详见 [异步任务与回调](/zh/guides/async-tasks)。
-
-相关协议还存在 `/mj-turbo/mj`、`/mj-relax/mj` 等前缀。是否开放、与默认模式的关系和计费以你的渠道配置为准；本页的 `/mj` 示例不代表其他前缀已开通。
+`state` 是你自己的业务关联值，例如订单或生成记录编号。它不是任务 ID，也不能代替 `taskId`。

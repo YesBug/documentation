@@ -1,0 +1,1682 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MaxAPI Midjourney API",
+    "version": "1.0.0",
+    "description": "Midjourney 绘图、交互动作与任务管理接口。请求使用 MaxAPI Bearer API Key。默认示例使用 /mj 路径；为同一任务保持一致的模式前缀。请求与响应示例仅展示结构，任务 ID、动作标识和图片内容必须来自你的实际调用。"
+  },
+  "servers": [
+    {
+      "url": "https://api.maxapi.ai",
+      "description": "Fast：默认示例使用 /mj。请选择当前账户已开通的模式。"
+    },
+    {
+      "url": "https://api.maxapi.ai/mj-turbo",
+      "description": "Turbo：生成路径 /mj-turbo/mj/...，需要账户已开通 Turbo。"
+    },
+    {
+      "url": "https://api.maxapi.ai/mj-relax",
+      "description": "Relax：生成路径 /mj-relax/mj/...，需要账户已开通 Relax。"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Midjourney 任务提交"
+    },
+    {
+      "name": "Midjourney 任务管理"
+    }
+  ],
+  "paths": {
+    "/mj/submit/imagine": {
+      "post": {
+        "operationId": "submitMidjourneyImagine",
+        "summary": "提交 Imagine 绘图",
+        "description": "根据提示词创建绘图任务。保存 result，再查询任务；提交响应不包含最终生成图片。",
+        "tags": [
+          "Midjourney 任务提交"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求结果。请同时检查业务码与任务状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitResponse"
+                },
+                "examples": {
+                  "accepted": {
+                    "summary": "已提交",
+                    "value": {
+                      "code": 1,
+                      "description": "提交成功",
+                      "result": "YOUR_TASK_ID"
+                    }
+                  },
+                  "queued": {
+                    "summary": "已进入队列",
+                    "value": {
+                      "code": 22,
+                      "description": "排队中",
+                      "result": "YOUR_TASK_ID"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份验证失败。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求被拒绝。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "请求资源未找到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImagineRequest"
+              },
+              "example": {
+                "prompt": "A small observatory on a green hill, watercolor illustration",
+                "state": "illustration-job-001"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/mj/submit/action": {
+      "post": {
+        "operationId": "submitMidjourneyAction",
+        "summary": "执行任务按钮动作",
+        "description": "使用原任务 id 与其 buttons 中的 customId 执行放大、变化等动作。code 为 21 且表示窗口等待时，result 是待确认任务 ID；确认 MODAL 状态后调用 modal。code 为 1 或 22 时跟踪返回的任务 ID。",
+        "tags": [
+          "Midjourney 任务提交"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求结果。请同时检查业务码与任务状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitResponse"
+                },
+                "examples": {
+                  "accepted": {
+                    "summary": "已提交",
+                    "value": {
+                      "code": 1,
+                      "description": "提交成功",
+                      "result": "YOUR_TASK_ID"
+                    }
+                  },
+                  "queued": {
+                    "summary": "已进入队列",
+                    "value": {
+                      "code": 22,
+                      "description": "排队中",
+                      "result": "YOUR_TASK_ID"
+                    }
+                  },
+                  "modal": {
+                    "summary": "等待补充输入",
+                    "value": {
+                      "code": 21,
+                      "description": "窗口等待",
+                      "result": "YOUR_PENDING_TASK_ID"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份验证失败。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求被拒绝。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "请求资源未找到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActionRequest"
+              },
+              "example": {
+                "taskId": "YOUR_TASK_ID",
+                "customId": "COPY_FROM_TASK_BUTTONS"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/mj/submit/modal": {
+      "post": {
+        "operationId": "submitMidjourneyModal",
+        "summary": "提交 Modal 补充输入",
+        "description": "为等待交互确认的任务提交最终提示词或蒙版。taskId 使用待确认任务的 ID，不能默认使用原始图片任务 ID。完成提交后，跟踪返回的 result。",
+        "tags": [
+          "Midjourney 任务提交"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求结果。请同时检查业务码与任务状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitResponse"
+                },
+                "examples": {
+                  "accepted": {
+                    "summary": "已提交",
+                    "value": {
+                      "code": 1,
+                      "description": "提交成功",
+                      "result": "YOUR_TASK_ID"
+                    }
+                  },
+                  "queued": {
+                    "summary": "已进入队列",
+                    "value": {
+                      "code": 22,
+                      "description": "排队中",
+                      "result": "YOUR_TASK_ID"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份验证失败。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求被拒绝。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "请求资源未找到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModalRequest"
+              },
+              "example": {
+                "taskId": "YOUR_PENDING_TASK_ID",
+                "prompt": "A small observatory on a green hill, watercolor illustration"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/mj/submit/blend": {
+      "post": {
+        "operationId": "submitMidjourneyBlend",
+        "summary": "提交 Blend 混图",
+        "description": "把多张图片以 Base64 Data URI 数组提交，混合生成新图片。请求是 JSON，不是 multipart 文件上传。",
+        "tags": [
+          "Midjourney 任务提交"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求结果。请同时检查业务码与任务状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitResponse"
+                },
+                "examples": {
+                  "accepted": {
+                    "summary": "已提交",
+                    "value": {
+                      "code": 1,
+                      "description": "提交成功",
+                      "result": "YOUR_TASK_ID"
+                    }
+                  },
+                  "queued": {
+                    "summary": "已进入队列",
+                    "value": {
+                      "code": 22,
+                      "description": "排队中",
+                      "result": "YOUR_TASK_ID"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份验证失败。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求被拒绝。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "请求资源未找到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlendRequest"
+              },
+              "example": {
+                "base64Array": [
+                  "data:image/png;base64,REPLACE_WITH_FIRST_IMAGE",
+                  "data:image/png;base64,REPLACE_WITH_SECOND_IMAGE"
+                ],
+                "dimensions": "SQUARE"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/mj/submit/describe": {
+      "post": {
+        "operationId": "submitMidjourneyDescribe",
+        "summary": "提交 Describe 图生文",
+        "description": "上传图片的 Base64 Data URI 生成提示词。等待任务成功后读取 properties.finalPrompt，并在存在时读取 finalZhPrompt；不要只等待新的 imageUrl。",
+        "tags": [
+          "Midjourney 任务提交"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求结果。请同时检查业务码与任务状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitResponse"
+                },
+                "examples": {
+                  "accepted": {
+                    "summary": "已提交",
+                    "value": {
+                      "code": 1,
+                      "description": "提交成功",
+                      "result": "YOUR_TASK_ID"
+                    }
+                  },
+                  "queued": {
+                    "summary": "已进入队列",
+                    "value": {
+                      "code": 22,
+                      "description": "排队中",
+                      "result": "YOUR_TASK_ID"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份验证失败。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求被拒绝。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "请求资源未找到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DescribeRequest"
+              },
+              "example": {
+                "base64": "data:image/png;base64,REPLACE_WITH_BASE64"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/mj/submit/shorten": {
+      "post": {
+        "operationId": "submitMidjourneyShorten",
+        "summary": "提交 Shorten 提示词分析",
+        "description": "分析提示词并生成简化建议。成功后从任务的 properties.finalPrompt 读取文本结果；操作本身不要求生成一张新图片。",
+        "tags": [
+          "Midjourney 任务提交"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求结果。请同时检查业务码与任务状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitResponse"
+                },
+                "examples": {
+                  "accepted": {
+                    "summary": "已提交",
+                    "value": {
+                      "code": 1,
+                      "description": "提交成功",
+                      "result": "YOUR_TASK_ID"
+                    }
+                  },
+                  "queued": {
+                    "summary": "已进入队列",
+                    "value": {
+                      "code": 22,
+                      "description": "排队中",
+                      "result": "YOUR_TASK_ID"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份验证失败。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求被拒绝。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "请求资源未找到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShortenRequest"
+              },
+              "example": {
+                "prompt": "A small observatory on a green hill, soft watercolor, warm morning light, peaceful atmosphere"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/mj/task/{id}/fetch": {
+      "get": {
+        "operationId": "fetchMidjourneyTask",
+        "summary": "查询单个任务",
+        "description": "返回任务对象本身。根据 status 区分等待、补充输入、成功、失败与取消；成功后读取图片或文本结果，再展示 buttons 中的可用动作。",
+        "tags": [
+          "Midjourney 任务管理"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求结果。请同时检查业务码与任务状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "已完成的绘图任务",
+                    "value": {
+                      "id": "YOUR_TASK_ID",
+                      "action": "IMAGINE",
+                      "status": "SUCCESS",
+                      "progress": "100%",
+                      "prompt": "A small observatory on a green hill, watercolor illustration",
+                      "imageUrl": "https://example.com/generated-image.png",
+                      "buttons": [
+                        {
+                          "customId": "COPY_FROM_TASK_BUTTONS",
+                          "label": "U1",
+                          "emoji": "",
+                          "style": 2,
+                          "type": 2
+                        }
+                      ],
+                      "state": "illustration-job-001"
+                    }
+                  },
+                  "modal": {
+                    "summary": "等待补充输入的任务",
+                    "value": {
+                      "id": "YOUR_PENDING_TASK_ID",
+                      "status": "MODAL"
+                    }
+                  },
+                  "text": {
+                    "summary": "Describe 文本结果",
+                    "value": {
+                      "id": "YOUR_TASK_ID",
+                      "action": "DESCRIBE",
+                      "status": "SUCCESS",
+                      "properties": {
+                        "finalPrompt": "A small observatory on a green hill, watercolor illustration"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份验证失败。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求被拒绝。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "请求资源未找到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "需要查询或操作的任务 ID。",
+            "schema": {
+              "type": "string",
+              "example": "YOUR_TASK_ID"
+            }
+          }
+        ]
+      }
+    },
+    "/mj/task/list-by-condition": {
+      "post": {
+        "operationId": "listMidjourneyTasksByIds",
+        "summary": "按 ID 批量查询任务",
+        "description": "一次查询多个任务，返回任务数组。按每项 id 与本地记录关联，逐项检查 status；不要依赖返回顺序或假定每个输入 ID 都有对应结果。",
+        "tags": [
+          "Midjourney 任务管理"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求结果。请同时检查业务码与任务状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Task"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份验证失败。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求被拒绝。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "请求资源未找到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskIdsRequest"
+              },
+              "example": {
+                "ids": [
+                  "YOUR_FIRST_TASK_ID",
+                  "YOUR_SECOND_TASK_ID"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mj/task/queue": {
+      "get": {
+        "operationId": "getMidjourneyQueue",
+        "summary": "查询任务队列",
+        "description": "返回当前请求可见的队列任务数组。队列快照不等于预计完成时间；已保存的单个任务仍可按 ID 查询。",
+        "tags": [
+          "Midjourney 任务管理"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求结果。请同时检查业务码与任务状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Task"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份验证失败。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求被拒绝。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "请求资源未找到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mj/task/{id}/cancel": {
+      "post": {
+        "operationId": "cancelMidjourneyTask",
+        "summary": "取消任务",
+        "description": "请求取消指定任务。检查返回的 code 与 description，再查询任务确认最终状态。取消结果不代表退款或所有执行阶段都可以取消。",
+        "tags": [
+          "Midjourney 任务管理"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求结果。请同时检查业务码与任务状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份验证失败。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求被拒绝。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "请求资源未找到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "需要查询或操作的任务 ID。",
+            "schema": {
+              "type": "string",
+              "example": "YOUR_TASK_ID"
+            }
+          }
+        ]
+      }
+    },
+    "/mj/task/{id}/image-seed": {
+      "get": {
+        "operationId": "getMidjourneyImageSeed",
+        "summary": "获取图片 Seed",
+        "description": "获取已生成图片的 seed。code 为 1 时 result 是 seed 字符串，不是新任务 ID。此功能依赖渠道已配置相应机器人的私信能力。",
+        "tags": [
+          "Midjourney 任务管理"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求结果。请同时检查业务码与任务状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeedResponse"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "Seed 获取成功",
+                    "value": {
+                      "code": 1,
+                      "description": "成功",
+                      "result": "123456789"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份验证失败。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求被拒绝。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "请求资源未找到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "需要查询或操作的任务 ID。",
+            "schema": {
+              "type": "string",
+              "example": "YOUR_TASK_ID"
+            }
+          }
+        ]
+      }
+    },
+    "/mj/task/list": {
+      "get": {
+        "operationId": "listMidjourneyTasks",
+        "summary": "查询任务列表",
+        "description": "返回当前请求可见的任务数组。需要控制分页或按状态筛选时使用 POST /mj/task/query。返回范围由当前渠道与权限决定。",
+        "tags": [
+          "Midjourney 任务管理"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求结果。请同时检查业务码与任务状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Task"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份验证失败。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求被拒绝。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "请求资源未找到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mj/task/query": {
+      "post": {
+        "operationId": "queryMidjourneyTasks",
+        "summary": "分页筛选任务",
+        "description": "按页码、任务状态、ID 或业务关联值筛选任务。pageNumber 从 0 开始；结果在 content 数组中，结合 last 与 totalPages 处理后续页。",
+        "tags": [
+          "Midjourney 任务管理"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求结果。请同时检查业务码与任务状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份验证失败。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求被拒绝。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "请求资源未找到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskQueryRequest"
+              },
+              "example": {
+                "pageNumber": 0,
+                "pageSize": 20,
+                "status": "SUCCESS"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "在控制台创建 API Key，并作为 Authorization: Bearer <API_KEY> 发送。"
+      }
+    },
+    "schemas": {
+      "AccountFilter": {
+        "type": "object",
+        "properties": {
+          "instanceId": {
+            "type": "string",
+            "description": "指定账号实例 ID。仅在已明确获知可用实例时填写。"
+          },
+          "modes": {
+            "type": "array",
+            "description": "按账号模式筛选。它不替代请求 URL 的模式前缀。",
+            "items": {
+              "type": "string",
+              "description": "账号运行模式。",
+              "enum": [
+                "RELAX",
+                "FAST",
+                "TURBO"
+              ]
+            }
+          },
+          "remix": {
+            "type": "boolean",
+            "description": "按账号是否启用 Remix 筛选。"
+          },
+          "remixAutoConsidered": {
+            "type": "boolean",
+            "description": "筛选时是否把启用 Remix 自动提交的账号视为 remix 为 false。"
+          }
+        },
+        "description": "可选账号筛选条件。普通接入通常可以省略，由服务端选择可用账号。"
+      },
+      "ImagineRequest": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "绘图或文本分析提示词。模型参数写在提示词中，按所选模型支持的语法使用。",
+            "example": "A small observatory on a green hill, watercolor illustration"
+          },
+          "base64Array": {
+            "type": "array",
+            "description": "参考图片的 Base64 Data URI 数组；纯文生图时省略。",
+            "items": {
+              "type": "string",
+              "description": "图片的 Base64 Data URI，例如 data:image/png;base64,...。把示例占位符替换为完整图片内容。",
+              "example": "data:image/png;base64,REPLACE_WITH_BASE64"
+            }
+          },
+          "botType": {
+            "type": "string",
+            "description": "机器人类型。Midjourney 使用 MID_JOURNEY，Niji 使用 NIJI_JOURNEY；是否可用取决于当前渠道。",
+            "enum": [
+              "MID_JOURNEY",
+              "NIJI_JOURNEY"
+            ]
+          },
+          "accountFilter": {
+            "$ref": "#/components/schemas/AccountFilter"
+          },
+          "notifyHook": {
+            "type": "string",
+            "description": "任务状态或进度变化的回调地址。不传时使用服务端已配置的回调地址（如有）；两者都为空则不发送回调。",
+            "example": "https://example.com/webhooks/midjourney"
+          },
+          "state": {
+            "type": "string",
+            "description": "自定义业务关联值，查询任务时在 state 中返回。不要放入密钥或敏感信息。",
+            "example": "illustration-job-001"
+          }
+        },
+        "required": [
+          "prompt"
+        ]
+      },
+      "ActionRequest": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "任务 ID。使用提交响应中的 result 或查询响应中的 id；保持为字符串。",
+            "example": "YOUR_TASK_ID"
+          },
+          "customId": {
+            "type": "string",
+            "description": "从该任务 buttons 中读取并原样提交的动作标识。不能只发送 U1、V1 等按钮文字，也不要拼接标识。",
+            "example": "COPY_FROM_TASK_BUTTONS"
+          },
+          "notifyHook": {
+            "type": "string",
+            "description": "任务状态或进度变化的回调地址。不传时使用服务端已配置的回调地址（如有）；两者都为空则不发送回调。",
+            "example": "https://example.com/webhooks/midjourney"
+          },
+          "state": {
+            "type": "string",
+            "description": "自定义业务关联值，查询任务时在 state 中返回。不要放入密钥或敏感信息。",
+            "example": "illustration-job-001"
+          }
+        },
+        "required": [
+          "customId",
+          "taskId"
+        ]
+      },
+      "ModalRequest": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "需要确认的待提交任务 ID。动作返回窗口等待时使用该响应的 result，不要直接复用原始图片任务 ID。",
+            "example": "YOUR_PENDING_TASK_ID"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "最终提示词。为空时沿用原任务提示词；自定义变焦等动作需要相应参数。",
+            "example": "A small observatory on a green hill, watercolor illustration"
+          },
+          "maskBase64": {
+            "type": "string",
+            "description": "局部重绘使用的蒙版 Base64 Data URI，黑色背景、白色区域表示选择重绘的区域。只在需要蒙版的动作中提供。",
+            "example": "data:image/png;base64,REPLACE_WITH_MASK_BASE64"
+          }
+        },
+        "required": [
+          "taskId"
+        ]
+      },
+      "BlendRequest": {
+        "type": "object",
+        "properties": {
+          "base64Array": {
+            "type": "array",
+            "description": "需要混合的图片 Base64 Data URI 数组。",
+            "items": {
+              "type": "string",
+              "description": "图片的 Base64 Data URI，例如 data:image/png;base64,...。把示例占位符替换为完整图片内容。",
+              "example": "data:image/png;base64,REPLACE_WITH_BASE64"
+            }
+          },
+          "dimensions": {
+            "type": "string",
+            "description": "输出比例：PORTRAIT 为 2:3，SQUARE 为 1:1，LANDSCAPE 为 3:2。",
+            "enum": [
+              "PORTRAIT",
+              "SQUARE",
+              "LANDSCAPE"
+            ]
+          },
+          "botType": {
+            "type": "string",
+            "description": "机器人类型。Midjourney 使用 MID_JOURNEY，Niji 使用 NIJI_JOURNEY；是否可用取决于当前渠道。",
+            "enum": [
+              "MID_JOURNEY",
+              "NIJI_JOURNEY"
+            ]
+          },
+          "accountFilter": {
+            "$ref": "#/components/schemas/AccountFilter"
+          },
+          "notifyHook": {
+            "type": "string",
+            "description": "任务状态或进度变化的回调地址。不传时使用服务端已配置的回调地址（如有）；两者都为空则不发送回调。",
+            "example": "https://example.com/webhooks/midjourney"
+          },
+          "state": {
+            "type": "string",
+            "description": "自定义业务关联值，查询任务时在 state 中返回。不要放入密钥或敏感信息。",
+            "example": "illustration-job-001"
+          }
+        },
+        "required": [
+          "base64Array"
+        ]
+      },
+      "DescribeRequest": {
+        "type": "object",
+        "properties": {
+          "base64": {
+            "type": "string",
+            "description": "图片的 Base64 Data URI，例如 data:image/png;base64,...。把示例占位符替换为完整图片内容。",
+            "example": "data:image/png;base64,REPLACE_WITH_BASE64"
+          },
+          "botType": {
+            "type": "string",
+            "description": "机器人类型。Midjourney 使用 MID_JOURNEY，Niji 使用 NIJI_JOURNEY；是否可用取决于当前渠道。",
+            "enum": [
+              "MID_JOURNEY",
+              "NIJI_JOURNEY"
+            ]
+          },
+          "accountFilter": {
+            "$ref": "#/components/schemas/AccountFilter"
+          },
+          "notifyHook": {
+            "type": "string",
+            "description": "任务状态或进度变化的回调地址。不传时使用服务端已配置的回调地址（如有）；两者都为空则不发送回调。",
+            "example": "https://example.com/webhooks/midjourney"
+          },
+          "state": {
+            "type": "string",
+            "description": "自定义业务关联值，查询任务时在 state 中返回。不要放入密钥或敏感信息。",
+            "example": "illustration-job-001"
+          }
+        },
+        "required": [
+          "base64"
+        ]
+      },
+      "ShortenRequest": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "绘图或文本分析提示词。模型参数写在提示词中，按所选模型支持的语法使用。",
+            "example": "A small observatory on a green hill, watercolor illustration"
+          },
+          "botType": {
+            "type": "string",
+            "description": "机器人类型。Midjourney 使用 MID_JOURNEY，Niji 使用 NIJI_JOURNEY；是否可用取决于当前渠道。",
+            "enum": [
+              "MID_JOURNEY",
+              "NIJI_JOURNEY"
+            ]
+          },
+          "accountFilter": {
+            "$ref": "#/components/schemas/AccountFilter"
+          },
+          "notifyHook": {
+            "type": "string",
+            "description": "任务状态或进度变化的回调地址。不传时使用服务端已配置的回调地址（如有）；两者都为空则不发送回调。",
+            "example": "https://example.com/webhooks/midjourney"
+          },
+          "state": {
+            "type": "string",
+            "description": "自定义业务关联值，查询任务时在 state 中返回。不要放入密钥或敏感信息。",
+            "example": "illustration-job-001"
+          }
+        },
+        "required": [
+          "prompt"
+        ]
+      },
+      "TaskIdsRequest": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "description": "需要查询的任务 ID 列表。按返回对象的 id 匹配，不依赖数组顺序。",
+            "items": {
+              "type": "string",
+              "description": "任务 ID。使用提交响应中的 result 或查询响应中的 id；保持为字符串。",
+              "example": "YOUR_TASK_ID"
+            }
+          }
+        }
+      },
+      "SubmitResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "提交业务码：1 表示已提交，22 表示已进入队列。21 必须结合接口与任务状态处理：动作接口可表示窗口等待（MODAL），部分兼容版本表示任务已存在。其他值读取 description，不要视为生成成功。",
+            "format": "int32"
+          },
+          "description": {
+            "type": "string",
+            "description": "本次提交结果的说明。"
+          },
+          "result": {
+            "type": "string",
+            "description": "本次提交关联的任务 ID。提交失败时不能仅凭此字段继续轮询。"
+          },
+          "properties": {
+            "type": "object",
+            "description": "附加提交信息，字段按实际响应处理。",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "code",
+          "description"
+        ]
+      },
+      "Button": {
+        "type": "object",
+        "properties": {
+          "customId": {
+            "type": "string",
+            "description": "动作标识，提交 action 时原样使用。"
+          },
+          "emoji": {
+            "type": "string",
+            "description": "按钮图标。"
+          },
+          "label": {
+            "type": "string",
+            "description": "用于展示的按钮文字，不是 action 的动作标识。"
+          },
+          "style": {
+            "type": "integer",
+            "description": "按钮样式；资料中 2 为 Primary、3 为 Green。",
+            "format": "int32"
+          },
+          "type": {
+            "type": "integer",
+            "description": "按钮类型，通常仅供展示组件使用。",
+            "format": "int32"
+          }
+        }
+      },
+      "TaskProperties": {
+        "type": "object",
+        "properties": {
+          "finalPrompt": {
+            "type": "string",
+            "description": "Describe 返回的图片描述，或 Shorten 返回的分析结果。内容可能包含 Markdown 或多段文字，按字符串处理。"
+          },
+          "finalZhPrompt": {
+            "type": "string",
+            "description": "可选的中文翻译结果，不保证每次返回。"
+          }
+        },
+        "additionalProperties": true
+      },
+      "Task": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "任务 ID。",
+            "example": "YOUR_TASK_ID"
+          },
+          "action": {
+            "type": "string",
+            "description": "任务类型，例如 IMAGINE、UPSCALE、VARIATION、REROLL、ZOOM、PAN、DESCRIBE、BLEND、SHORTEN。不同版本可能增加类型。"
+          },
+          "status": {
+            "type": "string",
+            "description": "任务状态：NOT_START 未启动；SUBMITTED 已提交；MODAL 等待补充输入；IN_PROGRESS 执行中；SUCCESS 成功；FAILURE 失败；CANCEL 已取消。MODAL 需要提交 modal，不应只继续轮询。"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "原始提示词。"
+          },
+          "promptEn": {
+            "type": "string",
+            "description": "英文提示词。"
+          },
+          "description": {
+            "type": "string",
+            "description": "任务的描述信息。"
+          },
+          "submitTime": {
+            "type": "integer",
+            "description": "任务提交时间。",
+            "format": "int64"
+          },
+          "startTime": {
+            "type": "integer",
+            "description": "任务开始执行时间。",
+            "format": "int64"
+          },
+          "finishTime": {
+            "type": "integer",
+            "description": "任务结束时间。",
+            "format": "int64"
+          },
+          "progress": {
+            "type": "string",
+            "description": "任务进度的显示文本，例如 100%。判断结束应读取 status。"
+          },
+          "imageUrl": {
+            "type": "string",
+            "description": "图片地址，执行中可能是预览图；最终下载前确认 status 为 SUCCESS。Describe 和 Shorten 应同时读取 properties 中的文本结果。"
+          },
+          "failReason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "失败原因，未失败时可能为空或缺失。"
+          },
+          "state": {
+            "type": "string",
+            "description": "提交时提供的业务关联值。"
+          },
+          "properties": {
+            "$ref": "#/components/schemas/TaskProperties"
+          },
+          "buttons": {
+            "type": "array",
+            "description": "当前任务返回的可用按钮。对所选按钮提交 customId，并保留它所属的任务 ID。",
+            "items": {
+              "$ref": "#/components/schemas/Button"
+            }
+          }
+        }
+      },
+      "Message": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "业务结果码。结合 description 与后续任务状态判断，不把 HTTP 200 等同于操作完成。",
+            "format": "int32"
+          },
+          "description": {
+            "type": "string",
+            "description": "操作结果说明。"
+          }
+        }
+      },
+      "SeedResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "1 表示获取成功；其他值读取 description。",
+            "format": "int32"
+          },
+          "description": {
+            "type": "string",
+            "description": "获取结果说明。"
+          },
+          "result": {
+            "type": "string",
+            "description": "图片的 seed 字符串。不是新的任务 ID，也不是图片地址。"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "description": "错误体由网关或渠道返回，保留原始响应用于排错；不假定统一字段。",
+        "additionalProperties": true
+      },
+      "TaskQueryRequest": {
+        "type": "object",
+        "properties": {
+          "pageNumber": {
+            "type": "integer",
+            "description": "页码，从 0 开始。",
+            "format": "int32",
+            "example": 0
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "每页条数。示例值不是服务端默认值或最大值。",
+            "format": "int32",
+            "example": 20
+          },
+          "sort": {
+            "type": "string",
+            "description": "排序表达式。只使用当前渠道已确认支持的格式。"
+          },
+          "action": {
+            "type": "string",
+            "description": "按任务类型筛选。",
+            "enum": [
+              "IMAGINE",
+              "UPSCALE",
+              "VARIATION",
+              "ZOOM",
+              "PAN",
+              "DESCRIBE",
+              "BLEND",
+              "SHORTEN",
+              "SWAP_FACE"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "description": "按任务描述筛选。"
+          },
+          "ids": {
+            "type": "array",
+            "description": "按任务 ID 列表筛选。",
+            "items": {
+              "type": "string",
+              "description": "任务 ID。使用提交响应中的 result 或查询响应中的 id；保持为字符串。",
+              "example": "YOUR_TASK_ID"
+            }
+          },
+          "instanceId": {
+            "type": "string",
+            "description": "按账号实例 ID 筛选。"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "按提示词筛选。"
+          },
+          "promptEn": {
+            "type": "string",
+            "description": "按英文提示词筛选。"
+          },
+          "state": {
+            "type": "string",
+            "description": "按提交时的业务关联值筛选。"
+          },
+          "status": {
+            "type": "string",
+            "description": "按单个任务状态筛选。",
+            "enum": [
+              "NOT_START",
+              "SUBMITTED",
+              "MODAL",
+              "IN_PROGRESS",
+              "FAILURE",
+              "SUCCESS",
+              "CANCEL"
+            ]
+          },
+          "statusSet": {
+            "type": "array",
+            "description": "按多个任务状态筛选。",
+            "items": {
+              "type": "string",
+              "description": "任务状态。",
+              "enum": [
+                "NOT_START",
+                "SUBMITTED",
+                "MODAL",
+                "IN_PROGRESS",
+                "FAILURE",
+                "SUCCESS",
+                "CANCEL"
+              ]
+            }
+          }
+        }
+      },
+      "Sort": {
+        "type": "object",
+        "properties": {
+          "empty": {
+            "type": "boolean",
+            "description": "是否没有排序条件。"
+          },
+          "sorted": {
+            "type": "boolean",
+            "description": "是否已指定排序。"
+          },
+          "unsorted": {
+            "type": "boolean",
+            "description": "是否未指定排序。"
+          }
+        }
+      },
+      "Pageable": {
+        "type": "object",
+        "properties": {
+          "offset": {
+            "type": "integer",
+            "description": "分页偏移量。",
+            "format": "int64"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "description": "当前页码。",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "每页条数。",
+            "format": "int32"
+          },
+          "paged": {
+            "type": "boolean",
+            "description": "是否使用分页。"
+          },
+          "sort": {
+            "$ref": "#/components/schemas/Sort"
+          },
+          "unpaged": {
+            "type": "boolean",
+            "description": "是否不使用分页。"
+          }
+        }
+      },
+      "TaskPage": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "description": "当前页的任务。",
+            "items": {
+              "$ref": "#/components/schemas/Task"
+            }
+          },
+          "empty": {
+            "type": "boolean",
+            "description": "当前页是否为空。"
+          },
+          "first": {
+            "type": "boolean",
+            "description": "是否为第一页。"
+          },
+          "last": {
+            "type": "boolean",
+            "description": "是否为最后一页。"
+          },
+          "number": {
+            "type": "integer",
+            "description": "当前页码，从 0 开始。",
+            "format": "int32"
+          },
+          "numberOfElements": {
+            "type": "integer",
+            "description": "当前页实际条数。",
+            "format": "int32"
+          },
+          "pageable": {
+            "$ref": "#/components/schemas/Pageable"
+          },
+          "size": {
+            "type": "integer",
+            "description": "分页大小。",
+            "format": "int32"
+          },
+          "sort": {
+            "$ref": "#/components/schemas/Sort"
+          },
+          "totalElements": {
+            "type": "integer",
+            "description": "符合条件的总条数。",
+            "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "总页数。",
+            "format": "int32"
+          }
+        }
+      }
+    }
+  }
+}

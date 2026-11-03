@@ -1,0 +1,43 @@
+---
+title: "Fetch: get task status and output"
+description: "Retrieve a Midjourney task by ID, interpret progress and terminal states, and inspect image output, text suggestions, or buttons for the next action."
+keywords: ["MaxAPI", "Midjourney", "fetch"]
+openapi: "openapi/midjourney-en.json GET /mj/task/{id}/fetch"
+---
+
+Fetch retrieves the current state of one Midjourney task. Use the submission response's `result` as the path `id`. The response is the task object itself, not another object wrapped inside `result`.
+
+## Retrieve a saved task
+
+This command requires `jq`. Set `TASK_ID` to the actual task ID and keep `MAXAPI_MJ_BASE_URL` identical to the address used in the [quickstart](/en/media/midjourney). It defaults to `https://api.maxapi.ai/mj`.
+
+```bash Retrieve and save a task
+: "${TASK_ID:?Set the actual task ID first}"
+TASK_ID_ESCAPED="$(printf '%s' "$TASK_ID" | jq -sRr @uri)"
+curl --fail-with-body \
+  "${MAXAPI_MJ_BASE_URL:-https://api.maxapi.ai/mj}/task/$TASK_ID_ESCAPED/fetch" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  --output mj-task.json
+```
+
+## Choose the next step from status
+
+| `status` | Application behavior |
+| --- | --- |
+| `NOT_START`, `SUBMITTED` | Keep the task ID and retrieve it again later |
+| `IN_PROGRESS` | Display returned progress and continue waiting |
+| `MODAL` | Wait for user input, then use [Modal](/en/api-reference/midjourney/modal) |
+| `SUCCESS` | Stop polling and read the output for this task type |
+| `FAILURE` | Stop polling and display or record `failReason` |
+| `CANCEL` | Stop polling and record cancellation |
+| Unrecognized value | Preserve the raw status and enforce a total wait deadline |
+
+`progress` describes progress; it does not replace terminal-state checks. Do not submit another Imagine request just because a task remains queued.
+
+## Read the output for the task type
+
+- Image generation: read `imageUrl`. Do not forward your MaxAPI key to the image host when downloading.
+- Describe or Shorten: inspect text and prompt results in `properties`; a new image is not required.
+- Follow-up actions: read this task's `buttons` and submit a selected `customId` together with this task's `id` to [Action](/en/api-reference/midjourney/action).
+
+See [Task lifecycle](/en/media/midjourney/tasks) for bounded polling, downloads, callback deduplication, and recovery.

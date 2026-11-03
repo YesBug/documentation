@@ -60,72 +60,9 @@ These are cross-protocol examples, not an exhaustive enum for any endpoint. Pres
 
 ## Run a complete Midjourney poller
 
-This script accepts an existing Midjourney task ID, exits on success or failure, and saves the latest response to `mj-task.json`. It creates no new generation task, so you can resume after restarting your application. First submit a task using the [Midjourney guide](/en/media/midjourney) and retain `TASK_ID`.
+[Midjourney task states and callbacks](/en/media/midjourney/tasks) includes a complete Python poller that saves the latest response, handles all seven task states, and retains the task ID for recovery after a timeout. It uses the configured Fast, Turbo, or Relax base URL and supports both image and text tasks.
 
-```bash Install the dependency
-python -m pip install requests
-```
-
-```python wait_for_midjourney.py
-import json
-import os
-import sys
-import time
-from pathlib import Path
-from urllib.parse import quote
-
-import requests
-
-
-def wait_for_midjourney(task_id, timeout_seconds=600, interval_seconds=5):
-    url = f"https://api.maxapi.ai/mj/task/{quote(task_id, safe='')}/fetch"
-    headers = {"Authorization": f"Bearer {os.environ['MAXAPI_API_KEY']}"}
-    deadline = time.monotonic() + timeout_seconds
-    pending = {"NOT_START", "SUBMITTED", "IN_PROGRESS"}
-
-    while time.monotonic() < deadline:
-        response = requests.get(url, headers=headers, timeout=(10, 30))
-        response.raise_for_status()
-        task = response.json()
-        Path("mj-task.json").write_text(
-            json.dumps(task, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
-        status = task.get("status")
-        print(f"{task_id}: {status}, {task.get('progress', '')}", file=sys.stderr)
-        if status == "SUCCESS":
-            if not task.get("imageUrl"):
-                raise RuntimeError("Task succeeded but imageUrl is missing; inspect mj-task.json")
-            return task
-        if status == "FAILURE":
-            raise RuntimeError(task.get("failReason") or "Midjourney generation failed")
-        if status not in pending:
-            raise RuntimeError(f"Unrecognized task state: {status!r}; inspect mj-task.json")
-        remaining = deadline - time.monotonic()
-        if remaining > 0:
-            time.sleep(min(interval_seconds, remaining))
-    raise TimeoutError(f"Still waiting for {task_id}; query the same ID again later")
-
-
-if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        raise SystemExit("Usage: python wait_for_midjourney.py TASK_ID")
-    wait_for_midjourney(sys.argv[1])
-    print("Task complete. Response saved to mj-task.json.")
-```
-
-```bash Wait for the submitted task
-python wait_for_midjourney.py "$TASK_ID"
-```
-
-The 5-second interval and 600-second waiting period are application example values, not MaxAPI rate limits or completion guarantees. Individual HTTP requests have separate connection and read timeouts; an in-flight request can finish after the polling deadline.
-
-| Outcome | Next step |
-| --- | --- |
-| Success saved to `mj-task.json` | Read `imageUrl` and use the [download example](/en/media/midjourney) |
-| Task state `FAILURE` | Inspect `failReason` before deciding whether to change the input and submit again |
-| Local waiting timeout | Retain the task ID and rerun later with the same ID |
-| HTTP or network error | The script exits; resolve [authentication, rate limit or network errors](/en/help/errors), then query the original ID |
-| Unexpected state | Inspect the saved response and route instead of applying a different protocol's parser |
+Midjourney `MODAL` requires user input, and `CANCEL` ends the task; neither should remain in a normal generation loop. Successful Describe / Shorten tasks return text in `properties.finalPrompt` and do not require `imageUrl`. See [Action and Modal](/en/media/midjourney/actions) for the interaction flow.
 
 ### Move polling to a background worker
 

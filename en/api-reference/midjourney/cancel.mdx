@@ -1,0 +1,34 @@
+---
+title: "Cancel: cancel a task"
+description: "Request cancellation of a Midjourney task, inspect its business response, and retrieve the task again to determine the actual resulting state."
+keywords: ["MaxAPI", "Midjourney", "cancel"]
+openapi: "openapi/midjourney-en.json POST /mj/task/{id}/cancel"
+---
+
+Cancel requests cancellation of a specific Midjourney task. It is a `POST` operation with the task ID in the URL path; a `GET` lookup does not cancel a task.
+
+## Target the intended task
+
+Show the task's prompt or associated record before a user cancels it. To cancel an upscale or variation, use that action's task ID rather than the source image ID.
+
+```bash Request cancellation using the original mode prefix
+: "${TASK_ID:?Set the task ID to cancel first}"
+TASK_ID_ESCAPED="$(printf '%s' "$TASK_ID" | jq -sRr @uri)"
+curl --fail-with-body -X POST \
+  "${MAXAPI_MJ_BASE_URL:-https://api.maxapi.ai/mj}/task/$TASK_ID_ESCAPED/cancel" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  --output mj-cancel.json
+```
+
+## Verify the resulting state
+
+The cancellation response contains `code` and `description`. It is not a full task object and does not provide a new generation task ID. After reading the business result, [retrieve the task](/en/api-reference/midjourney/fetch) again.
+
+| Retrieved status | What to display |
+| --- | --- |
+| `CANCEL` | Canceled |
+| `SUCCESS` | Completed; retain the generated output |
+| `FAILURE` | Failed; inspect `failReason` |
+| Still running or another state | Show the actual status and cancellation response instead of claiming cancellation |
+
+Cancellation depends on the task stage and channel behavior. Do not promise it will stop generation already submitted upstream, or infer refund and billing rules from a canceled status.

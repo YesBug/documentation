@@ -1,0 +1,40 @@
+---
+title: "批量查询指定任务"
+description: "按已保存的 Midjourney 任务 ID 批量查询，并以任务 ID 合并结果、识别未返回的记录。"
+keywords: ["MaxAPI", "Midjourney", "list-by-condition"]
+openapi: "openapi/midjourney-zh.json POST /mj/task/list-by-condition"
+---
+
+批量查询适合刷新应用中已知的一组 Midjourney 任务。发送 `ids` 数组，响应直接是任务数组；不使用分页查询的 `content` 字段。
+
+## 只查询需要刷新的 ID
+
+```json 查询两个已保存的任务
+{
+  "ids": ["YOUR_FIRST_TASK_ID", "YOUR_SECOND_TASK_ID"]
+}
+```
+
+本页示例中的值需要替换为真实任务 ID。提交前在应用中去重，并按任务保存的模式前缀分组；不要把不同模式下的记录随意合并到一个请求。
+
+`ids` 在协议结构中是可选字段，但查询已知任务时应显式传入非空列表，不依赖省略或空数组时的行为。
+
+## 按 ID 合并返回结果
+
+不要假设返回数组与请求数组一一对应或顺序一致。读取每条任务的 `id` 来更新自己的记录。
+
+```python 建立任务索引
+import json
+from pathlib import Path
+
+tasks = json.loads(Path("mj-batch.json").read_text(encoding="utf-8"))
+if not isinstance(tasks, list):
+    raise ValueError("Expected a task array")
+by_id = {task["id"]: task for task in tasks if isinstance(task, dict) and task.get("id")}
+for task_id, task in by_id.items():
+    print(task_id, task.get("status"), task.get("progress"))
+```
+
+某个 ID 未返回时，先保留其原记录，再通过 [单任务查询](/zh/api-reference/midjourney/fetch) 核对 ID、模式和权限。缺少记录不等于生成失败，也不应自动重新提交绘图。
+
+需要按状态筛选并分页时，使用 [分页查询](/zh/api-reference/midjourney/query)。

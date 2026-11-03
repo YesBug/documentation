@@ -1,0 +1,31 @@
+---
+title: "Get the task queue"
+description: "Inspect the Midjourney tasks currently visible in the queue, associate them with saved records, and retrieve individual tasks to confirm their outcomes."
+keywords: ["MaxAPI", "Midjourney", "queue"]
+openapi: "openapi/midjourney-en.json GET /mj/task/queue"
+---
+
+The queue endpoint returns queued tasks visible through the current channel. It provides a pending-work overview. The response is directly an array, not a history listing or a replacement for individual task retrieval.
+
+## Inspect the queue
+
+```bash Save the current queue
+curl --fail-with-body \
+  "${MAXAPI_MJ_BASE_URL:-https://api.maxapi.ai/mj}/task/queue" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  --output mj-queue.json
+```
+
+```bash Read queued tasks
+jq -r '.[] | [.id, .status, (.progress // "")] | @tsv' mj-queue.json
+```
+
+Use the same mode prefix as the tasks you are tracking. Associate records by `id` and preserve the actual returned status and progress.
+
+## When a task is absent
+
+A task missing from this array is not necessarily successful, failed, or canceled. It may have moved to another execution stage. Call [Get task](/en/api-reference/midjourney/fetch) with its saved ID to determine its state.
+
+Queue length is not an estimated wait time. Unless the API supplies a position or estimate, do not turn array indices into queue positions or promise a completion time.
+
+For history, use [List tasks](/en/api-reference/midjourney/list) or [Query tasks](/en/api-reference/midjourney/query). To refresh known IDs, use [Get tasks by ID list](/en/api-reference/midjourney/list-by-condition).

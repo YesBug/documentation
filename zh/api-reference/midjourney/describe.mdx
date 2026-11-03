@@ -1,0 +1,35 @@
+---
+title: "Describe：从图片生成描述"
+description: "上传编码后的图片创建 Describe 任务，查询描述结果，并选择提示词继续绘图。"
+keywords: ["MaxAPI", "Midjourney", "describe"]
+openapi: "openapi/midjourney-zh.json POST /mj/submit/describe"
+---
+
+Describe 从一张图片生成描述或提示词建议。它的成功结果用于帮助你继续构思提示词，不能把它当作生成新图片的 Imagine 请求。
+
+## 输入一张图片
+
+请求字段是单数 `base64`，与 Blend 和 Imagine 的 `base64Array` 不同。先按 [图片输入](/zh/media/midjourney/inputs) 编码真实文件，再提交：
+
+```json 请求结构示意，替换图片占位符后发送
+{
+  "base64": "data:image/png;base64,YOUR_IMAGE_BASE64",
+  "state": "describe-job-001"
+}
+```
+
+不要把 `https://...` 图片 URL 或本地文件名直接放入 `base64`。
+
+## 读取描述结果
+
+保存提交响应的 `result`，通过 [查询任务](/zh/api-reference/midjourney/fetch) 等待完成。查看任务的 `description`、`properties.finalPrompt`，以及可用时的 `properties.finalZhPrompt`；保存原始结果，不把输出强制转换为一张图片。
+
+```bash 查看文本结果
+jq '{status, description, finalPrompt: .properties.finalPrompt, finalZhPrompt: .properties.finalZhPrompt, buttons}' mj-task.json
+```
+
+查询成功但 `imageUrl` 为空时，先判断任务类型。Describe 的目标是文本建议，不能套用“必须有新图片才算成功”的处理逻辑。
+
+## 用建议继续绘图
+
+用户可以选取描述文本，编辑后作为 [Imagine](/zh/api-reference/midjourney/imagine) 的 `prompt`；如果当前任务返回了可执行按钮，也可以按 [Action](/zh/api-reference/midjourney/action) 提交真实 `customId`。两种方式都需要跟踪后续返回的任务 ID。

@@ -1,0 +1,177 @@
+---
+title: "Midjourney 图片输入与提示词"
+sidebarTitle: "参考图、混图与反推"
+description: "用可复制的 Python 与 cURL 示例完成参考图绘图、Blend 混图、Describe 反推和 Shorten 提示词精简。"
+keywords: ["MaxAPI", "Midjourney", "Blend", "Describe", "Shorten", "base64Array", "图片反推"]
+---
+
+Midjourney 提供四种不同的输入流程：Imagine 使用文字或参考图绘图，Blend 混合图片，Describe 从图片生成文字建议，Shorten 分析和精简提示词。它们都先返回任务 ID，但完成后需要读取的结果不同。
+
+## 选择合适的接口
+
+| 输入与目标 | 接口 | 主要输入 | 完成后读取 |
+| --- | --- | --- | --- |
+| 文字绘图，或参考图加文字 | Imagine | `prompt`，可选 `base64Array` | `imageUrl`、`buttons` |
+| 混合 2–5 张图片，不添加文字提示词 | Blend | `base64Array` | `imageUrl`、`buttons` |
+| 看图生成提示词建议 | Describe | 单张图片的 `base64` | `properties.finalPrompt`、`buttons` |
+| 分析已有提示词并精简 | Shorten | `prompt` | `properties.finalPrompt`、`buttons` |
+
+想在混图时加入文字要求，使用 Imagine 的参考图输入。不要给 Blend 添加它未定义的 `prompt` 字段。
+
+## 图片使用什么格式
+
+本页示例使用 PNG 文件，编码成完整 Data URI：
+
+```text
+data:image/png;base64,<图片字节的 Base64 编码>
+```
+
+使用 JPEG 时，前缀改为 `data:image/jpeg;base64,`，并编码对应 JPEG 文件的字节。**不要把图片 URL、文件路径或包含前缀的整段字符串再次做 Base64 编码。** 文档里的占位符不能作为真实图片提交。
+
+下面的示例使用 Python 3 读取本地文件、生成 JSON，再由 `curl` 发送。这样不需要手工把很长的图片编码粘贴进终端，也不会因为引号或换行破坏 JSON。
+
+先按 [快速开始](/zh/media/midjourney) 配置 `MAXAPI_API_KEY` 和 `MAXAPI_MJ_BASE_URL`。每种流程独立执行，生成请求文件的脚本成功后，再运行对应的 `curl`。
+
+## 参考图加文字：Imagine
+
+在当前目录放一张 `reference.png`。`base64Array` 是数组，`prompt` 仍然是必填字段。
+
+```bash 生成 Imagine 请求
+python3 - <<'PY'
+import base64
+import json
+from pathlib import Path
+
+image = base64.b64encode(Path("reference.png").read_bytes()).decode("ascii")
+payload = {
+    "botType": "MID_JOURNEY",
+    "prompt": "A ceramic cup inspired by the reference, on a light wooden desk, natural window light",
+    "base64Array": [f"data:image/png;base64,{image}"],
+    "state": "reference-photo-001"
+}
+Path("mj-imagine-request.json").write_text(json.dumps(payload), encoding="utf-8")
+PY
+```
+
+```bash
+curl --fail-with-body "$MAXAPI_MJ_BASE_URL/submit/imagine" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @mj-imagine-request.json \
+  --output mj-submit.json
+```
+
+提交被接受后，保存 `result`，按 [任务查询流程](/zh/media/midjourney/tasks) 等待成功，再读取图片和按钮。参考图会影响生成内容，不等于逐像素复制原图或只编辑某一区域；指定区域的编辑见 [局部重绘](/zh/media/midjourney/actions#局部重绘)。
+
+## 多图混合：Blend
+
+准备 `reference-a.png` 和 `reference-b.png`。Blend 用于混合 2–5 张图片的视觉内容，输出比例用 `dimensions` 选择。
+
+| `dimensions` | 输出比例 |
+| --- | --- |
+| `PORTRAIT` | 2:3，竖图 |
+| `SQUARE` | 1:1，方图 |
+| `LANDSCAPE` | 3:2，横图 |
+
+```bash 生成 Blend 请求
+python3 - <<'PY'
+import base64
+import json
+from pathlib import Path
+
+files = ["reference-a.png", "reference-b.png"]
+images = [
+    "data:image/png;base64," + base64.b64encode(Path(name).read_bytes()).decode("ascii")
+    for name in files
+]
+payload = {"base64Array": images, "dimensions": "SQUARE", "state": "blend-001"}
+Path("mj-blend-request.json").write_text(json.dumps(payload), encoding="utf-8")
+PY
+```
+
+```bash
+curl --fail-with-body "$MAXAPI_MJ_BASE_URL/submit/blend" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @mj-blend-request.json \
+  --output mj-submit.json
+```
+
+这同样是异步生成。处理提交业务码并保存 `result`，等待 `SUCCESS` 后读取 `imageUrl`；对结果继续操作时，使用该任务自己的 `buttons`。
+
+## 图片反推：Describe
+
+Describe 接收一张图，字段名是单数 **`base64`**。继续使用当前目录的 `reference.png`：
+
+```bash 生成 Describe 请求
+python3 - <<'PY'
+import base64
+import json
+from pathlib import Path
+
+image = base64.b64encode(Path("reference.png").read_bytes()).decode("ascii")
+payload = {"base64": f"data:image/png;base64,{image}", "state": "describe-001"}
+Path("mj-describe-request.json").write_text(json.dumps(payload), encoding="utf-8")
+PY
+```
+
+```bash
+curl --fail-with-body "$MAXAPI_MJ_BASE_URL/submit/describe" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @mj-describe-request.json \
+  --output mj-submit.json
+```
+
+保存提交结果中的任务 ID，查询至 `SUCCESS`。此时关注 `properties.finalPrompt`，不是等待出现新的绘图地址。示意结构如下：
+
+```json
+{
+  "id": "DESCRIBE_TASK",
+  "action": "DESCRIBE",
+  "status": "SUCCESS",
+  "properties": {
+    "finalPrompt": "1. A ceramic cup on a wooden desk...\n2. Soft daylight illuminating handmade pottery..."
+  },
+  "buttons": [
+    {"label": "1", "customId": "COPY_THE_ACTUAL_CUSTOM_ID_FROM_THIS_TASK"}
+  ]
+}
+```
+
+`finalPrompt` 是包含描述内容的**字符串**，不应假设它是 JSON 数组。部分通道还会给出译文字符串 `properties.finalZhPrompt`。
+
+```bash 读取已完成任务的文本
+jq -r '.properties.finalPrompt // empty' mj-task.json
+jq -r '.properties.finalZhPrompt // empty' mj-task.json
+```
+
+如果只是提取提示词，到这里即可。要根据其中一条建议生成图片，可以选择任务返回的对应按钮，执行 **Action → Modal 确认提示词 → 查询图片任务**；也可以将选定文字作为新 Imagine 的 `prompt`。两种方式都将产生新的生成任务。
+
+## 提示词分析：Shorten
+
+Shorten 分析提示词中的词语与重点，提供精简建议。提交字段是 `prompt`，没有图片输入：
+
+```bash
+curl --fail-with-body "$MAXAPI_MJ_BASE_URL/submit/shorten" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data '{
+    "prompt": "A beautifully handcrafted ceramic coffee cup with delicate blue patterns on a bright wooden table, soft natural morning sunlight, detailed product photography",
+    "state": "shorten-001"
+  }' \
+  --output mj-submit.json
+```
+
+保存 `result`，查询至成功，再读取 `properties.finalPrompt` 中的分析与建议。不要把它当成已经完成的图片生成任务。若要选用一个精简结果，使用任务实际返回的按钮，按 [Action 与 Modal 流程](/zh/media/midjourney/actions) 继续；若返回更多详情按钮，按它的实际业务响应处理。
+
+## 通用可选字段怎样用
+
+| 字段 | 用途 | 使用建议 |
+| --- | --- | --- |
+| `botType` | 选择 `MID_JOURNEY` 或 `NIJI_JOURNEY` | 按所选接口的参数说明与可用通道填写 |
+| `notifyHook` | 指定本次任务的回调地址 | 使用服务端可访问的 HTTPS 地址，见 [回调格式](/zh/media/midjourney/tasks#接收状态回调) |
+| `state` | 关联你的业务记录 | 例如 `order-001`；不会替代任务 ID |
+| `accountFilter` | 按实例、模式、Remix 配置筛选通道账号 | 一般接入可省略；不是模型参数，也不会改变账号配置 |
+
+完整字段、必填项和响应结构见 [Imagine](/zh/api-reference/midjourney/imagine)、[Blend](/zh/api-reference/midjourney/blend)、[Describe](/zh/api-reference/midjourney/describe) 与 [Shorten](/zh/api-reference/midjourney/shorten)。图片大小、模型版本和通道限制应以当前接口响应及账户配置为准，不要把其他图像模型的 `size`、`model` 或 `response_format` 直接套到这些请求里。

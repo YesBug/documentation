@@ -1,0 +1,31 @@
+---
+title: "查看任务队列"
+description: "查看 Midjourney 当前可见队列中的任务，按 ID 与本地记录关联，并继续查询任务结果。"
+keywords: ["MaxAPI", "Midjourney", "queue"]
+openapi: "openapi/midjourney-zh.json GET /mj/task/queue"
+---
+
+队列接口返回当前渠道可见的排队任务，用于展示待处理任务概况。响应直接是任务数组；它不是历史记录列表，也不替代单任务状态查询。
+
+## 查看队列
+
+```bash 保存当前队列
+curl --fail-with-body \
+  "${MAXAPI_MJ_BASE_URL:-https://api.maxapi.ai/mj}/task/queue" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  --output mj-queue.json
+```
+
+```bash 读取队列中的任务
+jq -r '.[] | [.id, .status, (.progress // "")] | @tsv' mj-queue.json
+```
+
+使用与你的任务一致的模式前缀。按任务 `id` 关联应用中的业务记录，保留服务端实际返回的状态与进度。
+
+## 不在队列里意味着什么
+
+任务未出现在队列中，不能直接判断它已经成功、失败或取消。它可能已经进入其他执行阶段；请使用已保存的 ID 调用 [查询任务](/zh/api-reference/midjourney/fetch)。
+
+队列长度不等于预计等待时间。没有明确返回队列位置或预计时长时，不把数组序号换算成排队名次，也不承诺完成时间。
+
+需要查看历史任务时使用 [任务列表](/zh/api-reference/midjourney/list) 或 [分页查询](/zh/api-reference/midjourney/query)；需要刷新一组已知 ID 时使用 [批量查询](/zh/api-reference/midjourney/list-by-condition)。

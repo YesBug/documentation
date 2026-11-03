@@ -1,0 +1,54 @@
+---
+title: "Midjourney 接口总览"
+description: "按绘图、按钮交互与任务管理选择 Midjourney 接口，并理解不同接口的返回结构。"
+keywords: ["MaxAPI", "Midjourney", "API", "MJ"]
+---
+
+Midjourney 接口围绕任务工作：提交绘图或交互操作，保存任务 ID，再查询进度与结果。这里按使用目标组织接口，每个操作都提供独立参数说明与在线调试入口。完整首图流程见 [Midjourney 快速开始](/zh/media/midjourney)。
+
+## 创建内容与处理输入
+
+| 目标 | 接口 |
+| --- | --- |
+| 用文字或参考图生成图片 | [Imagine](/zh/api-reference/midjourney/imagine) |
+| 混合多张参考图片 | [Blend](/zh/api-reference/midjourney/blend) |
+| 根据图片生成提示词建议 | [Describe](/zh/api-reference/midjourney/describe) |
+| 精简已有提示词 | [Shorten](/zh/api-reference/midjourney/shorten) |
+
+## 继续操作图片
+
+| 目标 | 接口 |
+| --- | --- |
+| 执行当前图片返回的放大、变化等按钮 | [Action](/zh/api-reference/midjourney/action) |
+| 为交互任务补充提示词或蒙版 | [Modal](/zh/api-reference/midjourney/modal) |
+| 获取可用的图片种子 | [Seed](/zh/api-reference/midjourney/seed) |
+
+## 管理与查询任务
+
+| 目标 | 接口 |
+| --- | --- |
+| 跟踪一个任务的状态和结果 | [Fetch](/zh/api-reference/midjourney/fetch) |
+| 刷新一组已知 ID | [批量查询](/zh/api-reference/midjourney/list-by-condition) |
+| 查看可见任务列表 | [任务列表](/zh/api-reference/midjourney/list) |
+| 按条件筛选并分页浏览 | [分页查询](/zh/api-reference/midjourney/query) |
+| 查看队列中的任务 | [任务队列](/zh/api-reference/midjourney/queue) |
+| 请求取消指定任务 | [Cancel](/zh/api-reference/midjourney/cancel) |
+
+## 不同接口的返回结构
+
+| 接口类型 | 结果位置 |
+| --- | --- |
+| Imagine、Blend、Describe、Shorten、Action、Modal | `code`、`description`、`result`；可继续处理时保存返回的任务 ID |
+| Fetch | 直接返回任务对象，读取 `status`、`imageUrl`、`buttons` 等 |
+| 批量查询、任务列表、任务队列 | 直接返回任务数组 |
+| 分页查询 | 返回分页对象，任务位于 `content` |
+| Seed | `result` 是种子字符串 |
+| Cancel | 返回业务 `code` 与 `description`，再查询原任务确认状态 |
+
+任务 ID 按字符串保存和传递，不转换为 JavaScript `Number`。较长的数字形式 ID 在转换后可能丢失精度，导致后续查不到任务。
+
+## 地址与模式
+
+本组接口从 `https://api.maxapi.ai/mj` 开始，不添加 OpenAI 兼容接口的 `/v1`。选择其他已开通模式时，把同一模式前缀用于提交、查询、动作和取消；同时把前缀保存在任务记录中。模式说明见 [Midjourney 快速开始](/zh/media/midjourney)。
+
+请求使用 `Authorization: Bearer YOUR_API_KEY`。在线调试会发送实际 API 请求，请填写自己的有效密钥和当前任务数据；示例中的任务 ID、动作 ID 与图片 Base64 占位符需要替换。
