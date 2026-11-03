@@ -1,0 +1,40 @@
+---
+title: "Imagine: create an image task"
+description: "Create a Midjourney image task from a prompt, inspect submission results, and retrieve the completed image and the actions available for that task."
+keywords: ["MaxAPI", "Midjourney", "imagine"]
+openapi: "openapi/midjourney-en.json POST /mj/submit/imagine"
+---
+
+Imagine starts a Midjourney image workflow. The response identifies a task; retrieve the image through a later task lookup. A successful submission does not mean the image is ready. Start with the [Midjourney quickstart](/en/media/midjourney) for a complete first request.
+
+## Choose the input
+
+| Your goal | Request |
+| --- | --- |
+| Generate from text | Send `prompt` |
+| Generate with reference images | Send `prompt` and `base64Array` |
+| Blend several images | Use [Blend](/en/api-reference/midjourney/blend) |
+| Get prompt suggestions from an image | Use [Describe](/en/api-reference/midjourney/describe) |
+
+```json Text-only image
+{
+  "prompt": "A small observatory on a green hill, watercolor illustration",
+  "state": "illustration-job-001"
+}
+```
+
+Use `state` to associate the task with your own record, such as an illustration order. It does not replace the task ID or prevent duplicate submissions. See [Image inputs](/en/media/midjourney/inputs) for file encoding and reference-image examples.
+
+## Handle the submission
+
+Save the returned `result` and the mode prefix used for this request. Submission code `1` indicates acceptance and `22` indicates queuing; both still require task retrieval. For other business codes, read `description` before deciding what to do. HTTP 200 alone does not establish success.
+
+Pass this `result` as the `id` in [Get task](/en/api-reference/midjourney/fetch). Once the task succeeds, read `imageUrl`. For an upscale or variation, select a returned button and use [Execute action](/en/api-reference/midjourney/action).
+
+## Diagnose a failed request
+
+- Use `/mj` or the enabled mode prefix. Do not prepend `/v1`.
+- Send a nonempty `prompt`. Put encoded images in `base64Array`, not local file paths.
+- After a submission timeout, check existing task records before submitting the same image again.
+
+See [Task lifecycle](/en/media/midjourney/tasks) for queuing, callbacks, and recovery.

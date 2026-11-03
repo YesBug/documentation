@@ -10,6 +10,20 @@ MaxAPI 的 API 服务地址为 `https://api.maxapi.ai`。使用 OpenAI 兼容 SD
 
 常用接口页面提供原生 **Try it** 调试面板，可填写 API Key、编辑 JSON 或上传文件。使用方式见 [在线调试](/zh/playground)；生成请求可能产生实际用量。
 
+## 从目标选择接口
+
+| 想完成的任务 | 第一篇文档 | 成功后应用要做什么 |
+| --- | --- | --- |
+| 完成第一次接入 | [快速开始](/zh/quickstart) | 保存配置，读取回复和结束原因 |
+| 给网站增加聊天 | [创建对话](/zh/api-reference/chat-completions) | 保存会话历史，选择普通或流式展示 |
+| 搜索自己的知识库 | [向量嵌入](/zh/api-reference/embeddings) | 建立索引，检索原文，再交给聊天模型 |
+| 生成或修改商品图 | [生成图像](/zh/api-reference/images) / [编辑图像](/zh/api-reference/images-edits) | 解码或下载图片，保存到应用存储 |
+| 将录音变成文字 | [转录音频](/zh/api-reference/audio-transcriptions) | 读取 `text` 或保存字幕文本 |
+| 将文字变成声音 | [文本转语音](/zh/api-reference/audio-speech) | 保存音频字节，按媒体格式播放 |
+| 创建视频、音乐等任务 | [异步任务](/zh/guides/async-tasks) | 保存任务 ID，查询终态，再保存结果 |
+
+每个接口页同时提供参数定义和实际使用说明。先用必需参数验证，再按模型支持增加可选项；参数列在规范中不代表每个模型都支持它。
+
 ## 文本与向量
 
 | 任务 | 方法与路径 | 文档 |
@@ -39,7 +53,7 @@ MaxAPI 的 API 服务地址为 `https://api.maxapi.ai`。使用 OpenAI 兼容 SD
 | --- | --- | --- |
 | 统一视频生成 | `/v2/videos/generations` | [提交与查询](/zh/media/videos) → [异步任务](/zh/guides/async-tasks) |
 | 厂商原生视频格式 | Wan、Veo、Seedance、Vidu、Hailuo、Luma、Kling、Runway | [厂商接口差异](/zh/media/video-providers) |
-| Midjourney 图像与动作 | `/mj/submit/...`、`/mj/task/...` | [Midjourney](/zh/media/midjourney) |
+| Midjourney 图像与动作 | `/mj/submit/...`、`/mj/task/...` | [快速开始](/zh/media/midjourney) → [13 个接口](/zh/api-reference/midjourney/index) |
 | Suno 音乐 | `/suno/v2/...` 或 `/suno/submit/...` | [音乐生成](/zh/media/music) |
 
 先选择一种协议完成整条流程，再增加其他格式。任务标识、回调字段和状态枚举不能在不同协议间直接替换。
@@ -57,3 +71,27 @@ MaxAPI 的 API 服务地址为 `https://api.maxapi.ai`。使用 OpenAI 兼容 SD
 - 检查 HTTP 状态后再按协议解析内容；生成失败与网络错误分别处理。
 - 保留可追踪的请求或任务标识，日志中隐藏密钥和敏感输入。
 - 模型价格、时长、分辨率和用量限制以控制台及所用模型说明为准。
+
+## 根据响应类型选择读取方式
+
+不能对所有成功响应调用同一个 JSON 解析器。请求是否流式、是否上传文件与最终返回什么格式，是三个不同问题。
+
+| 接口或模式 | 请求类型 | 成功响应 | 读取方式 |
+| --- | --- | --- | --- |
+| 普通聊天、补全、向量 | JSON | JSON | 解析对象，读取对应的 `choices` 或 `data` |
+| 流式聊天或补全 | JSON，`stream: true` | SSE | 按完整事件解析，再累积增量内容 |
+| 生成图像 | JSON | JSON | 从 `data` 取得 URL 或 Base64，再保存图片 |
+| 编辑图像 | Multipart 文件表单 | JSON | 文件上传不意味着返回文件流，仍先解析图片结果对象 |
+| 文本转语音 | JSON | 音频字节 | 检查状态和媒体类型，再写入二进制文件 |
+| 音频转录或翻译 | Multipart 文件表单 | JSON 或文本 | 按 `response_format` 读取 `text` 或字幕正文 |
+| 模型列表 | 无请求体 | JSON | 读取 `data[].id` |
+
+错误响应的格式可能与成功响应不同。例如语音失败时可能返回 JSON，而不是音频。先检查 HTTP 状态，再按实际内容类型读取，见 [错误排查](/zh/help/errors)。
+
+## 开始集成前检查
+
+1. 域名使用 `api.maxapi.ai`；SDK Base URL 为 `https://api.maxapi.ai/v1`。
+2. 用当前 API Key 查询模型，确认所选模型支持目标端点。
+3. 通过 [在线调试](/zh/playground) 或 cURL 验证一个最小请求。
+4. 在应用中实现成功、错误、超时和空结果分支，再添加模型特有选项。
+5. 保留已脱敏的状态、模型和请求或任务标识，方便复现问题。

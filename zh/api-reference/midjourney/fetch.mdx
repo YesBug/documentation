@@ -1,0 +1,43 @@
+---
+title: "Fetch：查询任务状态与结果"
+description: "按任务 ID 查询 Midjourney 的状态、进度、图片、文本和按钮，并处理等待输入与终态。"
+keywords: ["MaxAPI", "Midjourney", "fetch"]
+openapi: "openapi/midjourney-zh.json GET /mj/task/{id}/fetch"
+---
+
+Fetch 查询一个 Midjourney 任务的当前状态。路径中的 `id` 使用提交响应的 `result`；响应直接是任务对象，不需要再从 `result` 中解包一次。
+
+## 查询一个已保存的任务
+
+下面示例依赖 `jq`。把 `TASK_ID` 设置为实际任务 ID，并使 `MAXAPI_MJ_BASE_URL` 与 [快速开始](/zh/media/midjourney) 中提交时使用的地址一致；默认使用 `https://api.maxapi.ai/mj`。
+
+```bash 查询并保存任务
+: "${TASK_ID:?请先设置实际任务 ID}"
+TASK_ID_ESCAPED="$(printf '%s' "$TASK_ID" | jq -sRr @uri)"
+curl --fail-with-body \
+  "${MAXAPI_MJ_BASE_URL:-https://api.maxapi.ai/mj}/task/$TASK_ID_ESCAPED/fetch" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  --output mj-task.json
+```
+
+## 按状态决定下一步
+
+| `status` | 应用处理 |
+| --- | --- |
+| `NOT_START`、`SUBMITTED` | 保留任务 ID，稍后继续查询 |
+| `IN_PROGRESS` | 展示返回的进度，并继续等待 |
+| `MODAL` | 等待用户提供交互输入，转到 [Modal](/zh/api-reference/midjourney/modal) |
+| `SUCCESS` | 停止轮询，按任务类型读取结果 |
+| `FAILURE` | 停止轮询，显示或记录 `failReason` |
+| `CANCEL` | 停止轮询，记录任务已取消 |
+| 未识别的值 | 保存原始状态，使用总等待期限退出，避免无限请求 |
+
+`progress` 是进度信息，不代替终态判断。任务长期排队时也不要通过重复 Imagine 来刷新进度。
+
+## 按任务类型读取输出
+
+- 绘图任务：读取 `imageUrl`，下载时不要把 MaxAPI 密钥发送给图片域名。
+- Describe、Shorten：检查文本与 `properties` 中的提示词结果，不要求出现新图片。
+- 后续动作：读取当前任务的 `buttons`，把用户选中的 `customId` 与此任务的 `id` 一起传给 [Action](/zh/api-reference/midjourney/action)。
+
+完整的有界轮询、下载、回调去重和状态恢复见 [任务生命周期](/zh/media/midjourney/tasks)。

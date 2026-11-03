@@ -1,125 +1,149 @@
 ---
-title: "Generate images with Midjourney tasks"
-description: "Submit a Midjourney image task, inspect business status, query results, and use returned action identifiers for follow-up generation workflows."
-keywords: ["MaxAPI", "Generate images with Midjourney tasks", "API documentation"]
-sidebarTitle: "Midjourney"
+title: "Midjourney quickstart"
+sidebarTitle: "Quickstart"
+description: "Submit an Imagine task, retrieve its image and available actions, and learn how task IDs, action IDs and generation modes fit together in MaxAPI."
+keywords: ["MaxAPI", "Midjourney", "Imagine", "image generation", "taskId", "customId"]
 ---
 
-Midjourney uses task-based requests. Submit an image prompt, save the task ID, then query images and available actions. Confirm that the group associated with your key has Midjourney enabled; modes and actions depend on the channel.
+MaxAPI's Midjourney API uses asynchronous tasks: **submit a prompt → receive a task ID → query the completed result → choose an image action**. It does not use Chat Completions or require a chat `model` field in the request body.
 
-## Common routes
+## Choose your workflow
 
-| Method | Path | Purpose |
+| What you want to do | API | Next step |
 | --- | --- | --- |
-| POST | `/mj/submit/imagine` | Create an image task from a prompt |
-| GET | `/mj/task/{id}/fetch` | Query task status and result |
-| POST | `/mj/submit/action` | Execute an action on an existing task |
-| POST | `/mj/submit/blend` | Blend reference images |
-| POST | `/mj/submit/describe` | Describe an image |
-| POST | `/mj/submit/modal` | Submit an interaction requiring additional input |
+| Generate images from text, with optional reference images | [Imagine](/en/api-reference/midjourney/imagine) | Query the task for images and buttons |
+| Combine multiple images | [Blend](/en/api-reference/midjourney/blend) | Query the generated result |
+| Generate prompts from an image | [Describe](/en/api-reference/midjourney/describe) | Read the descriptions, then choose a prompt to generate an image |
+| Analyze and shorten a prompt | [Shorten](/en/api-reference/midjourney/shorten) | Read the analysis, then choose a prompt to generate |
+| Select an image, vary it, reroll, zoom or pan | [Action](/en/api-reference/midjourney/action) | Query the next task or continue through Modal |
+| Edit a prompt, redraw a region or confirm an interaction | [Modal](/en/api-reference/midjourney/modal) | Submit the additional input, then query the final task |
 
-All examples use MaxAPI's host and Bearer key. See the [catalog](/en/api-reference/catalog) for additional fields.
+For complete image-input examples, see [Reference images, Blend and Describe](/en/media/midjourney/inputs). For U/V buttons, Remix and region editing, see [Follow-up actions](/en/media/midjourney/actions).
 
-## Submit an Imagine task
+## Configure your environment
 
-| Field | Type | Requirement | Meaning |
-| --- | --- | --- | --- |
-| `prompt` | `string` | Required | Image prompt |
-| `base64Array` | `string[]` | Optional | Reference images; confirm exact encoding for the channel |
-| `notifyHook` | `string` | Optional | Callback URL |
-| `state` | `string` | Optional | Business correlation value; do not store secrets here |
+Get a key with Midjourney access from the [console](https://platform.maxapi.ai). The terminal examples below use Bash, `curl`, Python 3 and `jq`.
 
-```bash Create the task
-jq -n '{
-  prompt: "A tiny observatory on a green hill, watercolor illustration",
-  state: "illustration-job-001"
-}' | curl --fail-with-body https://api.maxapi.ai/mj/submit/imagine \
+```bash
+export MAXAPI_API_KEY="REPLACE_WITH_YOUR_MAXAPI_API_KEY"
+export MAXAPI_MJ_BASE_URL="https://api.maxapi.ai/mj"
+```
+
+| Mode | Base URL |
+| --- | --- |
+| Fast | `https://api.maxapi.ai/mj` |
+| Turbo | `https://api.maxapi.ai/mj-turbo/mj` |
+| Relax | `https://api.maxapi.ai/mj-relax/mj` |
+
+Choose a mode available to your account and use it consistently for submission, queries and follow-up actions. **Do not append `/v1` to these URLs.** Pricing, quotas and availability depend on your account configuration.
+
+## 1. Submit an image task
+
+This prompt creates a ceramic cup image for a product display. Set `botType` to `MID_JOURNEY`, or use `NIJI_JOURNEY` for Niji.
+
+```bash
+curl --fail-with-body "$MAXAPI_MJ_BASE_URL/submit/imagine" \
   -H "Authorization: Bearer $MAXAPI_API_KEY" \
   -H "Content-Type: application/json" \
-  --data-binary @- \
+  --data '{
+    "botType": "MID_JOURNEY",
+    "prompt": "A handmade ceramic cup on a clean studio background, soft side lighting, product photography",
+    "state": "product-photo-001"
+  }' \
   --output mj-submit.json
 ```
 
-### Inspect the business code
+A successful submission has this structure. `TASK_A` is an illustrative placeholder:
 
-```json Illustrative submission response
+```json
 {
   "code": 1,
-  "description": "Submission accepted",
-  "result": "your-mj-task-id"
+  "description": "Submitted successfully",
+  "result": "TASK_A"
 }
 ```
 
-| Code | Meaning in the source | Action |
-| --- | --- | --- |
-| `1` | Submitted | Save the task ID in `result` |
-| `21` | Already exists | Inspect the returned task rather than creating a duplicate |
-| `22` | Queued | Save a valid ID and query later |
-| Other | Error | Read `description` and do not treat it as a successful task |
+`code: 1` means the task was accepted; `code: 22` means it was queued. Neither means the image is ready. Save the task ID in `result`. An HTTP `200` response alone does not establish business success.
 
-These codes differ from HTTP status codes and later task states. This protocol puts the task ID in `result`:
+After the command completes, extract your task ID. Python preserves JSON integer precision before converting the ID to a string:
 
-```bash Extract a usable task ID
-TASK_ID="$(jq -er '
-  if (.code == 1 or .code == 21 or .code == 22)
-  then (.result // empty | tostring)
-  else error(.description // "Midjourney submission failed")
-  end
-' mj-submit.json)"
-: "${TASK_ID:?Response has no task ID}"
+```bash
+TASK_ID="$(python3 - <<'PY'
+import json
+from pathlib import Path
+
+result = json.loads(Path("mj-submit.json").read_text(encoding="utf-8"))
+if result.get("code") not in (1, 22):
+    raise SystemExit(result.get("description", "Submission was not accepted"))
+task_id = result.get("result")
+if isinstance(task_id, bool) or not isinstance(task_id, (str, int)) or str(task_id) == "":
+    raise SystemExit("No valid task ID in result")
+print(str(task_id))
+PY
+)"
+: "${TASK_ID:?Check the business result in mj-submit.json first}"
+export TASK_ID
 ```
 
-## Query the task
+## 2. Query the task until it completes
 
-```bash Query once
-TASK_ID_ESCAPED="$(printf '%s' "$TASK_ID" | jq -sRr @uri)"
-curl --fail-with-body \
-  "https://api.maxapi.ai/mj/task/$TASK_ID_ESCAPED/fetch" \
+```bash
+TASK_ID_ESCAPED="$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["TASK_ID"], safe=""))')"
+curl --fail-with-body "$MAXAPI_MJ_BASE_URL/task/$TASK_ID_ESCAPED/fetch" \
   -H "Authorization: Bearer $MAXAPI_API_KEY" \
   --output mj-task.json
+
+jq '{id, status, progress, imageUrl, failReason}' mj-task.json
 ```
 
-| Field | Meaning |
+While the task is pending, you may see `NOT_START`, `SUBMITTED` or `IN_PROGRESS`. Query **the same task** again later instead of resubmitting Imagine. [Task status and callbacks](/en/media/midjourney/tasks) includes a runnable polling script.
+
+Example completed task:
+
+```json
+{
+  "id": "TASK_A",
+  "action": "IMAGINE",
+  "status": "SUCCESS",
+  "progress": "100%",
+  "imageUrl": "https://example.com/generated-grid.png",
+  "buttons": [
+    {"label": "U1", "customId": "COPY_THE_ACTUAL_CUSTOM_ID_FROM_THIS_TASK"}
+  ]
+}
+```
+
+Check for `status: "SUCCESS"` before reading the finished `imageUrl`. A preview URL can appear during generation, so a nonempty URL alone does not prove completion. Read `failReason` when the status is `FAILURE`; `CANCEL` means the task was cancelled.
+
+## 3. Read the image and its buttons
+
+A typical image result may contain a four-image grid. `buttons` lists the actions available for this particular result: `label` is the name you display, while `customId` identifies the action you submit to the API.
+
+```bash
+jq -r '.buttons[]? | [.label, .emoji, .customId] | @tsv' mj-task.json
+```
+
+For example, to select the first image, find `U1` in this task's returned buttons. Submit its complete `customId` together with the task's `id` to Action. Do not send the literal string `"U1"` as `customId` or copy an action identifier from another task.
+
+| Identifier | Where to get it | Where to use it |
+| --- | --- | --- |
+| Original task ID | Imagine's `result`, or the queried task's `id` | Action's `taskId` |
+| Action identifier | This task's `buttons[].customId` | Action's `customId` |
+| Follow-up task ID | Action's or Modal's `result` | Subsequent task queries; stop querying the original task for this result |
+
+<Columns cols={2}>
+  <Card title="Continue with selection, variations and region editing" icon="wand-magic-sparkles" href="/en/media/midjourney/actions">Follow both paths: Action → new task, and Action → Modal → query.</Card>
+  <Card title="Explore the API reference" icon="code" href="/en/api-reference/midjourney/index">Find parameters, responses, examples and interactive testing for 13 endpoints.</Card>
+</Columns>
+
+## Common integration mistakes
+
+| Symptom | What to do |
 | --- | --- |
-| `id` | Current task ID |
-| `status` | Common source values: `NOT_START`, `SUBMITTED`, `IN_PROGRESS`, `SUCCESS`, `FAILURE` |
-| `progress` | Available progress information |
-| `imageUrl` | Check for an image URL after success |
-| `failReason` | Failure details |
-| `state` | Business correlation value |
-| `buttons` | Available actions returned by some channels |
+| A task ID is returned, but no image | Submission and queries are separate requests. Continue querying until the task succeeds. |
+| The original image still appears after an upscale action | Save the task ID returned by Action and query that follow-up task. |
+| Action returns `code: 21` with an input-required description, or the task status is `MODAL` | Follow the [Modal workflow](/en/media/midjourney/actions) to provide the required input. |
+| The task cannot be found | Check that the key, complete ID and mode prefix match the submission. |
+| An ID stops matching after being stored in JavaScript | Keep IDs as strings instead of converting them to `Number`. Use lossless JSON parsing for oversized numeric IDs. |
 
-Stop polling at success or failure. Preserve unknown states and set an overall deadline. See [asynchronous tasks](/en/guides/async-tasks).
-
-## Perform a follow-up action
-
-Upscale, variation and other actions refer to the original `taskId` and a specific `customId`. The action ID normally comes from returned button data such as `buttons[].customId`; do not invent it by concatenating a number.
-
-| Field | Type | Requirement | Meaning |
-| --- | --- | --- | --- |
-| `taskId` | `string` | Required | Original task ID |
-| `customId` | `string` | Required | Action actually offered for this task |
-| `notifyHook` | `string` | Optional | Callback for the action task |
-| `state` | `string` | Optional | Business correlation for this action |
-
-Set `MAXAPI_MJ_ACTION_ID` to the available action the user selected:
-
-```bash Execute the selected action
-: "${MAXAPI_MJ_ACTION_ID:?Set an available customId from the query response}"
-jq -n --arg task "$TASK_ID" --arg action "$MAXAPI_MJ_ACTION_ID" '{
-  taskId: $task,
-  customId: $action
-}' | curl --fail-with-body https://api.maxapi.ai/mj/submit/action \
-  -H "Authorization: Bearer $MAXAPI_API_KEY" \
-  -H "Content-Type: application/json" \
-  --data-binary @- \
-  --output mj-action.json
-```
-
-The action returns its own submission result. Check its business code, save the new `result` and query the new task. Do not keep querying the original task for a new image. Actions requiring additional input may need a corresponding interaction endpoint.
-
-## Callbacks and execution modes
-
-Use `notifyHook` only on a channel supporting callbacks. Correlate by task ID and deduplicate notifications. This field alone establishes no signature scheme, retry count or delivery order; see [asynchronous tasks](/en/guides/async-tasks).
-
-Related protocols include `/mj-turbo/mj` and `/mj-relax/mj` prefixes. Availability, relation to default mode and pricing depend on your channel. The `/mj` examples do not imply access to those modes.
+`state` is your own business reference, such as an order or generation-record identifier. It is not a task ID and cannot replace `taskId`.

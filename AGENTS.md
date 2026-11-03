@@ -25,6 +25,7 @@
 ## API 文档
 
 - 常用接口契约维护在 `openapi/zh.json` 与 `openapi/en.json`，保持方法、路径、字段类型和必填项一致。
+- Midjourney 独立规范位于 `openapi/midjourney-{zh,en}.json`，维护 13 个操作、七种状态与三种模式。修改后运行 `node scripts/check-midjourney.mjs`。
 - MDX frontmatter 使用完整引用，例如 `openapi: "openapi/zh.json POST /v1/chat/completions"`。项目有多个规范文件，不要只写方法和路径。
 - 参数和响应结构交给 OpenAPI 自动生成。MDX 补充任务流程、SDK 用法、输出处理与故障排查，避免重复维护同一参数表。
 - 保留 JSON、multipart、SSE 与音频响应的准确内容类型，不把所有响应都描述为 JSON。
@@ -35,7 +36,7 @@
 - 使用 Mintlify 原生 `Card`、`Columns`、`Steps`、`Tabs`、`Accordion` 与提示组件，无需导入。
 - 站内链接使用语言前缀和根相对地址，不带文件扩展名，例如 `/zh/quickstart` 或 `/en/quickstart`。
 - 对概览页显式使用 `/zh/index`、`/zh/api-reference/index`、`/zh/media/index`，英文同理。
-- 代码块注明语言；保持命令可复制。环境变量使用占位符，不能在文档里写入真实密钥。
+- 代码块注明语言；保持命令可复制。代码块标题使用不加引号的纯文本（例如在语言标记 python 后直接写 example.py），避免当前 Mintlify 渲染出空白 CodeGroup 标签。环境变量使用占位符，不能在文档里写入真实密钥。
 - 图片需要替代文本，SVG 品牌资产保持简洁，兼顾浅色与深色背景。
 - 不把维护说明、部署步骤、内部产品资料或脚本加入客户导航；在 `.mintignore` 中排除这些资料。
 

@@ -1,0 +1,1682 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MaxAPI Midjourney API",
+    "version": "1.0.0",
+    "description": "Midjourney image generation, interaction, and task management. Authenticate with a MaxAPI Bearer API key. Examples use the /mj prefix; keep a consistent mode prefix for each task. Examples illustrate structure: use task IDs, action identifiers, and image content from your own requests."
+  },
+  "servers": [
+    {
+      "url": "https://api.maxapi.ai",
+      "description": "Fast: the default example uses /mj. Select a mode enabled for your account."
+    },
+    {
+      "url": "https://api.maxapi.ai/mj-turbo",
+      "description": "Turbo: produces /mj-turbo/mj/... paths and requires Turbo access for your account."
+    },
+    {
+      "url": "https://api.maxapi.ai/mj-relax",
+      "description": "Relax: produces /mj-relax/mj/... paths and requires Relax access for your account."
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Midjourney submission"
+    },
+    {
+      "name": "Midjourney tasks"
+    }
+  ],
+  "paths": {
+    "/mj/submit/imagine": {
+      "post": {
+        "operationId": "submitMidjourneyImagine",
+        "summary": "Submit an Imagine task",
+        "description": "Create an image-generation task from a prompt. Save result and fetch the task; the submission response does not contain the final image.",
+        "tags": [
+          "Midjourney submission"
+        ],
+        "responses": {
+          "200": {
+            "description": "Request result. Inspect business codes and task states as applicable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitResponse"
+                },
+                "examples": {
+                  "accepted": {
+                    "summary": "Submitted",
+                    "value": {
+                      "code": 1,
+                      "description": "Submitted",
+                      "result": "YOUR_TASK_ID"
+                    }
+                  },
+                  "queued": {
+                    "summary": "Queued",
+                    "value": {
+                      "code": 22,
+                      "description": "Queued",
+                      "result": "YOUR_TASK_ID"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request was refused.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImagineRequest"
+              },
+              "example": {
+                "prompt": "A small observatory on a green hill, watercolor illustration",
+                "state": "illustration-job-001"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/mj/submit/action": {
+      "post": {
+        "operationId": "submitMidjourneyAction",
+        "summary": "Run a task button action",
+        "description": "Run an upscale, variation, or other available action using the source task ID and a customId from its buttons. When code 21 indicates modal waiting, result identifies the pending task: confirm MODAL and submit modal. For code 1 or 22, track the returned task ID.",
+        "tags": [
+          "Midjourney submission"
+        ],
+        "responses": {
+          "200": {
+            "description": "Request result. Inspect business codes and task states as applicable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitResponse"
+                },
+                "examples": {
+                  "accepted": {
+                    "summary": "Submitted",
+                    "value": {
+                      "code": 1,
+                      "description": "Submitted",
+                      "result": "YOUR_TASK_ID"
+                    }
+                  },
+                  "queued": {
+                    "summary": "Queued",
+                    "value": {
+                      "code": 22,
+                      "description": "Queued",
+                      "result": "YOUR_TASK_ID"
+                    }
+                  },
+                  "modal": {
+                    "summary": "Awaiting modal input",
+                    "value": {
+                      "code": 21,
+                      "description": "Awaiting modal confirmation",
+                      "result": "YOUR_PENDING_TASK_ID"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request was refused.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActionRequest"
+              },
+              "example": {
+                "taskId": "YOUR_TASK_ID",
+                "customId": "COPY_FROM_TASK_BUTTONS"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/mj/submit/modal": {
+      "post": {
+        "operationId": "submitMidjourneyModal",
+        "summary": "Submit modal input",
+        "description": "Submit final prompt or mask input for a task awaiting interaction. Use the pending task ID, not automatically the original image task ID. After submission, track the returned result.",
+        "tags": [
+          "Midjourney submission"
+        ],
+        "responses": {
+          "200": {
+            "description": "Request result. Inspect business codes and task states as applicable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitResponse"
+                },
+                "examples": {
+                  "accepted": {
+                    "summary": "Submitted",
+                    "value": {
+                      "code": 1,
+                      "description": "Submitted",
+                      "result": "YOUR_TASK_ID"
+                    }
+                  },
+                  "queued": {
+                    "summary": "Queued",
+                    "value": {
+                      "code": 22,
+                      "description": "Queued",
+                      "result": "YOUR_TASK_ID"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request was refused.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModalRequest"
+              },
+              "example": {
+                "taskId": "YOUR_PENDING_TASK_ID",
+                "prompt": "A small observatory on a green hill, watercolor illustration"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/mj/submit/blend": {
+      "post": {
+        "operationId": "submitMidjourneyBlend",
+        "summary": "Submit a Blend task",
+        "description": "Submit images as a JSON array of Base64 data URIs to blend them into a new image. This is not a multipart file upload.",
+        "tags": [
+          "Midjourney submission"
+        ],
+        "responses": {
+          "200": {
+            "description": "Request result. Inspect business codes and task states as applicable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitResponse"
+                },
+                "examples": {
+                  "accepted": {
+                    "summary": "Submitted",
+                    "value": {
+                      "code": 1,
+                      "description": "Submitted",
+                      "result": "YOUR_TASK_ID"
+                    }
+                  },
+                  "queued": {
+                    "summary": "Queued",
+                    "value": {
+                      "code": 22,
+                      "description": "Queued",
+                      "result": "YOUR_TASK_ID"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request was refused.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlendRequest"
+              },
+              "example": {
+                "base64Array": [
+                  "data:image/png;base64,REPLACE_WITH_FIRST_IMAGE",
+                  "data:image/png;base64,REPLACE_WITH_SECOND_IMAGE"
+                ],
+                "dimensions": "SQUARE"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/mj/submit/describe": {
+      "post": {
+        "operationId": "submitMidjourneyDescribe",
+        "summary": "Submit a Describe task",
+        "description": "Submit an image as a Base64 data URI to generate descriptions. When the task succeeds, read properties.finalPrompt and, if present, finalZhPrompt. Do not rely only on a new imageUrl.",
+        "tags": [
+          "Midjourney submission"
+        ],
+        "responses": {
+          "200": {
+            "description": "Request result. Inspect business codes and task states as applicable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitResponse"
+                },
+                "examples": {
+                  "accepted": {
+                    "summary": "Submitted",
+                    "value": {
+                      "code": 1,
+                      "description": "Submitted",
+                      "result": "YOUR_TASK_ID"
+                    }
+                  },
+                  "queued": {
+                    "summary": "Queued",
+                    "value": {
+                      "code": 22,
+                      "description": "Queued",
+                      "result": "YOUR_TASK_ID"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request was refused.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DescribeRequest"
+              },
+              "example": {
+                "base64": "data:image/png;base64,REPLACE_WITH_BASE64"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/mj/submit/shorten": {
+      "post": {
+        "operationId": "submitMidjourneyShorten",
+        "summary": "Submit a Shorten task",
+        "description": "Analyze a prompt and suggest shorter alternatives. Read the text result from properties.finalPrompt after the task succeeds; this operation does not require a new generated image.",
+        "tags": [
+          "Midjourney submission"
+        ],
+        "responses": {
+          "200": {
+            "description": "Request result. Inspect business codes and task states as applicable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitResponse"
+                },
+                "examples": {
+                  "accepted": {
+                    "summary": "Submitted",
+                    "value": {
+                      "code": 1,
+                      "description": "Submitted",
+                      "result": "YOUR_TASK_ID"
+                    }
+                  },
+                  "queued": {
+                    "summary": "Queued",
+                    "value": {
+                      "code": 22,
+                      "description": "Queued",
+                      "result": "YOUR_TASK_ID"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request was refused.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShortenRequest"
+              },
+              "example": {
+                "prompt": "A small observatory on a green hill, soft watercolor, warm morning light, peaceful atmosphere"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/mj/task/{id}/fetch": {
+      "get": {
+        "operationId": "fetchMidjourneyTask",
+        "summary": "Fetch a task",
+        "description": "Returns the task object directly. Use status to distinguish waiting, required input, success, failure, and cancellation. Read image or text results after success, then expose the available buttons.",
+        "tags": [
+          "Midjourney tasks"
+        ],
+        "responses": {
+          "200": {
+            "description": "Request result. Inspect business codes and task states as applicable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "Completed image task",
+                    "value": {
+                      "id": "YOUR_TASK_ID",
+                      "action": "IMAGINE",
+                      "status": "SUCCESS",
+                      "progress": "100%",
+                      "prompt": "A small observatory on a green hill, watercolor illustration",
+                      "imageUrl": "https://example.com/generated-image.png",
+                      "buttons": [
+                        {
+                          "customId": "COPY_FROM_TASK_BUTTONS",
+                          "label": "U1",
+                          "emoji": "",
+                          "style": 2,
+                          "type": 2
+                        }
+                      ],
+                      "state": "illustration-job-001"
+                    }
+                  },
+                  "modal": {
+                    "summary": "Task awaiting input",
+                    "value": {
+                      "id": "YOUR_PENDING_TASK_ID",
+                      "status": "MODAL"
+                    }
+                  },
+                  "text": {
+                    "summary": "Describe text result",
+                    "value": {
+                      "id": "YOUR_TASK_ID",
+                      "action": "DESCRIBE",
+                      "status": "SUCCESS",
+                      "properties": {
+                        "finalPrompt": "A small observatory on a green hill, watercolor illustration"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request was refused.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID of the task to retrieve or operate on.",
+            "schema": {
+              "type": "string",
+              "example": "YOUR_TASK_ID"
+            }
+          }
+        ]
+      }
+    },
+    "/mj/task/list-by-condition": {
+      "post": {
+        "operationId": "listMidjourneyTasksByIds",
+        "summary": "Fetch tasks by IDs",
+        "description": "Fetch multiple tasks as an array. Match each result to local records by id and check its status. Do not assume ordering or that every input ID has a returned object.",
+        "tags": [
+          "Midjourney tasks"
+        ],
+        "responses": {
+          "200": {
+            "description": "Request result. Inspect business codes and task states as applicable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Task"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request was refused.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskIdsRequest"
+              },
+              "example": {
+                "ids": [
+                  "YOUR_FIRST_TASK_ID",
+                  "YOUR_SECOND_TASK_ID"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mj/task/queue": {
+      "get": {
+        "operationId": "getMidjourneyQueue",
+        "summary": "Get the task queue",
+        "description": "Returns an array of queue tasks visible to the request. A queue snapshot is not a completion-time estimate. Continue fetching saved tasks by their IDs.",
+        "tags": [
+          "Midjourney tasks"
+        ],
+        "responses": {
+          "200": {
+            "description": "Request result. Inspect business codes and task states as applicable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Task"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request was refused.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mj/task/{id}/cancel": {
+      "post": {
+        "operationId": "cancelMidjourneyTask",
+        "summary": "Cancel a task",
+        "description": "Request cancellation of a task. Read code and description, then fetch the task to confirm its final state. A cancellation response does not establish a refund or guarantee that every execution stage can be cancelled.",
+        "tags": [
+          "Midjourney tasks"
+        ],
+        "responses": {
+          "200": {
+            "description": "Request result. Inspect business codes and task states as applicable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request was refused.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID of the task to retrieve or operate on.",
+            "schema": {
+              "type": "string",
+              "example": "YOUR_TASK_ID"
+            }
+          }
+        ]
+      }
+    },
+    "/mj/task/{id}/image-seed": {
+      "get": {
+        "operationId": "getMidjourneyImageSeed",
+        "summary": "Get an image seed",
+        "description": "Retrieve the seed of a generated image. For code 1, result is the seed string, not a new task ID. This feature requires the channel to have configured the corresponding bot direct-message capability.",
+        "tags": [
+          "Midjourney tasks"
+        ],
+        "responses": {
+          "200": {
+            "description": "Request result. Inspect business codes and task states as applicable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeedResponse"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "Seed retrieved",
+                    "value": {
+                      "code": 1,
+                      "description": "Success",
+                      "result": "123456789"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request was refused.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID of the task to retrieve or operate on.",
+            "schema": {
+              "type": "string",
+              "example": "YOUR_TASK_ID"
+            }
+          }
+        ]
+      }
+    },
+    "/mj/task/list": {
+      "get": {
+        "operationId": "listMidjourneyTasks",
+        "summary": "List tasks",
+        "description": "Returns a task array visible to the current request. Use POST /mj/task/query for pagination or state filtering. Visibility depends on the current channel and permissions.",
+        "tags": [
+          "Midjourney tasks"
+        ],
+        "responses": {
+          "200": {
+            "description": "Request result. Inspect business codes and task states as applicable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Task"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request was refused.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mj/task/query": {
+      "post": {
+        "operationId": "queryMidjourneyTasks",
+        "summary": "Query tasks with pagination",
+        "description": "Filter tasks by page number, state, IDs, or your application correlation value. pageNumber starts at 0. Results are in content; use last and totalPages when loading subsequent pages.",
+        "tags": [
+          "Midjourney tasks"
+        ],
+        "responses": {
+          "200": {
+            "description": "Request result. Inspect business codes and task states as applicable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request was refused.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskQueryRequest"
+              },
+              "example": {
+                "pageNumber": 0,
+                "pageSize": 20,
+                "status": "SUCCESS"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Create an API key in the console and send it as Authorization: Bearer <API_KEY>."
+      }
+    },
+    "schemas": {
+      "AccountFilter": {
+        "type": "object",
+        "properties": {
+          "instanceId": {
+            "type": "string",
+            "description": "Select an account instance by ID. Set this only when you have a known, available instance ID."
+          },
+          "modes": {
+            "type": "array",
+            "description": "Filter account modes. This does not replace the mode prefix in the request URL.",
+            "items": {
+              "type": "string",
+              "description": "Account execution mode.",
+              "enum": [
+                "RELAX",
+                "FAST",
+                "TURBO"
+              ]
+            }
+          },
+          "remix": {
+            "type": "boolean",
+            "description": "Filter by whether Remix is enabled on the account."
+          },
+          "remixAutoConsidered": {
+            "type": "boolean",
+            "description": "Whether account filtering treats Remix with automatic submission as remix being false."
+          }
+        },
+        "description": "Optional account filters. Standard integrations can usually omit them and let the service select an available account."
+      },
+      "ImagineRequest": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "The generation or prompt-analysis text. Add model parameters using syntax supported by the selected model.",
+            "example": "A small observatory on a green hill, watercolor illustration"
+          },
+          "base64Array": {
+            "type": "array",
+            "description": "Reference-image Base64 data URIs. Omit for text-only generation.",
+            "items": {
+              "type": "string",
+              "description": "A Base64 image data URI, such as data:image/png;base64,... . Replace the example placeholder with the complete encoded image.",
+              "example": "data:image/png;base64,REPLACE_WITH_BASE64"
+            }
+          },
+          "botType": {
+            "type": "string",
+            "description": "Bot type: MID_JOURNEY for Midjourney or NIJI_JOURNEY for Niji. Availability depends on the current channel.",
+            "enum": [
+              "MID_JOURNEY",
+              "NIJI_JOURNEY"
+            ]
+          },
+          "accountFilter": {
+            "$ref": "#/components/schemas/AccountFilter"
+          },
+          "notifyHook": {
+            "type": "string",
+            "description": "Callback URL for task status or progress changes. If omitted, a configured server callback is used when available. No callback is sent when neither is configured.",
+            "example": "https://example.com/webhooks/midjourney"
+          },
+          "state": {
+            "type": "string",
+            "description": "Your application correlation value, returned as state when fetching the task. Do not include credentials or sensitive data.",
+            "example": "illustration-job-001"
+          }
+        },
+        "required": [
+          "prompt"
+        ]
+      },
+      "ActionRequest": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "Task ID from result in a submission response or id in a fetched task. Keep it as a string.",
+            "example": "YOUR_TASK_ID"
+          },
+          "customId": {
+            "type": "string",
+            "description": "Copy this exact action identifier from the same task’s buttons array. Do not send only a label such as U1 or V1, or construct an identifier.",
+            "example": "COPY_FROM_TASK_BUTTONS"
+          },
+          "notifyHook": {
+            "type": "string",
+            "description": "Callback URL for task status or progress changes. If omitted, a configured server callback is used when available. No callback is sent when neither is configured.",
+            "example": "https://example.com/webhooks/midjourney"
+          },
+          "state": {
+            "type": "string",
+            "description": "Your application correlation value, returned as state when fetching the task. Do not include credentials or sensitive data.",
+            "example": "illustration-job-001"
+          }
+        },
+        "required": [
+          "customId",
+          "taskId"
+        ]
+      },
+      "ModalRequest": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "ID of the task awaiting confirmation. When an action returns a modal-wait response, use its result rather than the original image task ID.",
+            "example": "YOUR_PENDING_TASK_ID"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "Final prompt. An empty value keeps the original prompt; actions such as custom zoom require their corresponding parameters.",
+            "example": "A small observatory on a green hill, watercolor illustration"
+          },
+          "maskBase64": {
+            "type": "string",
+            "description": "Base64 data URI of the region mask. Use a black background and white selected regions. Supply this only for an action that requires a mask.",
+            "example": "data:image/png;base64,REPLACE_WITH_MASK_BASE64"
+          }
+        },
+        "required": [
+          "taskId"
+        ]
+      },
+      "BlendRequest": {
+        "type": "object",
+        "properties": {
+          "base64Array": {
+            "type": "array",
+            "description": "Base64 data URIs of the images to blend.",
+            "items": {
+              "type": "string",
+              "description": "A Base64 image data URI, such as data:image/png;base64,... . Replace the example placeholder with the complete encoded image.",
+              "example": "data:image/png;base64,REPLACE_WITH_BASE64"
+            }
+          },
+          "dimensions": {
+            "type": "string",
+            "description": "Output aspect ratio: PORTRAIT is 2:3, SQUARE is 1:1, and LANDSCAPE is 3:2.",
+            "enum": [
+              "PORTRAIT",
+              "SQUARE",
+              "LANDSCAPE"
+            ]
+          },
+          "botType": {
+            "type": "string",
+            "description": "Bot type: MID_JOURNEY for Midjourney or NIJI_JOURNEY for Niji. Availability depends on the current channel.",
+            "enum": [
+              "MID_JOURNEY",
+              "NIJI_JOURNEY"
+            ]
+          },
+          "accountFilter": {
+            "$ref": "#/components/schemas/AccountFilter"
+          },
+          "notifyHook": {
+            "type": "string",
+            "description": "Callback URL for task status or progress changes. If omitted, a configured server callback is used when available. No callback is sent when neither is configured.",
+            "example": "https://example.com/webhooks/midjourney"
+          },
+          "state": {
+            "type": "string",
+            "description": "Your application correlation value, returned as state when fetching the task. Do not include credentials or sensitive data.",
+            "example": "illustration-job-001"
+          }
+        },
+        "required": [
+          "base64Array"
+        ]
+      },
+      "DescribeRequest": {
+        "type": "object",
+        "properties": {
+          "base64": {
+            "type": "string",
+            "description": "A Base64 image data URI, such as data:image/png;base64,... . Replace the example placeholder with the complete encoded image.",
+            "example": "data:image/png;base64,REPLACE_WITH_BASE64"
+          },
+          "botType": {
+            "type": "string",
+            "description": "Bot type: MID_JOURNEY for Midjourney or NIJI_JOURNEY for Niji. Availability depends on the current channel.",
+            "enum": [
+              "MID_JOURNEY",
+              "NIJI_JOURNEY"
+            ]
+          },
+          "accountFilter": {
+            "$ref": "#/components/schemas/AccountFilter"
+          },
+          "notifyHook": {
+            "type": "string",
+            "description": "Callback URL for task status or progress changes. If omitted, a configured server callback is used when available. No callback is sent when neither is configured.",
+            "example": "https://example.com/webhooks/midjourney"
+          },
+          "state": {
+            "type": "string",
+            "description": "Your application correlation value, returned as state when fetching the task. Do not include credentials or sensitive data.",
+            "example": "illustration-job-001"
+          }
+        },
+        "required": [
+          "base64"
+        ]
+      },
+      "ShortenRequest": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "The generation or prompt-analysis text. Add model parameters using syntax supported by the selected model.",
+            "example": "A small observatory on a green hill, watercolor illustration"
+          },
+          "botType": {
+            "type": "string",
+            "description": "Bot type: MID_JOURNEY for Midjourney or NIJI_JOURNEY for Niji. Availability depends on the current channel.",
+            "enum": [
+              "MID_JOURNEY",
+              "NIJI_JOURNEY"
+            ]
+          },
+          "accountFilter": {
+            "$ref": "#/components/schemas/AccountFilter"
+          },
+          "notifyHook": {
+            "type": "string",
+            "description": "Callback URL for task status or progress changes. If omitted, a configured server callback is used when available. No callback is sent when neither is configured.",
+            "example": "https://example.com/webhooks/midjourney"
+          },
+          "state": {
+            "type": "string",
+            "description": "Your application correlation value, returned as state when fetching the task. Do not include credentials or sensitive data.",
+            "example": "illustration-job-001"
+          }
+        },
+        "required": [
+          "prompt"
+        ]
+      },
+      "TaskIdsRequest": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "description": "IDs of the tasks to retrieve. Match returned objects by id rather than relying on their array positions.",
+            "items": {
+              "type": "string",
+              "description": "Task ID from result in a submission response or id in a fetched task. Keep it as a string.",
+              "example": "YOUR_TASK_ID"
+            }
+          }
+        }
+      },
+      "SubmitResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "Submission business code: 1 means submitted and 22 means queued. Interpret 21 with the endpoint and task state: an action can require modal confirmation (MODAL), while some compatible versions use it for an existing task. For other codes, read description instead of treating the generation as successful.",
+            "format": "int32"
+          },
+          "description": {
+            "type": "string",
+            "description": "Explanation of the submission result."
+          },
+          "result": {
+            "type": "string",
+            "description": "ID associated with this submission. Its presence alone does not mean that a failed submission should be polled."
+          },
+          "properties": {
+            "type": "object",
+            "description": "Additional submission metadata. Handle fields according to the actual response.",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "code",
+          "description"
+        ]
+      },
+      "Button": {
+        "type": "object",
+        "properties": {
+          "customId": {
+            "type": "string",
+            "description": "Action identifier to pass unchanged to action."
+          },
+          "emoji": {
+            "type": "string",
+            "description": "Button icon."
+          },
+          "label": {
+            "type": "string",
+            "description": "Display label, not the action identifier."
+          },
+          "style": {
+            "type": "integer",
+            "description": "Button style. The documented values include 2 for Primary and 3 for Green.",
+            "format": "int32"
+          },
+          "type": {
+            "type": "integer",
+            "description": "Button type, normally used by display components.",
+            "format": "int32"
+          }
+        }
+      },
+      "TaskProperties": {
+        "type": "object",
+        "properties": {
+          "finalPrompt": {
+            "type": "string",
+            "description": "Image descriptions from Describe or analysis from Shorten. The string may contain Markdown or multiple text sections."
+          },
+          "finalZhPrompt": {
+            "type": "string",
+            "description": "Optional Chinese translation. It may be absent."
+          }
+        },
+        "additionalProperties": true
+      },
+      "Task": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Task ID.",
+            "example": "YOUR_TASK_ID"
+          },
+          "action": {
+            "type": "string",
+            "description": "Task type, such as IMAGINE, UPSCALE, VARIATION, REROLL, ZOOM, PAN, DESCRIBE, BLEND, or SHORTEN. Other types may be added by different versions."
+          },
+          "status": {
+            "type": "string",
+            "description": "Task state: NOT_START, SUBMITTED, MODAL (awaiting input), IN_PROGRESS, SUCCESS, FAILURE, or CANCEL. MODAL requires a modal submission; polling alone does not resolve it. Handle unfamiliar values explicitly."
+          },
+          "prompt": {
+            "type": "string",
+            "description": "Original prompt."
+          },
+          "promptEn": {
+            "type": "string",
+            "description": "English prompt."
+          },
+          "description": {
+            "type": "string",
+            "description": "Task description."
+          },
+          "submitTime": {
+            "type": "integer",
+            "description": "Task submission time.",
+            "format": "int64"
+          },
+          "startTime": {
+            "type": "integer",
+            "description": "Task execution start time.",
+            "format": "int64"
+          },
+          "finishTime": {
+            "type": "integer",
+            "description": "Task completion time.",
+            "format": "int64"
+          },
+          "progress": {
+            "type": "string",
+            "description": "Display progress, such as 100%. Use status to determine completion."
+          },
+          "imageUrl": {
+            "type": "string",
+            "description": "Image URL; during generation it may refer to a preview. Confirm SUCCESS before downloading the final image. For Describe and Shorten, also read text results from properties."
+          },
+          "failReason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Failure reason, which may be null or absent when the task has not failed."
+          },
+          "state": {
+            "type": "string",
+            "description": "Application correlation value supplied when submitting."
+          },
+          "properties": {
+            "$ref": "#/components/schemas/TaskProperties"
+          },
+          "buttons": {
+            "type": "array",
+            "description": "Buttons returned for this task. Submit the selected customId together with the ID of the task it belongs to.",
+            "items": {
+              "$ref": "#/components/schemas/Button"
+            }
+          }
+        }
+      },
+      "Message": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "Business result code. Inspect description and the subsequent task state; HTTP 200 alone does not establish completion.",
+            "format": "int32"
+          },
+          "description": {
+            "type": "string",
+            "description": "Operation result description."
+          }
+        }
+      },
+      "SeedResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "1 means the seed was retrieved. For other values, read description.",
+            "format": "int32"
+          },
+          "description": {
+            "type": "string",
+            "description": "Seed lookup result description."
+          },
+          "result": {
+            "type": "string",
+            "description": "Image seed as a string. This is not a new task ID or an image URL."
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "description": "Error bodies depend on the gateway or channel. Preserve the original response for troubleshooting without assuming a universal field structure.",
+        "additionalProperties": true
+      },
+      "TaskQueryRequest": {
+        "type": "object",
+        "properties": {
+          "pageNumber": {
+            "type": "integer",
+            "description": "Page number, starting at 0.",
+            "format": "int32",
+            "example": 0
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "Items per page. The example is not a server default or maximum.",
+            "format": "int32",
+            "example": 20
+          },
+          "sort": {
+            "type": "string",
+            "description": "Sort expression. Use only syntax confirmed for the current channel."
+          },
+          "action": {
+            "type": "string",
+            "description": "Filter by task type.",
+            "enum": [
+              "IMAGINE",
+              "UPSCALE",
+              "VARIATION",
+              "ZOOM",
+              "PAN",
+              "DESCRIBE",
+              "BLEND",
+              "SHORTEN",
+              "SWAP_FACE"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "description": "Filter by task description."
+          },
+          "ids": {
+            "type": "array",
+            "description": "Filter by task IDs.",
+            "items": {
+              "type": "string",
+              "description": "Task ID from result in a submission response or id in a fetched task. Keep it as a string.",
+              "example": "YOUR_TASK_ID"
+            }
+          },
+          "instanceId": {
+            "type": "string",
+            "description": "Filter by account instance ID."
+          },
+          "prompt": {
+            "type": "string",
+            "description": "Filter by prompt."
+          },
+          "promptEn": {
+            "type": "string",
+            "description": "Filter by English prompt."
+          },
+          "state": {
+            "type": "string",
+            "description": "Filter by the application correlation value."
+          },
+          "status": {
+            "type": "string",
+            "description": "Filter by one task state.",
+            "enum": [
+              "NOT_START",
+              "SUBMITTED",
+              "MODAL",
+              "IN_PROGRESS",
+              "FAILURE",
+              "SUCCESS",
+              "CANCEL"
+            ]
+          },
+          "statusSet": {
+            "type": "array",
+            "description": "Filter by multiple task states.",
+            "items": {
+              "type": "string",
+              "description": "Task state.",
+              "enum": [
+                "NOT_START",
+                "SUBMITTED",
+                "MODAL",
+                "IN_PROGRESS",
+                "FAILURE",
+                "SUCCESS",
+                "CANCEL"
+              ]
+            }
+          }
+        }
+      },
+      "Sort": {
+        "type": "object",
+        "properties": {
+          "empty": {
+            "type": "boolean",
+            "description": "Whether sort criteria are empty."
+          },
+          "sorted": {
+            "type": "boolean",
+            "description": "Whether sorting is specified."
+          },
+          "unsorted": {
+            "type": "boolean",
+            "description": "Whether no sorting is specified."
+          }
+        }
+      },
+      "Pageable": {
+        "type": "object",
+        "properties": {
+          "offset": {
+            "type": "integer",
+            "description": "Pagination offset.",
+            "format": "int64"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "description": "Current page number.",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "Page size.",
+            "format": "int32"
+          },
+          "paged": {
+            "type": "boolean",
+            "description": "Whether pagination is active."
+          },
+          "sort": {
+            "$ref": "#/components/schemas/Sort"
+          },
+          "unpaged": {
+            "type": "boolean",
+            "description": "Whether pagination is disabled."
+          }
+        }
+      },
+      "TaskPage": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "description": "Tasks on the current page.",
+            "items": {
+              "$ref": "#/components/schemas/Task"
+            }
+          },
+          "empty": {
+            "type": "boolean",
+            "description": "Whether the current page is empty."
+          },
+          "first": {
+            "type": "boolean",
+            "description": "Whether this is the first page."
+          },
+          "last": {
+            "type": "boolean",
+            "description": "Whether this is the last page."
+          },
+          "number": {
+            "type": "integer",
+            "description": "Current page number, starting at 0.",
+            "format": "int32"
+          },
+          "numberOfElements": {
+            "type": "integer",
+            "description": "Actual number of items on the current page.",
+            "format": "int32"
+          },
+          "pageable": {
+            "$ref": "#/components/schemas/Pageable"
+          },
+          "size": {
+            "type": "integer",
+            "description": "Requested page size.",
+            "format": "int32"
+          },
+          "sort": {
+            "$ref": "#/components/schemas/Sort"
+          },
+          "totalElements": {
+            "type": "integer",
+            "description": "Total number of matching items.",
+            "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "Total page count.",
+            "format": "int32"
+          }
+        }
+      }
+    }
+  }
+}

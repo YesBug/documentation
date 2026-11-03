@@ -5,19 +5,67 @@ keywords: ["MaxAPI", "文本补全", "completions"]
 openapi: "openapi/zh.json POST /v1/completions"
 ---
 
-文本补全接口接收 `prompt` 并续写文本，适合已有 Completions 集成。它与接收 `messages` 的 [对话接口](/zh/api-reference/chat-completions) 使用不同的请求和响应结构。请先确认模型支持该端点。
+文本补全接口接收 `prompt` 并续写文本，适合已有 Completions 集成。它与接收 `messages` 的 [对话接口](/zh/api-reference/chat-completions) 使用不同的请求和响应结构，调用前应确认模型支持此端点。
 
-## 读取结果
+## 补全一段文本
 
-生成内容位于 `choices[].text`。流式响应继续使用该字段提供增量文本，不使用 Chat Completions 的 `delta.content`。SSE 分帧方式可参考 [流式响应](/zh/guides/streaming)。
+配置 `MAXAPI_API_KEY`，将 `MAXAPI_MODEL` 设为支持文本补全的模型。示例依赖 `jq`，仅传入必需字段。
 
-## 接入注意事项
+```bash 文本补全
+jq -n --arg model "$MAXAPI_MODEL" '{
+  model: $model,
+  prompt: "续写这段产品介绍：MaxAPI 帮助开发者"
+}' | curl --fail-with-body https://api.maxapi.ai/v1/completions \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @- \
+  --output completion-response.json
+```
+
+确认命令成功后，读取 `choices[].text`。返回的文字是补全结果，不要依赖它一定包含原始 `prompt`。
+
+```python 读取补全结果
+import json
+from pathlib import Path
+
+result = json.loads(Path("completion-response.json").read_text(encoding="utf-8"))
+if not result.get("choices"):
+    raise ValueError("没有补全结果，请检查原始响应")
+for choice in result["choices"]:
+    print("候选：", choice.get("index"))
+    print(choice.get("text", ""))
+    print("结束原因：", choice.get("finish_reason"))
+print("用量：", result.get("usage", {}))
+```
+
+`finish_reason: "length"` 表示生成受到长度限制，不能假定文本完整。模型支持时，通过 `max_tokens` 设置请求的输出上限；该值不是平台统一额度。
+
+## 与 Chat Completions 的区别
+
+| 处理环节 | 文本补全 | 对话 |
+| --- | --- | --- |
+| 输入 | `prompt` 字符串；批量字符串需要模型支持 | 按顺序排列的 `messages` |
+| 普通结果 | `choices[].text` | `choices[].message.content` |
+| 流式文本 | `choices[].text` | `choices[].delta.content` |
+| 多轮历史 | 应用组织为完整提示文本 | 应用保留消息角色与历史 |
+| 工具与图片 | 不能直接照搬聊天字段 | 需模型支持对应聊天能力 |
+
+新建聊天应用时，可以从对话接口的消息格式开始。迁移已有补全集成时，需要同时修改请求构造和结果读取，不能只替换 URL。
+
+## 流式补全
+
+在请求中加入 `stream: true`，使用 `curl -N` 观察事件，或使用能够解析 SSE 的客户端。每个事件中的 `choices[].text` 是增量片段，应按候选结果的 `index` 分别拼接。
+
+结束时检查返回的结束原因。不要对每一个网络数据块直接运行 JSON 解析；网络数据块不一定对应完整 SSE 事件。事件读取方式见 [流式响应](/zh/guides/streaming)，其中聊天的文本提取字段需要改为 `choices[].text`。
+
+## 常见问题
 
 | 问题 | 建议 |
 | --- | --- |
-| 模型可见但调用失败 | 模型列表只说明可见性，确认其是否支持 `/v1/completions` |
-| 返回文本读取不到 | 读取 `choices[].text`，而非 `choices[].message.content` |
+| 模型可见但调用失败 | 确认该模型支持 `/v1/completions`，再验证最小请求 |
+| 返回文本读取不到 | 读取 `choices[].text`，而非 `message.content` |
 | 使用聊天消息报错 | 此端点使用 `prompt`；对话场景改用 Chat Completions |
-| 生成被截断 | 检查 `finish_reason: "length"` 和模型上下文限制 |
+| 只得到一半的句子 | 检查 `finish_reason`、请求的输出上限与上下文限制 |
+| `stop` 或 `logprobs` 报错 | 删除该参数验证；可选字段并非所有模型都支持 |
 
 其他 HTTP 错误见 [错误排查](/zh/help/errors)。

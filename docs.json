@@ -51,12 +51,20 @@
               {
                 "group": "开发接入",
                 "pages": [
+                  "zh/guides/text-generation",
                   "zh/guides/python",
                   "zh/guides/nodejs",
                   "zh/guides/streaming",
                   "zh/guides/vision",
-                  "zh/guides/tools",
+                  "zh/guides/tools"
+                ]
+              },
+              {
+                "group": "集成与上线",
+                "pages": [
                   "zh/guides/protocols",
+                  "zh/guides/migration",
+                  "zh/guides/production",
                   "zh/guides/async-tasks"
                 ]
               },
@@ -67,7 +75,15 @@
                   "zh/media/image-providers",
                   "zh/media/videos",
                   "zh/media/video-providers",
-                  "zh/media/midjourney",
+                  {
+                    "group": "Midjourney",
+                    "pages": [
+                      "zh/media/midjourney",
+                      "zh/media/midjourney/inputs",
+                      "zh/media/midjourney/actions",
+                      "zh/media/midjourney/tasks"
+                    ]
+                  },
                   "zh/media/music"
                 ]
               },
@@ -104,6 +120,40 @@
                 "pages": [
                   "zh/api-reference/images",
                   "zh/api-reference/images-edits"
+                ]
+              },
+              {
+                "group": "Midjourney",
+                "pages": [
+                  "zh/api-reference/midjourney/index",
+                  {
+                    "group": "绘图与输入",
+                    "pages": [
+                      "zh/api-reference/midjourney/imagine",
+                      "zh/api-reference/midjourney/blend",
+                      "zh/api-reference/midjourney/describe",
+                      "zh/api-reference/midjourney/shorten"
+                    ]
+                  },
+                  {
+                    "group": "后续动作",
+                    "pages": [
+                      "zh/api-reference/midjourney/action",
+                      "zh/api-reference/midjourney/modal"
+                    ]
+                  },
+                  {
+                    "group": "任务管理",
+                    "pages": [
+                      "zh/api-reference/midjourney/fetch",
+                      "zh/api-reference/midjourney/list-by-condition",
+                      "zh/api-reference/midjourney/queue",
+                      "zh/api-reference/midjourney/list",
+                      "zh/api-reference/midjourney/query",
+                      "zh/api-reference/midjourney/cancel",
+                      "zh/api-reference/midjourney/seed"
+                    ]
+                  }
                 ]
               },
               {
@@ -158,12 +208,20 @@
               {
                 "group": "Build with MaxAPI",
                 "pages": [
+                  "en/guides/text-generation",
                   "en/guides/python",
                   "en/guides/nodejs",
                   "en/guides/streaming",
                   "en/guides/vision",
-                  "en/guides/tools",
+                  "en/guides/tools"
+                ]
+              },
+              {
+                "group": "Integration and production",
+                "pages": [
                   "en/guides/protocols",
+                  "en/guides/migration",
+                  "en/guides/production",
                   "en/guides/async-tasks"
                 ]
               },
@@ -174,7 +232,15 @@
                   "en/media/image-providers",
                   "en/media/videos",
                   "en/media/video-providers",
-                  "en/media/midjourney",
+                  {
+                    "group": "Midjourney",
+                    "pages": [
+                      "en/media/midjourney",
+                      "en/media/midjourney/inputs",
+                      "en/media/midjourney/actions",
+                      "en/media/midjourney/tasks"
+                    ]
+                  },
                   "en/media/music"
                 ]
               },
@@ -211,6 +277,40 @@
                 "pages": [
                   "en/api-reference/images",
                   "en/api-reference/images-edits"
+                ]
+              },
+              {
+                "group": "Midjourney",
+                "pages": [
+                  "en/api-reference/midjourney/index",
+                  {
+                    "group": "Generation and inputs",
+                    "pages": [
+                      "en/api-reference/midjourney/imagine",
+                      "en/api-reference/midjourney/blend",
+                      "en/api-reference/midjourney/describe",
+                      "en/api-reference/midjourney/shorten"
+                    ]
+                  },
+                  {
+                    "group": "Follow-up actions",
+                    "pages": [
+                      "en/api-reference/midjourney/action",
+                      "en/api-reference/midjourney/modal"
+                    ]
+                  },
+                  {
+                    "group": "Task management",
+                    "pages": [
+                      "en/api-reference/midjourney/fetch",
+                      "en/api-reference/midjourney/list-by-condition",
+                      "en/api-reference/midjourney/queue",
+                      "en/api-reference/midjourney/list",
+                      "en/api-reference/midjourney/query",
+                      "en/api-reference/midjourney/cancel",
+                      "en/api-reference/midjourney/seed"
+                    ]
+                  }
                 ]
               },
               {

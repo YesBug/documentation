@@ -1,0 +1,42 @@
+---
+title: "Action: execute an image button"
+description: "Execute an upscale, variation, or another returned Midjourney button using its customId, then track the new task or supply the required modal input."
+keywords: ["MaxAPI", "Midjourney", "action"]
+openapi: "openapi/midjourney-en.json POST /mj/submit/action"
+---
+
+Action executes a button available on an existing Midjourney task. Retrieve the source task, then submit its `id` together with the selected button's `customId`. See [Buttons and region edits](/en/media/midjourney/actions) for the complete upscale, variation, and interactive workflows.
+
+## Select a returned button
+
+Read the saved `mj-task.json` to list button labels and action identifiers. A label may be empty; use `emoji` when displaying it. Always submit `customId`.
+
+```bash List available buttons
+jq -r '.buttons[]? | [(.label // ""), (.emoji // ""), .customId] | @tsv' mj-task.json
+```
+
+Do not submit a display label such as `U1` or `V2` as the `customId`, or copy an identifier from another task. The `taskId` and `customId` must belong to the same task.
+
+```json Request structure
+{
+  "taskId": "YOUR_SOURCE_TASK_ID",
+  "customId": "YOUR_SELECTED_BUTTON_CUSTOM_ID",
+  "state": "illustration-upscale-001"
+}
+```
+
+## Follow the correct next step
+
+| Response | Next step |
+| --- | --- |
+| Accepted or queued with a task ID | Save the new `result` and retrieve that task until the action completes |
+| `code: 21`, waiting for input | Save the returned interaction task ID, confirm its `MODAL` status, then submit [Modal](/en/api-reference/midjourney/modal) |
+| Error or no usable task ID | Read `description`; do not keep polling the old task |
+
+The action task ID may differ from the source image's ID. Store the source task, selected button, and action task together. Retrieve the action task when displaying its new image.
+
+## Diagnose an unavailable action
+
+A button may be stale, mismatched, or unsupported by the current channel. [Retrieve the source task](/en/api-reference/midjourney/fetch) again and inspect its current buttons. Keep the original task association instead of constructing a replacement `customId`.
+
+Use the source task's mode prefix for every follow-up request. A lookup through a different mode is not a reason to regenerate the original image.

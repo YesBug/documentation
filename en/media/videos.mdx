@@ -14,6 +14,19 @@ GET  https://api.maxapi.ai/v2/videos/generations/{task_id}
 
 For existing native integrations, see [video protocols](/en/media/video-providers). `/v2/videos/generations` and `/v1/videos` are different formats; changing the path alone does not translate parameters.
 
+## Define the input and expected output
+
+Text-to-video starts from a description. Image-to-video also requires reference images that match the model's input roles. Start with one main action, then describe subject, setting and camera without combining contradictory shot instructions.
+
+| Goal | Confirm first | First validation |
+| --- | --- | --- |
+| Generate one shot from text | Unified text-to-video is enabled for the model | Send only `model` and `prompt`, then save submission output |
+| Animate one image | Image-to-video support and an accessible reference URL | Use one reference and describe the desired motion |
+| Use first and last frames | Explicit support for both frame roles and their order | Do not assume any two images become first and last frames |
+| Use multiple reference subjects | Explicit support and accepted image count | Follow subject-reference rules instead of frame assumptions |
+
+Add duration, aspect ratio and other optional controls one at a time to a successful request so parameter failures remain easy to locate.
+
 ## Prepare submission fields
 
 Use Bearer authentication and a JSON body.
@@ -113,6 +126,41 @@ Common result locations include `data.video_url`, `data.output`, top-level `vide
 ```
 
 Confirm the successful state and result URL, then download and persist it from your server. Generated links may be temporary. Do not attach your MaxAPI key to arbitrary result-download domains.
+
+### Save the video file
+
+The following command targets the `status` and `data.video_url` shape shown above. If your channel uses another wrapper, adjust the extraction path from its actual response. It rejects unfinished tasks and empty URLs instead of guessing a URL from arbitrary fields.
+
+```bash Extract a URL only from a completed task
+VIDEO_URL="$(jq -er '
+  if .status != "SUCCESS" then error("Task has not succeeded")
+  else (.data.video_url | select(type == "string" and startswith("https://")))
+  end
+' video-status.json)"
+: "${VIDEO_URL:?Successful response has no usable video URL}"
+curl --fail --location --proto '=https' --proto-redir '=https' \
+  --connect-timeout 10 --max-time 300 \
+  --dump-header video-download.headers \
+  --output generated-video.download "$VIDEO_URL"
+```
+
+`--max-time 300` is an example download timeout, not a video generation duration limit. Check headers and actual format before choosing an extension. Do not deliver a JSON error or HTML page as a video. Track generation completion and asset storage separately so a download failure retries only file retrieval.
+
+### Resume after interruption
+
+Keep `video-submit.json` or the original task ID in your business record, then run the status query again. There is no need to submit a task you already have an ID for. Poll only the GET endpoint, explicitly mapping the channel's pending, successful and failed states. Follow the [async task guide](/en/guides/async-tasks) for bounded waiting and background scheduling.
+
+## Troubleshoot video integration
+
+| Symptom | Check first |
+| --- | --- |
+| `images` is rejected or images are required | Model branch, expected image count and image roles |
+| An ID exists but no video appears | Submission only confirms acceptance; use the matching query endpoint |
+| Polling never completes | State field location and case; avoid another provider's state map |
+| Success has no `data.video_url` | Inspect the actual wrapper and adapt the parser explicitly |
+| Generation succeeds but downloading fails | Query the current result link and inspect the download response |
+| The same parameters fail after changing models | Return to a minimum request, then validate duration, ratio and image fields one at a time |
+
 
 ## Handle timeouts and retries
 

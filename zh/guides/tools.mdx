@@ -33,7 +33,7 @@ keywords: ["MaxAPI", "工具调用", "tools"]
 
 示例使用本地字典模拟配送时效查询，数据仅供演示。安装 `openai` 包，设置 `MAXAPI_API_KEY`，并将 `MAXAPI_MODEL` 设为支持工具调用的模型。
 
-```python "Python：工具调用闭环"
+```python tools.py
 import json
 import os
 from openai import OpenAI
@@ -41,6 +41,8 @@ from openai import OpenAI
 client = OpenAI(
     api_key=os.environ["MAXAPI_API_KEY"],
     base_url="https://api.maxapi.ai/v1",
+    timeout=60.0,
+    max_retries=0,
 )
 tools = [{
     "type": "function",
@@ -78,8 +80,13 @@ for _ in range(4):
         tools=tools,
         tool_choice="auto",
     )
-    reply = response.choices[0].message
+    if not response.choices:
+        raise RuntimeError("响应中没有候选结果。")
+    choice = response.choices[0]
+    reply = choice.message
     if not reply.tool_calls:
+        if choice.finish_reason != "stop" or not reply.content:
+            raise RuntimeError("未得到完整回答。")
         print(reply.content)
         break
     messages.append(reply.model_dump(exclude_none=True))
@@ -93,13 +100,86 @@ else:
     raise RuntimeError("已达到工具调用轮数上限")
 ```
 
+保存为 `tools.py`，运行 `python tools.py`。如果模型选择调用演示工具，应用返回的结果是 `{"days": 2, "source": "demo"}`，随后模型会基于结果生成自然语言回答。`source: "demo"` 表示本地演示数据，不是物流服务的实时信息。四轮和 60 秒都是示例应用设置。
+
 `auto` 允许模型直接回答，因此每轮都要判断是否存在 `tool_calls`。如果业务必须使用工具，可在模型明确支持时使用相应 `tool_choice` 策略。
+
+## 可运行的 Node.js 示例
+
+安装 `openai`，设置相同环境变量，保存为 `tools.mjs` 后运行 `node tools.mjs`。此示例同样只查询内存中的演示数据。
+
+```javascript tools.mjs
+import OpenAI from "openai";
+
+const apiKey = process.env.MAXAPI_API_KEY;
+const model = process.env.MAXAPI_MODEL;
+if (!apiKey || !model) throw new Error("请设置 MAXAPI_API_KEY 和 MAXAPI_MODEL。");
+const client = new OpenAI({
+  apiKey, baseURL: "https://api.maxapi.ai/v1", timeout: 60_000, maxRetries: 0,
+});
+const tools = [{
+  type: "function",
+  function: {
+    name: "get_delivery_days",
+    description: "查询演示配送天数：east 为华东，west 为华西。",
+    parameters: {
+      type: "object",
+      properties: { region: { type: "string", enum: ["east", "west"] } },
+      required: ["region"],
+      additionalProperties: false,
+    },
+  },
+}];
+
+function runTool(call) {
+  if (call.type !== "function" || call.function.name !== "get_delivery_days") {
+    return { error: "unknown_tool" };
+  }
+  let args;
+  try { args = JSON.parse(call.function.arguments); }
+  catch { return { error: "invalid_json" }; }
+  if (!args || Array.isArray(args) || typeof args !== "object" ||
+      Object.keys(args).length !== 1 || !Object.hasOwn(args, "region")) {
+    return { error: "invalid_arguments" };
+  }
+  if (args.region !== "east" && args.region !== "west") {
+    return { error: "invalid_region" };
+  }
+  return { days: { east: 2, west: 4 }[args.region], source: "demo" };
+}
+
+const messages = [{ role: "user", content: "请查询演示数据，华东配送预计需要几天？" }];
+let completed = false;
+for (let turn = 0; turn < 4; turn++) {
+  const response = await client.chat.completions.create({
+    model, messages, tools, tool_choice: "auto",
+  });
+  const choice = response.choices[0];
+  if (!choice) throw new Error("响应中没有候选结果。");
+  const reply = choice.message;
+  if (!reply.tool_calls?.length) {
+    if (choice.finish_reason !== "stop" || !reply.content) {
+      throw new Error("未得到完整回答。");
+    }
+    console.log(reply.content);
+    completed = true;
+    break;
+  }
+  messages.push({ role: "assistant", content: reply.content, tool_calls: reply.tool_calls });
+  for (const call of reply.tool_calls) {
+    messages.push({
+      role: "tool", tool_call_id: call.id, content: JSON.stringify(runTool(call)),
+    });
+  }
+}
+if (!completed) throw new Error("已达到工具调用轮数上限。");
+```
 
 ## 响应与结果关联
 
 以下为 assistant 消息结构示意，并非实际调用结果：
 
-```json "模型提出工具调用"
+```json 模型提出工具调用
 {
   "role": "assistant",
   "content": null,

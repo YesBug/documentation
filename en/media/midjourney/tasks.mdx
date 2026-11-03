@@ -1,0 +1,146 @@
+---
+title: "Midjourney task status and callbacks"
+sidebarTitle: "Tasks and callbacks"
+description: "Distinguish submission codes from task status, handle Modal input and cancellation, retrieve results, and resume queries with a bounded polling script."
+keywords: ["Midjourney", "task queries", "MODAL", "CANCEL", "notifyHook", "callbacks"]
+---
+
+A Midjourney submission response tells you whether the request was accepted. A task query tells you how far the work has progressed. This page explains the distinction and provides a polling script you can run.
+
+## Submission codes and task status are different
+
+| Submission `code` | Meaning | Next step |
+| --- | --- | --- |
+| `1` | Accepted | Save `result` and query the task. |
+| `22` | Accepted and queued | Save `result` and query the same queued task. |
+| `21`, with an input-required description | Action needs an additional confirmation | Save the pending task ID and continue through Modal. |
+| Other result | The operation did not complete through the normal submission path | Read `description`. A nonempty `result` alone does not establish success. |
+
+The meaning of `21` can differ by operation or older response descriptions. For follow-up actions, use `description` and the queried `MODAL` status to identify the branch. Do not always treat it as “already exists” or as a normal queued submission.
+
+## Seven task states
+
+| `status` | Suggested display | Application behavior |
+| --- | --- | --- |
+| `NOT_START` | Waiting to start | Keep the task ID and continue querying. |
+| `SUBMITTED` | Submitted | Continue querying. |
+| `IN_PROGRESS` | Generating | Display `progress` and continue querying. |
+| `MODAL` | Input required | Stop waiting automatically and request the [interaction parameters](/en/media/midjourney/actions). |
+| `SUCCESS` | Complete | Read image or text results according to the task type. |
+| `FAILURE` | Failed | Stop querying and read `failReason`. |
+| `CANCEL` | Cancelled | Stop querying; do not display a successful result. |
+
+`progress` is display information, not proof of success. An `imageUrl` can appear during generation. For Describe and Shorten, primarily read `properties.finalPrompt`, plus `properties.finalZhPrompt` when present.
+
+## Wait for an existing task
+
+Set `MAXAPI_API_KEY`, `MAXAPI_MJ_BASE_URL` and `TASK_ID` as shown in the [quickstart](/en/media/midjourney). This script only queries an existing task; it does not create another one.
+
+```bash
+python3 -m pip install requests
+```
+
+Save this as `wait_for_mj.py`:
+
+```python wait_for_mj.py
+import json
+import os
+import sys
+import time
+from pathlib import Path
+from urllib.parse import quote
+
+import requests
+
+
+def wait_for_task(task_id, budget=600, interval=5):
+    base = os.environ.get("MAXAPI_MJ_BASE_URL", "https://api.maxapi.ai/mj").rstrip("/")
+    url = f"{base}/task/{quote(str(task_id), safe='')}/fetch"
+    headers = {"Authorization": f"Bearer {os.environ['MAXAPI_API_KEY']}"}
+    deadline = time.monotonic() + budget
+    while time.monotonic() < deadline:
+        response = requests.get(url, headers=headers, timeout=(10, 30))
+        response.raise_for_status()
+        task = response.json()
+        Path("mj-task.json").write_text(
+            json.dumps(task, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        status = task.get("status")
+        print(status, task.get("progress", ""))
+        if status == "SUCCESS":
+            return task
+        if status == "MODAL":
+            raise RuntimeError("Input required: submit /submit/modal with this pending task ID")
+        if status in {"FAILURE", "CANCEL"}:
+            raise RuntimeError(task.get("failReason") or f"Task ended: {status}")
+        if status not in {"NOT_START", "SUBMITTED", "IN_PROGRESS"}:
+            raise RuntimeError(f"Unknown status {status!r}; inspect mj-task.json")
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            time.sleep(min(interval, remaining))
+    raise TimeoutError("Polling budget expired; retain the ID and resume later")
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        raise SystemExit("Usage: python3 wait_for_mj.py TASK_ID")
+    completed = wait_for_task(sys.argv[1])
+    print("Completed task:", completed["id"])
+    print("Response saved to mj-task.json")
+```
+
+```bash
+python3 wait_for_mj.py "$TASK_ID"
+```
+
+The five-second interval and 600-second budget are client choices in this example. Each HTTP request also has connection and read timeouts, so the budget is not a strict wall-clock guarantee. After a timeout, run the query again with the same task ID instead of submitting another image task.
+
+## Read the correct result
+
+| Task type | Main result fields |
+| --- | --- |
+| Imagine, Blend, image selection, variations, zoom and pan | `imageUrl`, plus `buttons` for available next actions |
+| Describe | `properties.finalPrompt`; `finalZhPrompt` when a Chinese translation is available |
+| Shorten | Analysis in `properties.finalPrompt`; subsequent buttons may offer prompt selection or details |
+| Seed query | `result` in the separate endpoint response is the seed, **not a task ID** |
+
+Download images from the returned HTTPS URL without forwarding your MaxAPI Bearer key to the image host. This command first saves a file for inspection:
+
+```bash
+IMAGE_URL="$(jq -er 'select(.status == "SUCCESS") | .imageUrl | select(type == "string" and startswith("https://"))' mj-task.json)"
+: "${IMAGE_URL:?No HTTPS image URL in the successful task}"
+curl --fail --location --proto '=https' --proto-redir '=https' \
+  --connect-timeout 10 --max-time 120 \
+  --dump-header mj-image.headers \
+  --output mj-image.download "$IMAGE_URL"
+```
+
+Check the final response's `Content-Type` before renaming the file to match its actual format. Images are not always PNG. If the download fails, retry the download or query the current result URL; you do not need to regenerate the image.
+
+## Receive status callbacks
+
+Set `notifyHook` when submitting a task to receive `POST application/json` notifications at your endpoint. Progress changes as well as status changes can trigger callbacks, so one task can produce several notifications. A task-level `notifyHook` overrides the default callback address for that task.
+
+```json Example callback structure
+{
+  "id": "TASK_A",
+  "action": "IMAGINE",
+  "status": "SUCCESS",
+  "progress": "100%",
+  "imageUrl": "https://example.com/generated.png",
+  "state": "product-photo-001",
+  "buttons": []
+}
+```
+
+Match `id` to the task and `state` to your business record. Handle duplicate notifications, and prevent a delayed progress update from overwriting a completed result. Do not infer a signature algorithm, retry count or delivery order from the field name. If the notification's origin or status is uncertain, query the task with your own API key to confirm it.
+
+Use callbacks to update existing tasks. Do not automatically call Imagine again for every notification.
+
+## Batches, queues, cancellation and seeds
+
+- To query saved task IDs, use [Query by IDs](/en/api-reference/midjourney/list-by-condition), which returns a task array.
+- To inspect tasks awaiting execution, use [Queue](/en/api-reference/midjourney/queue).
+- To browse records, use [List tasks](/en/api-reference/midjourney/list) or [Paginated query](/en/api-reference/midjourney/query). Pages start at `0`; read `content` and the pagination fields.
+- To stop an unwanted task, call [Cancel task](/en/api-reference/midjourney/cancel), then query its status. A cancellation response is not an image and does not establish a refund or billing policy.
+- To retrieve a seed, use [Image seed](/en/api-reference/midjourney/seed). It depends on the channel's configuration; application users do not need to configure Discord administration parameters themselves.

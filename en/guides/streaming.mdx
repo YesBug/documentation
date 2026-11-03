@@ -1,88 +1,142 @@
 ---
-title: "Read streaming responses"
-description: "Receive MaxAPI chat output incrementally with Python, Node.js or raw SSE, and handle empty chunks, completion, cancellation and network interruptions."
-keywords: ["MaxAPI", "Read streaming responses", "API documentation"]
+title: "Streaming responses"
 sidebarTitle: "Streaming"
+description: "Read MaxAPI SSE streams with Python, Node.js, or cURL, assemble text deltas, and distinguish completion, truncation, cancellation, and connection failures."
+keywords: ["MaxAPI", "streaming", "SSE", "delta", "cancellation"]
 ---
 
-Streaming returns data while a model generates its response. For a model that supports streaming, set `stream` to `true` and read the incremental events instead of waiting for a complete JSON result.
+Streaming lets your application display text before generation finishes. Set `stream: true` on a model that supports streaming, then read deltas in order. A reliable interface also distinguishes an active generation, a completed answer, and partial content left after an interruption.
 
-## Stream with Python
+## Before you start
 
-Install `openai` and set `MAXAPI_API_KEY` and `MAXAPI_MODEL` before running this example:
+Complete a [non-streaming request](/en/quickstart) with the same model first. Install the [Python SDK](/en/guides/python) or [Node.js SDK](/en/guides/nodejs), then set `MAXAPI_API_KEY` and `MAXAPI_MODEL`.
+
+| Non-streaming | Streaming |
+| --- | --- |
+| Wait for a complete JSON response | Receive `text/event-stream` events continuously |
+| Read `choices[0].message.content` | Read `choices[0].delta.content` fragments |
+| Read `finish_reason` once | Record a nonempty `finish_reason` from chunks |
+| Failure usually leaves no complete answer | Some text may already be visible before a failure |
+
+## Python: display text and detect interruptions
+
+Save this as `stream.py`. It keeps received fragments and reports completion only after observing a normal finish reason. It closes the stream on an exception or Ctrl+C.
 
 ```python stream.py
 import os
+import sys
+import openai
 from openai import OpenAI
 
-client = OpenAI(
-    api_key=os.environ["MAXAPI_API_KEY"],
-    base_url="https://api.maxapi.ai/v1",
-)
-
-stream = client.chat.completions.create(
-    model=os.environ["MAXAPI_MODEL"],
-    messages=[{"role": "user", "content": "Write a short passage about exploration."}],
-    stream=True,
-)
+parts = []
+finish_reason = None
+stream = None
 
 try:
-    for chunk in stream:
-        if not chunk.choices:
-            continue
-        text = chunk.choices[0].delta.content
-        if text:
-            print(text, end="", flush=True)
-finally:
-    stream.close()
+    with OpenAI(
+        api_key=os.environ["MAXAPI_API_KEY"],
+        base_url="https://api.maxapi.ai/v1",
+        timeout=60.0,
+        max_retries=0,
+    ) as client:
+        stream = client.chat.completions.create(
+            model=os.environ["MAXAPI_MODEL"],
+            messages=[{"role": "user", "content": "Write a short getting-started guide for a team notes app."}],
+            stream=True,
+        )
+        try:
+            for chunk in stream:
+                if not chunk.choices:
+                    continue
+                choice = chunk.choices[0]
+                if choice.delta.content:
+                    parts.append(choice.delta.content)
+                    print(choice.delta.content, end="", flush=True)
+                if choice.finish_reason:
+                    finish_reason = choice.finish_reason
+        finally:
+            stream.close()
+    if finish_reason != "stop":
+        raise RuntimeError(f"A complete answer was not confirmed: {finish_reason}")
+    print("\nGeneration completed.", file=sys.stderr)
+except KeyboardInterrupt:
+    print("\nCanceled. The displayed content is partial.", file=sys.stderr)
+except (openai.OpenAIError, RuntimeError) as error:
+    print(f"\nStream incomplete: {type(error).__name__}; finish reason: {finish_reason}", file=sys.stderr)
+    sys.exit(1)
 
-print()
+text_received = "".join(parts)
 ```
 
-## Stream with Node.js
+```bash
+python stream.py
+```
+
+Text appears progressively. After a normal finish, standard error shows “Generation completed.” The `text_received` variable contains all received text. Use the final status to decide whether to store it as a completed answer or an unfinished draft.
+
+## Node.js: support cancellation
+
+Save this as `stream.mjs`. Ctrl+C aborts the local request without treating previously displayed fragments as a complete answer.
 
 ```javascript stream.mjs
 import OpenAI from "openai";
 
 const apiKey = process.env.MAXAPI_API_KEY;
 const model = process.env.MAXAPI_MODEL;
-if (!apiKey || !model) {
-  throw new Error("Set MAXAPI_API_KEY and MAXAPI_MODEL.");
-}
-
+if (!apiKey || !model) throw new Error("Set MAXAPI_API_KEY and MAXAPI_MODEL.");
 const client = new OpenAI({
-  apiKey,
-  baseURL: "https://api.maxapi.ai/v1",
+  apiKey, baseURL: "https://api.maxapi.ai/v1", timeout: 60_000, maxRetries: 0,
 });
+const controller = new AbortController();
+const cancel = () => controller.abort();
+process.once("SIGINT", cancel);
+const parts = [];
+let finishReason = null;
 
-const stream = await client.chat.completions.create({
-  model,
-  messages: [{ role: "user", content: "Write a short passage about exploration." }],
-  stream: true,
-});
+try {
+  const stream = await client.chat.completions.create({
+    model,
+    messages: [{ role: "user", content: "Write a short getting-started guide for a team notes app." }],
+    stream: true,
+  }, { signal: controller.signal });
 
-for await (const chunk of stream) {
-  const text = chunk.choices[0]?.delta.content;
-  if (text) process.stdout.write(text);
+  for await (const chunk of stream) {
+    const choice = chunk.choices[0];
+    if (choice?.delta.content) {
+      parts.push(choice.delta.content);
+      process.stdout.write(choice.delta.content);
+    }
+    if (choice?.finish_reason) finishReason = choice.finish_reason;
+  }
+  if (controller.signal.aborted || finishReason !== "stop") {
+    throw new Error("A complete answer was not confirmed.");
+  }
+  console.error("\nGeneration completed.");
+} catch (error) {
+  console.error("\n", controller.signal.aborted ? "Canceled; content is partial." : "Stream incomplete.",
+    "Finish reason:", finishReason);
+  process.exitCode = 1;
+} finally {
+  controller.abort();
+  process.off("SIGINT", cancel);
 }
-
-process.stdout.write("\n");
+const textReceived = parts.join("");
 ```
 
-## Understand incremental content
+```bash
+node stream.mjs
+```
 
-Read `choices[0].message.content` for a non-streaming chat result. In a chat stream, concatenate the `choices[0].delta.content` values in order.
+The 60-second value is a client timeout, not a service-wide generation limit. Cancellation stops the client from waiting; it does not establish that the server has not processed the request or that no charges apply.
 
-Some chunks contain only a role, finish state or metadata. They may have empty `choices` or no text content. Tool arguments can also arrive in fragments; assemble them before parsing JSON. See [tool calling](/en/guides/tools).
+## Inspect raw events with cURL
 
-## Read raw HTTP events
+`curl -N` disables curl's output buffering. `jq` safely builds the JSON request body.
 
-Compatible streaming endpoints use Server-Sent Events (SSE). The `-N` flag disables cURL output buffering so you can observe events arriving:
-
-```bash cURL with jq
+```bash cURL · requires jq
 jq -n --arg model "$MAXAPI_MODEL" '{
   model: $model,
-  messages: [{role: "user", content: "Write a short passage about exploration."}],
+  messages: [{role: "user", content: "Explain APIs in three sentences."}],
   stream: true
 }' | curl -N --fail-with-body https://api.maxapi.ai/v1/chat/completions \
   -H "Authorization: Bearer $MAXAPI_API_KEY" \
@@ -90,17 +144,43 @@ jq -n --arg model "$MAXAPI_MODEL" '{
   --data-binary @-
 ```
 
-Parse a raw SSE stream at event boundaries. One network chunk does not necessarily contain a whole JSON object or even a complete character. An SDK handles this framing for you.
+The following simplified SSE sequence omits other metadata. It illustrates the format and is not a recorded API response:
+
+```text
+data: {"choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}
+
+data: {"choices":[{"index":0,"delta":{"content":"An API "},"finish_reason":null}]}
+
+data: {"choices":[{"index":0,"delta":{"content":"is an interface."},"finish_reason":null}]}
+
+data: {"choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+data: [DONE]
+```
+
+Events use `data:` lines separated by blank lines. `[DONE]` is a terminal marker, not a JSON object to parse. The SDK handles SSE framing and provides parsed chunks.
 
 <Note>
-Legacy [Completions](/en/api-reference/completions) streams put text in `choices[].text`, not `delta.content`. Audio byte streaming is also different from chat SSE.
+One network read is not one SSE event. An event may span several reads, and one read may contain several events. A custom parser must decode UTF-8 incrementally and split complete events before parsing JSON. Do not call `JSON.parse` on each network chunk.
 </Note>
 
-## Connect a user interface
+## Handle chunks without text
 
-- Show a loading state until the first content arrives, then append text in order.
-- Distinguish completion, user cancellation and network interruption. Do not mark interrupted text as a complete answer.
-- Close the connection when the user cancels generation or leaves the page.
-- Check response buffering and connection timeouts in your application and its hosting path.
+- Some chunks contain only a role, finish reason, or other metadata; empty `delta.content` is normal.
+- Check `choices` before reading it because it can be empty.
+- Do not depend on chunk size or assume that a chunk is exactly one token or word.
+- The presence and fields of `usage` depend on the endpoint and model. Missing usage does not mean zero usage.
+- Tool arguments may arrive as `delta.tool_calls` fragments. Accumulate names, IDs, and arguments separately by choice and call index. Parse and execute only after a call is complete. See [tool calling](/en/guides/tools).
 
-Streaming changes when content is displayed. Model capabilities, output limits and billing still follow the selected model and console information.
+## UI states and failure handling
+
+| Situation | Application behavior |
+| --- | --- |
+| No text received yet | Show a waiting state; a role-only chunk is not an empty answer |
+| Text continues to arrive | Append in order and preserve the output so far |
+| Finish reason is `stop` | Mark the answer complete |
+| Finish reason is `length` | Mark possible truncation and offer an explicit retry or continuation |
+| User cancels | Close the connection and mark canceled while keeping visible fragments |
+| Connection closes without a finish reason | Mark incomplete; do not silently save it as a successful answer |
+
+If cURL receives text progressively but your page displays everything at once, check whether your application buffers the entire response or an intermediate proxy buffers output. Retrying an interrupted request creates a new generation. Do not append the new answer to the old one as if it resumed the original stream.

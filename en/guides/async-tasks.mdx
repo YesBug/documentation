@@ -17,6 +17,21 @@ Video, music and some image requests can take time to complete. A successful sub
 
 Associate the task ID with a business record. Refreshing a page should not submit another generation request.
 
+## Persist enough information to resume
+
+Keep the following application records so a refresh, restart or missed callback does not lose the task. These are your application's fields, not extra parameters to send to MaxAPI.
+
+| Application record | Purpose |
+| --- | --- |
+| Business record ID and owner | Locate the request and authorize access to its result |
+| Protocol, submission path and model | Select the matching query route and parser |
+| Task IDs, clip IDs or operation name | Resume queries; one generation can produce several result IDs |
+| Submission time, last query time and raw state | Show progress and identify tasks that stopped updating |
+| Latest response and failure reason | Diagnose format differences; redact keys and unnecessary sensitive input before storing |
+| Result URL in your own storage | Preserve an asset independently of temporary generation URLs |
+
+Return your business record ID to the frontend. Repeatedly opening the result view should read that record. Only an explicit new generation action should submit another API task.
+
 ## Keep protocol identifiers distinct
 
 | Protocol | Identifier from submission | Query |
@@ -43,35 +58,18 @@ Your application can normalize states, but the original values differ:
 
 These are cross-protocol examples, not an exhaustive enum for any endpoint. Preserve unknown values and investigate within a bounded waiting period. A state that is not explicitly failure is not necessarily success.
 
-## Poll with a deadline
+## Run a complete Midjourney poller
 
-Adapt `fetch_status` and `classify` to your protocol. The timing values here are application policy, not platform limits:
+[Midjourney task states and callbacks](/en/media/midjourney/tasks) includes a complete Python poller that saves the latest response, handles all seven task states, and retains the task ID for recovery after a timeout. It uses the configured Fast, Turbo, or Relax base URL and supports both image and text tasks.
 
-```python polling.py
-import random
-import time
+Midjourney `MODAL` requires user input, and `CANCEL` ends the task; neither should remain in a normal generation loop. Successful Describe / Shorten tasks return text in `properties.finalPrompt` and do not require `imageUrl`. See [Action and Modal](/en/media/midjourney/actions) for the interaction flow.
 
+### Move polling to a background worker
 
-def wait_for_task(fetch_status, classify, timeout_seconds=600):
-    deadline = time.monotonic() + timeout_seconds
-    delay = 2.0
-    while time.monotonic() < deadline:
-        # Also set connection and read timeouts inside fetch_status.
-        payload = fetch_status()
-        state = classify(payload)
-        if state == "succeeded":
-            return payload
-        if state == "failed":
-            raise RuntimeError("Task failed; inspect the redacted error details")
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            break
-        time.sleep(min(remaining, delay + random.uniform(0, 0.5)))
-        delay = min(delay * 1.5, 15.0)
-    raise TimeoutError("Waiting timed out; retain the task ID to query again later")
-```
+Closing a page should not end the business task. Schedule queries on your application backend: query once per worker execution, save the next query time, and release the worker. Stagger queries when managing many tasks.
 
-A network error differs from a failed generation task. Brief query failures may justify [bounded retries](/en/help/errors); a task already marked failed should not be polled indefinitely.
+Record query failures separately from generation failures. Retry temporary query errors after a delay; stop polling once generation explicitly fails. For HTTP `429`, honor a supplied `Retry-After` within your own waiting budget. Retrying a query must not automatically submit another generation.
+
 
 ## Handle submission timeouts
 
@@ -88,6 +86,12 @@ Some protocols provide `notifyHook`, `notify_hook` or `callback_url`. Their fiel
 - Keep polling available to recover from missing, delayed or out-of-order callbacks.
 
 Callbacks originate from a server. `localhost` and private-network-only URLs generally cannot receive them.
+
+### Handle callbacks racing with queries
+
+Locate the record by task ID and apply an atomic state update. After success has been verified and its asset stored, an older processing notification should not move the task backward. Reuse the stored asset when the same completion notification arrives again.
+
+If a notification claims completion but a query does not confirm it, retain the notification for diagnosis and continue scheduling from the query result. A callback processing failure is not a generation failure and should not automatically trigger a new submission.
 
 ## Retrieve and retain results
 

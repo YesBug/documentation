@@ -16,7 +16,7 @@ Speech 接口将文本合成为音频，适合语音播报和内容朗读。模�
 <Tabs>
 <Tab title="cURL">
 
-```bash "cURL"
+```bash cURL
 jq -n \
   --arg model "$MAXAPI_AUDIO_MODEL" \
   --arg voice "$MAXAPI_VOICE" '{
@@ -36,7 +36,7 @@ jq -n \
 
 安装 `openai` 包后，使用响应上下文将音频逐块保存，避免把整个文件一次性载入内存。
 
-```python "Python"
+```python Python
 import os
 from openai import OpenAI
 
@@ -62,7 +62,7 @@ with client.audio.speech.with_streaming_response.create(
 
 成功响应的主体是音频字节，应写入文件或交给音频播放器。它不是带有音频 URL 的普通 JSON 对象。示意：
 
-```http "成功响应结构示意"
+```http 成功响应结构示意
 HTTP/1.1 200 OK
 Content-Type: audio/mpeg
 
@@ -81,3 +81,59 @@ Content-Type: audio/mpeg
 | 需要将声音转成文字 | 使用 [语音转录与翻译](/zh/api-reference/audio-transcriptions) |
 
 鉴权、配额与限流问题见 [错误排查](/zh/help/errors)。
+
+## 选择输出格式
+
+根据播放端和后续处理方式选择模型支持的格式，不要只修改文件名。
+
+| 使用方式 | 需要确认的内容 |
+| --- | --- |
+| 下载后播放 | `response_format`、响应的 `Content-Type` 和保存扩展名一致 |
+| 边接收边写文件 | 使用 SDK 的字节流接口，连接完成后再确认文件是否完整 |
+| 在网页中播放 | 后端传递实际媒体类型；不要将二进制响应转成 JSON 字符串 |
+| 合并多段朗读 | 为每段保留顺序，使用了解该音频格式的工具合并，不要直接拼接任意文件字节 |
+
+`audio/mpeg` 常用于 MP3，其他格式可能返回不同媒体类型。`application/octet-stream` 仅表示通用二进制，仍应按请求格式与实际文件检查。
+
+## 避免将错误体保存为音频
+
+下面的 Python 标准库示例先检查 HTTP 响应和媒体类型，再写入文件。它与前面的 SDK 示例用途相同，适合排查 SDK 之外的直接 HTTP 行为。60 秒是示例客户端超时，不是平台处理时限。
+
+```python 检查响应后保存音频
+import json
+import os
+import shutil
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+payload = {
+    "model": os.environ["MAXAPI_AUDIO_MODEL"],
+    "voice": os.environ["MAXAPI_VOICE"],
+    "input": "您的订单已确认，我们会及时通知配送进度。",
+    "response_format": "mp3",
+}
+request = urllib.request.Request(
+    "https://api.maxapi.ai/v1/audio/speech",
+    data=json.dumps(payload).encode("utf-8"),
+    headers={
+        "Authorization": f"Bearer {os.environ['MAXAPI_API_KEY']}",
+        "Content-Type": "application/json",
+    },
+    method="POST",
+)
+try:
+    with urllib.request.urlopen(request, timeout=60) as response:
+        content_type = response.headers.get_content_type()
+        if not content_type.startswith("audio/") and content_type != "application/octet-stream":
+            raise ValueError(f"预期音频，实际收到 {content_type}")
+        temporary = Path("speech.part")
+        with temporary.open("wb") as file:
+            shutil.copyfileobj(response, file)
+        temporary.replace("speech.mp3")
+    print("已保存 speech.mp3")
+except urllib.error.HTTPError as error:
+    raise RuntimeError(f"语音请求失败，HTTP {error.code}；检查错误响应后再重试") from error
+```
+
+连接中断时 `.part` 文件可能是不完整音频。不要把它标记为生成成功，也不要因为前端停止播放就认定上游生成已取消。是否重试应结合实际返回和控制台记录判断。

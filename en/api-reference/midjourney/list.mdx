@@ -1,0 +1,34 @@
+---
+title: "List tasks"
+description: "Read the Midjourney task list available to the current credentials and channel, inspect task objects, and choose a suitable lookup for history or refresh."
+keywords: ["MaxAPI", "Midjourney", "list"]
+openapi: "openapi/midjourney-en.json GET /mj/task/list"
+---
+
+List tasks returns Midjourney records visible to the current credentials and channel. The response is directly a task array. It is not a cross-account platform listing or permanent history storage.
+
+## Read the list
+
+```bash Save visible tasks
+curl --fail-with-body \
+  "${MAXAPI_MJ_BASE_URL:-https://api.maxapi.ai/mj}/task/list" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  --output mj-list.json
+```
+
+```bash Inspect task summaries
+jq -r '.[] | [.id, .action, .status, (.state // "")] | @tsv' mj-list.json
+```
+
+Use `state` to help associate application records, but identify each task by `id`. Save task IDs, modes, and generated outputs in your application for longer-term use.
+
+## Choose a more specific lookup
+
+| Goal | Endpoint |
+| --- | --- |
+| Open one image's details | [Get task](/en/api-reference/midjourney/fetch) |
+| Refresh a few known tasks on screen | [Get tasks by ID list](/en/api-reference/midjourney/list-by-condition) |
+| Filter by status and show multiple pages | [Query tasks](/en/api-reference/midjourney/query) |
+| Inspect pending work | [Get the queue](/en/api-reference/midjourney/queue) |
+
+If a record is absent, check the mode prefix, task ID, and access permissions. Do not delete a locally saved result or resubmit generation solely because a listing omitted it.

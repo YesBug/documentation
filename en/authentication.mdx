@@ -84,3 +84,39 @@ For a `401` response, check that:
 - The key is still valid and belongs to the MaxAPI account you are using.
 
 If authentication succeeds but a model request fails, check [model capabilities](/en/models) and [troubleshooting](/en/help/errors).
+
+## Connect a browser application
+
+Use the flow `Browser → Your server → MaxAPI`. The browser calls your application using its own login session. Your server reads the MaxAPI key from its environment and constructs the API request. This also lets you apply per-user limits, restrict model choices and track business usage.
+
+Do not blindly forward arbitrary URLs, authorization headers or unrestricted model parameters supplied by a browser. Expose only the endpoints your application needs and validate user identity, input length and allowed parameters.
+
+The [documentation playground](/en/playground) is for manual development tests. Your product should use its own server-side credential management.
+
+## Check configuration without printing the key
+
+Environment variables affect the current process and child processes started afterward. Saving a `.env` file does not mean Python, Node.js, an IDE, a container or a hosting platform loads it automatically. Load configuration, restart the relevant service and check whether the value exists:
+
+<CodeGroup>
+```python Python
+import os
+
+print("API key configured:", bool(os.environ.get("MAXAPI_API_KEY")))
+```
+```javascript Node.js
+console.log("API key configured:", Boolean(process.env.MAXAPI_API_KEY));
+```
+</CodeGroup>
+
+A true result only confirms a nonempty value is present in the process. Verify authentication with `GET /v1/models` next; printing parts of the key is not a substitute for request verification.
+
+## Manage environments and teams
+
+| Environment | Recommended practice |
+| --- | --- |
+| Local development | Use a development key; keep personal production keys out of examples |
+| CI and deployment | Use CI secret settings and prevent command echoing or build artifacts from exposing keys |
+| Production services | Read deployment secret configuration and confirm updates reach every instance |
+| Support investigations | Share redacted requests, timestamps and response identifiers, never complete keys |
+
+If a key leaks, revoke it and update the application first, then review usage records. Deleting the plaintext from code does not revoke an exposed credential. Git history and build logs may retain old values.

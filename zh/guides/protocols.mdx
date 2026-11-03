@@ -20,7 +20,7 @@ keywords: ["MaxAPI", "选择接口格式", "protocols"]
 
 对于 `chat.completions.create` 这类 SDK 方法，库会添加 `/chat/completions`，因此 Base URL 应包含一段 `/v1`。
 
-```python "SDK 配置"
+```python SDK 配置
 import os
 from openai import OpenAI
 
@@ -70,3 +70,21 @@ JSON 请求通常使用 `Content-Type: application/json`。图像编辑、音频
 5. 对于 [扩展接口目录](/zh/api-reference/catalog) 中标记“需核对”的条目，先核对路径和请求结构再集成。
 
 新增可选字段并不表示所有模型都支持它。分辨率、时长、输出格式、上下文限制与计费方式，以所用模型和控制台说明为准。
+
+## 请求格式决定解析方式
+
+| 请求 / 响应 | 典型任务 | 客户端处理 |
+| --- | --- | --- |
+| JSON → JSON | 非流式聊天、向量、图片生成 | JSON 编码请求，检查成功状态后解析响应 |
+| JSON → SSE | 流式聊天 | 逐事件解析 `data:`，拼接增量并检查结束状态 |
+| multipart → JSON / 文本 | 图像编辑、转录、音频翻译 | 上传真实文件字节；根据 `response_format` 读取结果 |
+| JSON → 二进制 | 语音合成 | 检查状态和内容类型后保存文件，不调用 JSON 解析器 |
+| JSON → 任务对象 → 查询 | 视频、音乐、专用生成通道 | 保存协议原始 ID，按相应查询接口获取最终结果 |
+
+SDK 可以处理很多传输细节，但不能替你选出正确的模型或原生协议。如果 HTTP 请求成功而应用报 JSON 解析错误，先检查返回的究竟是 SSE、文件、文本还是错误页面。
+
+## 不同协议的消息不能直接复制
+
+OpenAI 兼容聊天使用 `messages`；原生协议可能使用不同角色、内容数组和工具声明。即使是同一份用户文本，也应按照目标契约重新组装请求和解析输出。厂商 SDK 的 Base URL 拼接规则也可能与 OpenAI SDK 不同。
+
+从已有客户端迁移时，先找到它实际调用的方法和路径，再阅读 [迁移已有应用](/zh/guides/migration)。不要把同行的协议前缀或模型别名当成 MaxAPI 配置。

@@ -1,0 +1,40 @@
+---
+title: "分页筛选任务"
+description: "使用状态、业务标记或任务 ID 筛选 Midjourney 记录，读取分页 content 与页数信息。"
+keywords: ["MaxAPI", "Midjourney", "query"]
+openapi: "openapi/midjourney-zh.json POST /mj/task/query"
+---
+
+分页查询用于构建可筛选的 Midjourney 任务历史。与列表接口不同，响应是分页对象，任务位于 `content` 数组中。
+
+## 查询第一页
+
+`pageNumber` 从 `0` 开始。下面明确请求每页 10 条，这个数值是示例选择，不代表接口默认值或最大值。
+
+```json 查询第一页成功任务
+{
+  "pageNumber": 0,
+  "pageSize": 10,
+  "sort": "id,desc",
+  "status": "SUCCESS"
+}
+```
+
+查询下一页时递增 `pageNumber`。筛选条件变更后回到第 0 页，避免沿用旧页码导致看起来没有数据。
+
+## 组合筛选条件
+
+- 用 `ids` 限定已知任务；只需要按 ID 刷新时，也可使用 [批量查询](/zh/api-reference/midjourney/list-by-condition)。
+- 用 `state` 关联提交时保存的业务标记。
+- 查询单一状态使用 `status`，多个状态使用 `statusSet`。不要依赖同时传入二者时未说明的优先级。
+- `action`、`prompt` 等字段按当前参数参考填写；不要假设字符串筛选一定支持正则表达式或模糊匹配。
+
+## 读取分页结果
+
+```bash 查看分页内容与导航信息
+jq '{number, size, totalElements, totalPages, first, last, content}' mj-page.json
+```
+
+`content` 是本页任务，`number` 是返回页码，`totalElements` 与 `totalPages` 描述当前查询结果。优先使用返回的 `last` 判断是否还有下一页；空页不等于历史中没有任何任务。
+
+单个记录中的状态与输出按 [任务查询](/zh/api-reference/midjourney/fetch) 处理。列表实时变化时，保存和合并记录仍以任务 `id` 为准，不以页码或数组位置作为任务标识。

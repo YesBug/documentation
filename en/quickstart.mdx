@@ -1,69 +1,229 @@
 ---
-title: "Get started with MaxAPI"
-description: "Create an API key, find an available model, and send your first MaxAPI chat request from a terminal before integrating a compatible application SDK."
-keywords: ["MaxAPI", "Get started with MaxAPI", "API documentation"]
-sidebarTitle: "Quickstart"
+title: "Quickstart"
+description: "Configure your key and model, make a first request with Python, Node.js or cURL, and understand the response."
+keywords: ["MaxAPI", "quickstart", "Python", "Node.js", "cURL", "API key"]
 ---
 
-Send a chat request through MaxAPI's OpenAI-compatible interface with an API key and an available model. This guide starts in your terminal and links to complete SDK examples.
+Go from environment setup to your first AI reply. By the end of this guide, you will have a minimal example that runs locally and can be moved into your application server.
 
-<Steps>
-  <Step title="Prepare an API key">
-    Sign in to the [MaxAPI console](https://platform.maxapi.ai), create an API key and confirm that your account can access the model you intend to use.
+## 1. Prepare your key and endpoint
 
-    Save the key as a server-side environment variable. Replace this placeholder with your own key:
+Sign in to the [MaxAPI console](https://platform.maxapi.ai), then create or select a development API key in key management. Confirm that your account has access and available quota for the target model. Save the key in a local environment variable.
 
-    ```bash Terminal
+| Setting | Value |
+| --- | --- |
+| API key | Your key from the MaxAPI console |
+| SDK base URL | `https://api.maxapi.ai/v1` |
+| HTTP endpoint | For example, `https://api.maxapi.ai/v1/chat/completions` |
+| Model ID | An available model for your account; query it next |
+
+<Tabs>
+  <Tab title="macOS / Linux">
+    Set the variable in the same terminal you will use to run the example:
+
+    ```bash
     export MAXAPI_API_KEY="YOUR_MAXAPI_API_KEY"
     ```
-
-    Keep your key out of browser code, public repositories and client packages. See [authentication](/en/authentication) for storage and rotation guidance.
-  </Step>
-  <Step title="Choose a model">
-    Query the models visible to your key:
-
-    ```bash List models
-    curl --fail-with-body https://api.maxapi.ai/v1/models \
-      -H "Authorization: Bearer $MAXAPI_API_KEY"
+  </Tab>
+  <Tab title="Windows PowerShell">
+    ```powershell
+    $env:MAXAPI_API_KEY="YOUR_MAXAPI_API_KEY"
     ```
 
-    Copy the exact `id` of a model suitable for text chat:
+    The Python and Node.js examples work in PowerShell. The cURL example uses Bash line continuations; on Windows, run it in WSL or Git Bash.
+  </Tab>
+</Tabs>
 
-    ```bash Set the model
-    export MAXAPI_MODEL="YOUR_CHAT_MODEL_ID"
+<Warning>
+Run these examples in a local terminal or on your server. Keep keys out of browser code, public repositories and shared screenshots. See [Authentication](/en/authentication) for storage and rotation.
+</Warning>
+
+## 2. Find and select a model ID
+
+Verify authentication and connectivity before generating content. In Bash, run:
+
+```bash
+curl --fail-with-body "https://api.maxapi.ai/v1/models" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY"
+```
+
+In PowerShell, use:
+
+```powershell
+(Invoke-RestMethod -Uri "https://api.maxapi.ai/v1/models" `
+  -Headers @{Authorization="Bearer $env:MAXAPI_API_KEY"}).data.id
+```
+
+The JSON response contains a `data` array. Choose the `id` of a model suitable for **text chat**. Use its API identifier, not its display name, and do not select an image, audio or embedding model.
+
+```json Illustrative model list
+{
+  "object": "list",
+  "data": [{"id": "YOUR_CHAT_MODEL_ID", "object": "model"}]
+}
+```
+
+`YOUR_CHAT_MODEL_ID` is a placeholder. Replace it with the actual model ID:
+
+<CodeGroup>
+```bash macOS / Linux
+export MAXAPI_MODEL="YOUR_CHAT_MODEL_ID"
+```
+```powershell Windows PowerShell
+$env:MAXAPI_MODEL="YOUR_CHAT_MODEL_ID"
+```
+</CodeGroup>
+
+A successful list response confirms this query worked. Input types, tool calling, streaming and parameter support still need to be checked for your chosen model. See [Models and capabilities](/en/models).
+
+## 3. Send your first request
+
+Choose one option. Each calls `POST /v1/chat/completions` with only `model` and `messages` so you can verify the basic integration first.
+
+<Tabs>
+  <Tab title="Python">
+    Install the SDK in your project directory:
+
+    ```bash
+    python -m pip install openai
     ```
 
-    An empty list or failed request requires checking the key, account access and returned error. Available models and their capabilities are determined by the console and live API response.
-  </Step>
-  <Step title="Send a chat request">
-    Install `jq` before running this example. It constructs JSON safely when the model ID contains special characters.
+    Save this as `hello.py`. If your system uses `python3`, use it for both installation and execution.
 
-    ```bash Create a chat response
-    jq -n --arg model "$MAXAPI_MODEL" '{
-      model: $model,
-      messages: [
-        {role: "user", content: "Introduce yourself in one sentence."}
-      ]
-    }' | curl --fail-with-body https://api.maxapi.ai/v1/chat/completions \
+    ```python hello.py
+    import os
+    from openai import OpenAI
+
+    with OpenAI(
+        api_key=os.environ["MAXAPI_API_KEY"],
+        base_url="https://api.maxapi.ai/v1",
+        timeout=60.0,
+        max_retries=0,
+    ) as client:
+        response = client.chat.completions.create(
+            model=os.environ["MAXAPI_MODEL"],
+            messages=[{"role": "user", "content": "Explain an API in one sentence."}],
+        )
+        print(response.choices[0].message.content)
+        print("finish_reason:", response.choices[0].finish_reason)
+        if response.usage:
+            print("usage:", response.usage.model_dump())
+    ```
+
+    ```bash
+    python hello.py
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    With Node.js installed, run these commands in your project directory:
+
+    ```bash
+    npm init -y
+    npm install openai
+    ```
+
+    Save this as `hello.mjs`. The `.mjs` extension enables ES module imports in Node.js.
+
+    ```javascript hello.mjs
+    import OpenAI from "openai";
+
+    if (!process.env.MAXAPI_API_KEY || !process.env.MAXAPI_MODEL) {
+      throw new Error("Set MAXAPI_API_KEY and MAXAPI_MODEL first");
+    }
+    const client = new OpenAI({
+      apiKey: process.env.MAXAPI_API_KEY,
+      baseURL: "https://api.maxapi.ai/v1",
+      timeout: 60_000,
+      maxRetries: 0,
+    });
+    const response = await client.chat.completions.create({
+      model: process.env.MAXAPI_MODEL,
+      messages: [{ role: "user", content: "Explain an API in one sentence." }],
+    });
+    console.log(response.choices[0].message.content);
+    console.log("finish_reason:", response.choices[0].finish_reason);
+    if (response.usage) console.log("usage:", response.usage);
+    ```
+
+    ```bash
+    node hello.mjs
+    ```
+  </Tab>
+  <Tab title="cURL">
+    Install `curl` and `jq`, then run this in Bash. `jq` handles JSON escaping for the model ID and text.
+
+    ```bash
+    jq -n --arg model "$MAXAPI_MODEL" \
+      '{model: $model, messages: [{role: "user", content: "Explain an API in one sentence."}]}' \
+      > request.json
+
+    curl --fail-with-body --max-time 60 \
+      "https://api.maxapi.ai/v1/chat/completions" \
       -H "Authorization: Bearer $MAXAPI_API_KEY" \
       -H "Content-Type: application/json" \
-      --data-binary @-
+      --data-binary @request.json \
+      --output response.json
     ```
 
-    In a compatible non-streaming response, generated text is in `choices[0].message.content`. The response can also include model information, a finish reason and usage. Exact fields depend on the model and response type.
-  </Step>
-  <Step title="Connect your application">
-    Set your compatible SDK's base URL to `https://api.maxapi.ai/v1` and use your MaxAPI key. You can then call `chat.completions.create`.
+    After the command succeeds, read the reply:
 
-    <Columns cols={2}>
-      <Card title="Python" icon="python" href="/en/guides/python">Create a client and handle responses and errors.</Card>
-      <Card title="Node.js" icon="node-js" href="/en/guides/nodejs">Integrate from JavaScript or TypeScript on your server.</Card>
-    </Columns>
-  </Step>
-</Steps>
+    ```bash
+    jq -r '.choices[0].message.content' response.json
+    jq '{id, model, usage, finish_reason: .choices[0].finish_reason}' response.json
+    ```
+  </Tab>
+</Tabs>
 
-## Check a failed request
+The 60-second timeout is an example client setting, not a MaxAPI response-time commitment. SDK retries are disabled for this first diagnostic call. For production behavior, see [Timeouts, rate limits and retries](/en/guides/production).
 
-Confirm that the final request URL contains `/v1` exactly once, then check your API key and model ID. Preserve the HTTP status and a redacted error response and follow [troubleshooting](/en/help/errors).
+## 4. Understand the result
 
-Continue with [streaming](/en/guides/streaming) for incremental text or [Chat Completions](/en/api-reference/chat-completions) for request fields and response schemas.
+A successful call prints text such as “An API is a set of rules that lets programs exchange data and use each other's functions.” Generated text can vary. This abbreviated response is an **illustration**, not a recorded API call.
+
+```json
+{
+  "id": "chatcmpl-example",
+  "object": "chat.completion",
+  "model": "YOUR_CHAT_MODEL_ID",
+  "choices": [{
+    "index": 0,
+    "message": {"role": "assistant", "content": "An API lets programs exchange data and use each other's functions."},
+    "finish_reason": "stop"
+  }],
+  "usage": {"prompt_tokens": 20, "completion_tokens": 22, "total_tokens": 42}
+}
+```
+
+| Field | How to use it |
+| --- | --- |
+| `choices[0].message.content` | Display generated text; tool calls and other response types may not contain plain text |
+| `choices[0].finish_reason` | Distinguish completion, truncation and tool calls; see [Text generation](/en/guides/text-generation) |
+| `id`, `model` | Record the response identifier and model for diagnosis; a response ID is not an asynchronous task ID |
+| `usage` | Observe input and output usage when available; fields can vary by response |
+
+<Check>
+If you can list models and receive a reply in `choices` from your selected text model, the basic integration works. Add streaming and application parameters next.
+</Check>
+
+## Troubleshoot the first call
+
+| Symptom | First action |
+| --- | --- |
+| `KeyError` or missing environment variable | Set variables in the terminal running the code; configure your IDE or container separately |
+| `401` | Check the key, revocation status and the space after `Bearer` |
+| `404` or an HTML response | Use `api.maxapi.ai` and include `/v1` exactly once in the SDK base URL |
+| Model not found or access denied | Check the exact ID, account permissions and endpoint type |
+| `400` | Run the minimal request first and remove any optional parameters you added |
+| `429` | Read the error body to distinguish temporary throttling from quota problems; avoid immediate repeated requests |
+| Timeout or connection failure | Test the model list, network and proxy first; a timeout does not prove the request never ran |
+
+See [Error troubleshooting](/en/help/errors) for a diagnostic process and a support report template.
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Text generation and conversations" icon="comments" href="/en/guides/text-generation">Keep history, organize messages and handle finish reasons.</Card>
+  <Card title="Streaming" icon="bolt" href="/en/guides/streaming">Display incremental output and distinguish interruption from completion.</Card>
+  <Card title="Migrate an application" icon="arrow-right-arrow-left" href="/en/guides/migration">Check base URLs, models, parameters and existing dependencies.</Card>
+  <Card title="Try endpoints online" icon="code" href="/en/playground">Use authentication, parameter and request controls in the docs.</Card>
+</Columns>

@@ -6,53 +6,95 @@ sidebarTitle: "Embeddings"
 openapi: "openapi/en.json POST /v1/embeddings"
 ---
 
-Embeddings encode text into numeric vectors. Index document fragments, then embed a query to retrieve related content for a later chat request. Use an embedding-capable model enabled for your account.
+Embeddings encode text as numeric vectors for semantic retrieval, similarity matching and knowledge bases. This page completes a small retrieval workflow: embed two documents and one question, then rank the documents by similarity. Select an embedding-capable model.
 
-## Embed a batch
+## Embed documents and a question
 
-Set `MAXAPI_EMBEDDING_MODEL` to an available embedding model. This example requires `jq`:
+Set `MAXAPI_API_KEY` and `MAXAPI_EMBEDDING_MODEL`. This `jq` example explicitly requests float arrays for similarity calculations; the selected model must support that encoding.
 
-```bash Embed two inputs
+```bash Embed three inputs
 jq -n --arg model "$MAXAPI_EMBEDDING_MODEL" '{
   model: $model,
-  input: ["How do I create an API key?", "How do I list available models?"]
+  input: [
+    "Create an API key in the MaxAPI console and load it from a server-side environment variable.",
+    "Use GET /v1/models to list model identifiers visible to the current API key.",
+    "Where do I obtain a key to access the API?"
+  ],
+  encoding_format: "float"
 }' | curl --fail-with-body https://api.maxapi.ai/v1/embeddings \
   -H "Authorization: Bearer $MAXAPI_API_KEY" \
   -H "Content-Type: application/json" \
-  --data-binary @-
+  --data-binary @- \
+  --output embeddings-response.json
 ```
 
-Remove empty text before submitting, split long documents into meaningful fragments and retain each fragment's source and position. Input lengths, batch sizes and output dimensions depend on the model.
+The third input is the query; the first two are searchable documents. Production systems usually embed documents during ingestion and embed only the query when it arrives. One batch keeps this demonstration self-contained.
 
-## Map results to inputs
+## Map results and calculate similarity
 
-Use `data[].index` to map each vector back to its input. With float encoding, vectors are in `data[].embedding`. If you request supported Base64 encoding, decode according to that encoding.
+After the command succeeds, run this Python standard-library example. It uses `data[].index` to restore input order, checks the count and dimensions, and calculates cosine similarity. Do not use array position as the input identifier.
 
-```python Read batch results
-import os
-from openai import OpenAI
+```python Local retrieval example
+import json
+import math
+from pathlib import Path
 
-client = OpenAI(
-    api_key=os.environ["MAXAPI_API_KEY"],
-    base_url="https://api.maxapi.ai/v1",
+documents = [
+    "Create an API key in the MaxAPI console and load it from a server-side environment variable.",
+    "Use GET /v1/models to list model identifiers visible to the current API key.",
+]
+result = json.loads(Path("embeddings-response.json").read_text(encoding="utf-8"))
+items = result.get("data", [])
+vectors = {item["index"]: item["embedding"] for item in items}
+if len(items) != 3 or set(vectors) != {0, 1, 2}:
+    raise ValueError("Missing or duplicate input indexes")
+if any(not isinstance(v, list) or not v for v in vectors.values()):
+    raise ValueError("Expected nonempty float arrays; check encoding_format")
+if len({len(v) for v in vectors.values()}) != 1:
+    raise ValueError("Embedding dimensions differ")
+
+def cosine(a, b):
+    norm = math.sqrt(sum(x * x for x in a) * sum(y * y for y in b))
+    if norm == 0:
+        raise ValueError("Cannot compare a zero vector")
+    return sum(x * y for x, y in zip(a, b)) / norm
+
+ranked = sorted(
+    ((cosine(vectors[2], vectors[i]), text) for i, text in enumerate(documents)),
+    reverse=True,
 )
-result = client.embeddings.create(
-    model=os.environ["MAXAPI_EMBEDDING_MODEL"],
-    input=["How do I create an API key?", "How do I list available models?"],
-)
-for item in sorted(result.data, key=lambda item: item.index):
-    print(item.index, len(item.embedding))
+for score, text in ranked:
+    print(f"{score:.4f}  {text}")
+print("Dimensions:", len(vectors[0]))
+print("Usage:", result.get("usage", {}))
 ```
 
-## Build retrieval into an application
+Results are ordered from highest to lowest score. A score compares relevance within one retrieval configuration; it is not the probability of a correct answer. Do not treat an example threshold as universal across models.
 
-1. Store document fragments with their source text and vectors.
-2. Embed the user's question with the same model and dimensions.
-3. Retrieve related fragments from your vector database.
-4. Add the retrieved text to a [chat request](/en/api-reference/chat-completions).
+## Build a knowledge base
 
-Rebuild the affected index when changing the embedding model or dimension. Vectors from different models should not be mixed even if they have the same length.
+| Stage | What your application retains or does |
+| --- | --- |
+| Split documents | Split at paragraphs or semantic boundaries and retain source, fragment ID and text |
+| Build the index | Save the vector, model ID, dimensions and your chunking version |
+| Retrieve | Embed the question using the same model and dimensions, then search the vector index |
+| Answer | Pass retrieved source text and the question to [Chat Completions](/en/api-reference/chat-completions) |
+| Update documents | Replace changed fragments and vectors, and remove stale fragments |
+
+Rebuild the relevant index when changing the model or dimensions. Vectors from different models are not interchangeable even when their lengths match. Returning embeddings does not automatically store source documents or create a knowledge base.
+
+## Batches and encoding
+
+Remove empty input. Split batches according to the model's input-length and batch limits, retaining fragment IDs for each batch so retries do not misassociate results. Configurable `dimensions` is not supported by every model.
+
+With `encoding_format: "base64"`, `embedding` is a string and cannot directly enter numeric vector calculations. Verify float output first. For encoded output, confirm the decoding expected by that model.
 
 ## Troubleshooting
 
-Empty inputs, oversized text, excessive batch size or an unsupported `dimensions` value can cause parameter errors. Start with one short text and minimal fields. For rate limits, reduce batch size and concurrency and follow [troubleshooting](/en/help/errors).
+| Symptom | Check |
+| --- | --- |
+| Invalid input | Test one short string, then inspect empty inputs, batch count and length |
+| Vector database rejects inserts | Compare actual dimensions with the index and confirm float-array output |
+| Retrieval quality drops suddenly | Check changes to model, dimensions, preprocessing or chunking |
+| A vector matches the wrong document | Map `index` to the current batch, then to your fragment ID |
+| Batches receive `429` | Reduce concurrency and batch pressure; distinguish throttling from quota failures in [troubleshooting](/en/help/errors) |

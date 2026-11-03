@@ -1,0 +1,133 @@
+---
+title: "超时、限流与重试"
+description: "为生产应用配置超时预算、并发控制和错误恢复，避免重复请求与无限重试。"
+keywords: ["MaxAPI", "超时", "限流", "429", "重试", "并发", "生产环境"]
+---
+
+基础调用成功后，应用还需要在延迟升高、请求失败和流量突增时保持可控。本页给出客户端的配置方法与处理流程；示例中的时间和并发数是应用侧选择，不是 MaxAPI 的服务限额。
+
+## 区分三种等待时间
+
+| 时间 | 发生在哪里 | 配置原则 |
+| --- | --- | --- |
+| 连接超时 | DNS、代理、TLS 或建立连接 | 尽早识别无法连接的情况，排查网络 |
+| 读取超时 | 已连接，但迟迟没有新数据 | 根据任务类型设置；长文本和媒体任务的等待方式不同 |
+| 总体截止时间 | 排队、每次请求、重试等待的总和 | 由业务决定用户最多等多久；不能只设置单次超时 |
+
+Python SDK 的超时数值以秒计，Node.js SDK 以毫秒计。反向代理、负载均衡和浏览器也可能有各自的超时；客户端设置较长，不能让中间层自动延长。
+
+<CodeGroup>
+```python Python 客户端配置
+import os
+from openai import OpenAI
+
+client = OpenAI(
+    api_key=os.environ["MAXAPI_API_KEY"],
+    base_url="https://api.maxapi.ai/v1",
+    timeout=60.0,
+    max_retries=0,
+)
+```
+```javascript Node.js 客户端配置
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: process.env.MAXAPI_API_KEY,
+  baseURL: "https://api.maxapi.ai/v1",
+  timeout: 60_000,
+  maxRetries: 0,
+});
+```
+</CodeGroup>
+
+这里关闭 SDK 自动重试，便于让应用统一决定恢复策略。如果选择由 SDK 重试，先检查所安装版本的行为与重试次数，不要再叠加一层没有预算的应用重试。
+
+## 先判断是否值得重试
+
+| 情况 | 推荐处理 |
+| --- | --- |
+| `400`、参数或上下文错误 | 修改输入后再发；重复同一个请求通常无法解决 |
+| `401`、`403` | 检查密钥、权限和账户配置 |
+| `404` | 检查完整路径、协议与模型标识 |
+| `429`，正文表明暂时限流 | 降低发起速率，按响应给出的等待提示退避 |
+| `429`，正文表明额度或计费问题 | 停止自动重试，先处理账户问题 |
+| 暂时性 `5xx` | 在总预算内有限重试；生成类请求先考虑重复执行的影响 |
+| 请求超时或连接中断 | 结果不确定；可能已经开始处理，不能等同于服务端取消 |
+| 流式请求已输出部分文本 | 保留并标记部分结果；不要自动把新一轮生成拼到旧内容后面 |
+| 异步任务已经拿到 ID | 继续查询原任务，避免重新提交生成任务 |
+
+如果返回 `Retry-After`，按照有效的秒数或 HTTP 日期至少等待到指定时间。没有可用提示时，可以使用指数退避并加入随机延迟，例如应用自行选定的 `1s → 2s → 4s` 基础间隔。还要同时限制尝试次数和总等待时间；服务端要求等待的时间超过业务预算时，应停止或转入队列，而不是提前重试。
+
+<Note>
+`Retry-After` 并非每次错误都会返回。也不要假设添加 `Idempotency-Key` 就能避免重复生成；只有接口明确支持时才能依赖这种语义。
+</Note>
+
+## 控制并发与排队
+
+并发数表示同时进行的请求数量，调用速率表示单位时间发起多少请求。即使并发很低，快速请求仍可能触发限流；生产应用通常需要同时控制并发、排队长度和发起速率。
+
+下面是一个小批量处理示例。先按 [快速开始](/zh/quickstart) 安装 Python SDK 并设置环境变量，保存为 `batch.py`，运行 `python batch.py`。它最多同时发起两个请求，保留每项结果或失败类型，不自动重发失败项。
+
+```python batch.py
+import asyncio
+import os
+from openai import AsyncOpenAI, APIConnectionError, APIStatusError
+
+async def main():
+    limit = asyncio.Semaphore(2)  # 应用示例值，按实测调整
+    prompts = ["用一句话解释 API。", "用一句话解释 JSON。", "用一句话解释 HTTPS。"]
+
+    async with AsyncOpenAI(
+        api_key=os.environ["MAXAPI_API_KEY"],
+        base_url="https://api.maxapi.ai/v1",
+        timeout=60.0,
+        max_retries=0,
+    ) as client:
+        async def run_one(index, prompt):
+            async with limit:
+                try:
+                    response = await client.chat.completions.create(
+                        model=os.environ["MAXAPI_MODEL"],
+                        messages=[{"role": "user", "content": prompt}],
+                    )
+                    if not response.choices:
+                        return {"index": index, "error": "invalid_response"}
+                    return {"index": index, "text": response.choices[0].message.content,
+                            "response_id": response.id}
+                except APIStatusError as exc:
+                    return {"index": index, "error": "http", "status": exc.status_code}
+                except APIConnectionError:
+                    return {"index": index, "error": "connection_or_timeout"}
+
+        for result in await asyncio.gather(*(run_one(i, p) for i, p in enumerate(prompts))):
+            print(result)
+
+asyncio.run(main())
+```
+
+该示例会产生三次实际生成调用。大批量任务应使用有界队列或固定 worker 数量，避免一次性为所有输入创建协程；多实例部署还需要跨实例协调流量。
+
+## 监控哪些信息
+
+建议按接口与模型记录以下指标，先建立正常流量基线，再决定告警阈值：
+
+| 信息 | 用途 |
+| --- | --- |
+| 请求时间、耗时、HTTP 状态、模型 ID | 判断错误是否集中在某模型、时段或接口 |
+| 响应 ID；服务端返回的请求追踪标识（若有） | 关联支持排查信息 |
+| `finish_reason`、流式是否完整结束 | 区分完整成功、截断、工具调用与中断 |
+| 首段延迟、完整响应耗时 | 分别衡量交互体验与整体吞吐 |
+| `usage`（若有）、实际计费记录 | 分析输入输出增长与成本 |
+| 重试次数、排队时长、在途请求数 | 识别重试放大和持续积压 |
+
+不要把完整 Authorization、上传文件、签名下载地址或用户原始对话默认写入日志。保留业务请求 ID 和必要的脱敏诊断信息即可。
+
+## 上线前走一遍恢复流程
+
+1. 用最小请求验证正式环境的域名、密钥、模型和网络。
+2. 用模拟响应验证 `401`、`429`、`5xx`、超时和空回复的应用处理，不需要通过大量真实请求制造错误。
+3. 对流式输出主动取消一次，确认 UI 不会把中断当作完整成功。
+4. 对异步任务模拟进程重启，确认能用已保存的任务 ID 继续查询。
+5. 限制用户重复点击，记录应用侧操作 ID；这不能替代服务端幂等保证。
+
+继续阅读 [错误排查](/zh/help/errors)、[流式响应](/zh/guides/streaming) 与 [异步任务](/zh/guides/async-tasks)。SDK 自动重试的通用行为可参考 [OpenAI 官方重试说明](https://developers.openai.com/api/docs/guides/rate-limits#retrying-with-exponential-backoff)；MaxAPI 的实际限额以账户配置与接口结果为准。

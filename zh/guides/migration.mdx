@@ -1,0 +1,94 @@
+---
+title: "迁移已有应用"
+description: "将已有 OpenAI 兼容应用接入 MaxAPI，逐项核对地址、密钥、模型和参数，并验证完整业务流程。"
+keywords: ["MaxAPI", "迁移", "OpenAI 兼容", "Base URL", "第三方客户端"]
+---
+
+如果你的应用已经使用 OpenAI 兼容的 Chat Completions 接口，通常可以保留 SDK 和消息结构，替换连接配置后逐项验证。兼容的请求格式不代表所有模型或上游功能都相同。
+
+## 先确认应用实际调用的接口
+
+查看代码中的 SDK 方法或脱敏后的请求路径。`client.chat.completions.create()` 对应 `/v1/chat/completions`；`client.responses.create()` 使用另一套请求和事件结构，不能仅替换地址就视为已完成迁移。
+
+| 原应用使用的功能 | 迁移时核对 |
+| --- | --- |
+| Chat Completions | Base URL、模型 ID、消息角色、可选参数 |
+| Embeddings | 嵌入模型、维度、输出编码；换模型后重新评估已有向量索引 |
+| 图片生成或编辑 | 图像模型、JSON / multipart、URL / Base64 输出 |
+| 音频 | 对应模型、上传类型、返回格式及二进制处理 |
+| Responses、Assistants、文件管理或厂商原生 SDK | 单独核对路由与契约；不要用 Chat Completions 的兼容性作保证 |
+| 视频、音乐和其他异步生成 | 提交与查询必须属于同一协议，保留原始任务 ID |
+
+本项目的常用接口契约见 [API 参考](/zh/api-reference/index)。扩展目录中的结构记录不等于当前账户已开通该接口。
+
+## 替换三个连接配置
+
+| 配置 | MaxAPI 配置 |
+| --- | --- |
+| API Key | MaxAPI 控制台创建的密钥 |
+| Base URL | `https://api.maxapi.ai/v1` |
+| Model | MaxAPI 当前账户实际可用的模型 ID |
+
+<CodeGroup>
+```python Python
+import os
+from openai import OpenAI
+
+client = OpenAI(
+    api_key=os.environ["MAXAPI_API_KEY"],
+    base_url="https://api.maxapi.ai/v1",
+)
+```
+```javascript Node.js
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: process.env.MAXAPI_API_KEY,
+  baseURL: "https://api.maxapi.ai/v1",
+});
+```
+</CodeGroup>
+
+`MAXAPI_API_KEY` 是这些示例主动读取的变量名，SDK 不会因为变量名里含有 MaxAPI 就自动加载它。使用第三方客户端时，按照该客户端自己的变量名称或界面字段配置。
+
+## 第三方客户端怎么填
+
+在支持自定义 OpenAI 兼容提供商的客户端中，依次填写：
+
+1. 选择 OpenAI 兼容类型或自定义提供商。
+2. 填入 MaxAPI 的 API Key。
+3. 如果字段叫“Base URL”并由客户端追加接口路径，填写 `https://api.maxapi.ai/v1`。
+4. 如果明确要求“完整接口地址”，填写 `https://api.maxapi.ai/v1/chat/completions`。
+5. 设置准确的模型 ID，发送一条短文本测试。
+
+字段名和路径拼接规则因客户端而异。若出现 `/v1/v1/`、`/chat/completions/chat/completions` 或请求落到控制台网页，先修正地址；不要通过反复更换密钥解决路径错误。
+
+## 逐层验证，定位兼容差异
+
+<Steps>
+  <Step title="最小文本请求">
+    先运行 [快速开始](/zh/quickstart)，只传 `model` 和 `messages`。确认域名、鉴权、模型和基础响应解析。
+  </Step>
+  <Step title="恢复参数">
+    逐个恢复输出长度、采样和业务参数。记录在哪一步开始失败，核对目标模型支持范围。不要照搬旧模型的默认值和上限。
+  </Step>
+  <Step title="恢复高级能力">
+    分别验证图片输入、工具调用、流式响应。工具调用要走完执行函数和回传结果的闭环；流式要检查空分片、结束状态与中断。
+  </Step>
+  <Step title="验证错误与运维">
+    核对异常类型、超时、自动重试、日志脱敏和成本观察。用模拟失败覆盖错误分支，再逐步放量。
+  </Step>
+</Steps>
+
+## 常见迁移问题
+
+| 现象 | 常见原因与处理 |
+| --- | --- |
+| 模型列表可见，但聊天失败 | 模型类型不符、调用权限或参数支持不同；从最小请求开始 |
+| `temperature` 等参数报错 | 当前模型不接受原来的字段或值，按模型说明删减或调整 |
+| 只拿到空文本 | 检查 `tool_calls`、结束原因和实际响应，不只读取一个字段 |
+| 非流式正常、流式卡住 | 检查代理缓冲、SSE 解析、读超时和前端刷新逻辑 |
+| 向量检索质量下降 | 不同模型生成的向量空间不能直接混用，维度相同也不代表兼容 |
+| 第三方工具仍请求旧地址 | 检查该工具的配置优先级、进程环境和是否需要重启 |
+
+保留原服务的配置回滚路径，使用固定的一组代表性输入比较正确性、延迟和用量。模型返回措辞可能变化，验收应围绕业务结果，不要求逐字一致。

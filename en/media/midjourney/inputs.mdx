@@ -1,0 +1,177 @@
+---
+title: "Midjourney image inputs and prompts"
+sidebarTitle: "Images and prompts"
+description: "Use copyable Python and cURL examples for reference-image generation, Blend, Describe and Shorten, and read the correct image or text result."
+keywords: ["MaxAPI", "Midjourney", "Blend", "Describe", "Shorten", "base64Array", "image to prompt"]
+---
+
+Midjourney provides four input workflows: Imagine generates images from text and optional references; Blend combines images; Describe suggests prompts from an image; Shorten analyzes and simplifies a prompt. All initially return a task ID, but the fields you read after completion differ.
+
+## Choose the right endpoint
+
+| Input and goal | Endpoint | Main input | Read after completion |
+| --- | --- | --- | --- |
+| Generate from text, with optional reference images | Imagine | `prompt`, optional `base64Array` | `imageUrl`, `buttons` |
+| Combine 2 to 5 images without a text prompt | Blend | `base64Array` | `imageUrl`, `buttons` |
+| Suggest prompts from an image | Describe | A single image in `base64` | `properties.finalPrompt`, `buttons` |
+| Analyze and shorten an existing prompt | Shorten | `prompt` | `properties.finalPrompt`, `buttons` |
+
+To include text instructions when combining images, use Imagine with reference images. Do not add an undefined `prompt` field to Blend.
+
+## Encode image inputs
+
+These examples use PNG files encoded as complete Data URIs:
+
+```text
+data:image/png;base64,<BASE64_ENCODED_IMAGE_BYTES>
+```
+
+For JPEG, use the prefix `data:image/jpeg;base64,` and encode the corresponding JPEG file's bytes. **Do not Base64-encode an image URL, file path or an already-prefixed Data URI.** Placeholders in this documentation are not valid images to submit.
+
+The examples use Python 3 to read local files and write JSON, then send it with `curl`. This avoids pasting long image strings into a terminal or breaking JSON with quotes and line breaks.
+
+Set `MAXAPI_API_KEY` and `MAXAPI_MJ_BASE_URL` as shown in the [quickstart](/en/media/midjourney). Each workflow below runs independently. Run its `curl` command only after the script successfully creates the request file.
+
+## Reference image plus text: Imagine
+
+Place `reference.png` in your current directory. `base64Array` is an array, and `prompt` remains required.
+
+```bash Build an Imagine request
+python3 - <<'PY'
+import base64
+import json
+from pathlib import Path
+
+image = base64.b64encode(Path("reference.png").read_bytes()).decode("ascii")
+payload = {
+    "botType": "MID_JOURNEY",
+    "prompt": "A ceramic cup inspired by the reference, on a light wooden desk, natural window light",
+    "base64Array": [f"data:image/png;base64,{image}"],
+    "state": "reference-photo-001"
+}
+Path("mj-imagine-request.json").write_text(json.dumps(payload), encoding="utf-8")
+PY
+```
+
+```bash
+curl --fail-with-body "$MAXAPI_MJ_BASE_URL/submit/imagine" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @mj-imagine-request.json \
+  --output mj-submit.json
+```
+
+After acceptance, save `result` and follow the [task-query workflow](/en/media/midjourney/tasks) until success, then read the image and buttons. Reference images influence generation; they do not guarantee a pixel-for-pixel copy or an edit limited to one region. To modify a specific area, see [Region editing](/en/media/midjourney/actions#region-editing).
+
+## Combine images: Blend
+
+Prepare `reference-a.png` and `reference-b.png`. Blend combines the visual content of 2 to 5 images. Choose the output aspect ratio with `dimensions`.
+
+| `dimensions` | Output aspect ratio |
+| --- | --- |
+| `PORTRAIT` | 2:3, portrait |
+| `SQUARE` | 1:1, square |
+| `LANDSCAPE` | 3:2, landscape |
+
+```bash Build a Blend request
+python3 - <<'PY'
+import base64
+import json
+from pathlib import Path
+
+files = ["reference-a.png", "reference-b.png"]
+images = [
+    "data:image/png;base64," + base64.b64encode(Path(name).read_bytes()).decode("ascii")
+    for name in files
+]
+payload = {"base64Array": images, "dimensions": "SQUARE", "state": "blend-001"}
+Path("mj-blend-request.json").write_text(json.dumps(payload), encoding="utf-8")
+PY
+```
+
+```bash
+curl --fail-with-body "$MAXAPI_MJ_BASE_URL/submit/blend" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @mj-blend-request.json \
+  --output mj-submit.json
+```
+
+This is also asynchronous generation. Handle the submission code, save `result`, and wait for `SUCCESS` before reading `imageUrl`. Use this task's own `buttons` for further actions on its result.
+
+## Suggest prompts from an image: Describe
+
+Describe accepts one image in the singular field **`base64`**. This example reuses `reference.png` in the current directory:
+
+```bash Build a Describe request
+python3 - <<'PY'
+import base64
+import json
+from pathlib import Path
+
+image = base64.b64encode(Path("reference.png").read_bytes()).decode("ascii")
+payload = {"base64": f"data:image/png;base64,{image}", "state": "describe-001"}
+Path("mj-describe-request.json").write_text(json.dumps(payload), encoding="utf-8")
+PY
+```
+
+```bash
+curl --fail-with-body "$MAXAPI_MJ_BASE_URL/submit/describe" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @mj-describe-request.json \
+  --output mj-submit.json
+```
+
+Save the task ID from the submission result and query until `SUCCESS`. Read `properties.finalPrompt` instead of waiting for a newly generated image URL. Example structure:
+
+```json
+{
+  "id": "DESCRIBE_TASK",
+  "action": "DESCRIBE",
+  "status": "SUCCESS",
+  "properties": {
+    "finalPrompt": "1. A ceramic cup on a wooden desk...\n2. Soft daylight illuminating handmade pottery..."
+  },
+  "buttons": [
+    {"label": "1", "customId": "COPY_THE_ACTUAL_CUSTOM_ID_FROM_THIS_TASK"}
+  ]
+}
+```
+
+`finalPrompt` is a **string** containing the descriptions; do not assume it is a JSON array. Some channels also return a translated string in `properties.finalZhPrompt`.
+
+```bash Read the completed task's text
+jq -r '.properties.finalPrompt // empty' mj-task.json
+jq -r '.properties.finalZhPrompt // empty' mj-task.json
+```
+
+If you only need suggested prompts, stop here. To generate an image from one suggestion, choose its returned button and follow **Action → Modal prompt confirmation → image-task query**. Alternatively, send the selected text as `prompt` in a new Imagine request. Both approaches create a new generation task.
+
+## Analyze a prompt: Shorten
+
+Shorten analyzes words and emphasis in your prompt and suggests shorter alternatives. It accepts `prompt`, with no image input:
+
+```bash
+curl --fail-with-body "$MAXAPI_MJ_BASE_URL/submit/shorten" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data '{
+    "prompt": "A beautifully handcrafted ceramic coffee cup with delicate blue patterns on a bright wooden table, soft natural morning sunlight, detailed product photography",
+    "state": "shorten-001"
+  }' \
+  --output mj-submit.json
+```
+
+Save `result`, query until success, and read the analysis and suggestions in `properties.finalPrompt`. This is not a completed image-generation task. To use a shortened prompt, choose an actual returned button and continue through [Action and Modal](/en/media/midjourney/actions). If a button offers more details, handle its actual business response accordingly.
+
+## Use the common optional fields
+
+| Field | Purpose | Guidance |
+| --- | --- | --- |
+| `botType` | Select `MID_JOURNEY` or `NIJI_JOURNEY` | Follow the chosen endpoint's parameters and channel availability. |
+| `notifyHook` | Set this task's callback address | Use an HTTPS endpoint reachable by the service; see [Callback format](/en/media/midjourney/tasks#receive-status-callbacks). |
+| `state` | Link the task to your business record | For example, `order-001`; this does not replace the task ID. |
+| `accountFilter` | Select channel accounts by instance, mode and Remix configuration | Usually optional. It is not a model parameter and does not change account settings. |
+
+For complete fields, required inputs and response structures, see [Imagine](/en/api-reference/midjourney/imagine), [Blend](/en/api-reference/midjourney/blend), [Describe](/en/api-reference/midjourney/describe) and [Shorten](/en/api-reference/midjourney/shorten). Image-size, model-version and channel limits depend on the current endpoint response and account configuration. Do not copy fields such as `size`, `model` or `response_format` from other image APIs into these requests.

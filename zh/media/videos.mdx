@@ -6,12 +6,25 @@ keywords: ["MaxAPI", "统一视频接口", "videos"]
 
 统一视频格式使用同一组提交和查询路由，模型通过 `model` 指定。它适用于已支持该格式的视频渠道；可用模型、图像输入方式和可选参数需在 [控制台](https://platform.maxapi.ai) 确认。
 
-```http "Endpoints"
+```http Endpoints
 POST https://api.maxapi.ai/v2/videos/generations
 GET  https://api.maxapi.ai/v2/videos/generations/{task_id}
 ```
 
 如果你的应用已经使用厂商原生请求体，先查看 [视频专用协议](/zh/media/video-providers)。`/v2/videos/generations` 与 `/v1/videos` 是不同接口格式，不能只替换路径后复用全部参数。
+
+## 先确定输入与输出目标
+
+文生视频从文字描述生成画面；图生视频还要求参考图与模型支持的输入角色匹配。对一条请求先固定一个主要动作，再描述主体、场景和镜头，避免把互相冲突的镜头要求放进同一段提示词。
+
+| 场景 | 提交前确认 | 首次验证建议 |
+| --- | --- | --- |
+| 文字生成一个镜头 | 模型支持统一格式的文生视频 | 只传 `model` 和 `prompt`，保存任务响应 |
+| 让一张图动起来 | 模型支持图生视频，图片地址可访问 | 先使用一张参考图，描述希望发生的动作 |
+| 使用首尾两帧 | 模型明确支持首尾帧，图片顺序符合要求 | 不要把任意两张图自动理解为首帧与尾帧 |
+| 多个角色或主体参考 | 模型明确支持参考主体及对应图片数量 | 按模型要求组织图片，不复用首尾帧假设 |
+
+把时长、比例和其他可选控制项逐个加入已经成功的请求。这样出现参数错误时，可以定位到新加入的字段。
 
 ## 提交任务
 
@@ -32,7 +45,7 @@ GET  https://api.maxapi.ai/v2/videos/generations/{task_id}
 
 下面示例适用于已确认支持文生视频的统一格式模型。将 `MAXAPI_VIDEO_MODEL` 设置为该模型的准确 ID。
 
-```bash "提交并保存响应"
+```bash 提交并保存响应
 : "${MAXAPI_VIDEO_MODEL:?请设置支持统一文生视频格式的模型 ID}"
 jq -n --arg model "$MAXAPI_VIDEO_MODEL" '{
   model: $model,
@@ -48,7 +61,7 @@ jq -n --arg model "$MAXAPI_VIDEO_MODEL" '{
 
 把 `MAXAPI_IMAGE_URL` 设置为你有权使用、且生成服务能够访问的参考图 URL。参考图数量和用途以模型要求为准。
 
-```bash "携带一张参考图"
+```bash 携带一张参考图
 : "${MAXAPI_IMAGE_URL:?请设置可访问的参考图 URL}"
 jq -n --arg model "$MAXAPI_VIDEO_MODEL" --arg image "$MAXAPI_IMAGE_URL" '{
   model: $model,
@@ -65,13 +78,13 @@ jq -n --arg model "$MAXAPI_VIDEO_MODEL" --arg image "$MAXAPI_IMAGE_URL" '{
 
 本例处理提交响应以顶层 `task_id` 返回标识的统一视频分支。部分统一格式的 Wan 示例使用 `id` 与 `output.task_id`；接入这类分支时应先确认它们与查询接口的对应关系，再明确修改解析代码。不要将其他协议的任意 `id` 自动送到此查询路由。
 
-```json "任务标识示意"
+```json 任务标识示意
 {
   "task_id": "your-task-id"
 }
 ```
 
-```bash "提取并检查任务 ID"
+```bash 提取并检查任务 ID
 TASK_ID="$(jq -er '.task_id // empty' video-submit.json)"
 : "${TASK_ID:?响应中没有任务 ID，请检查错误详情}"
 ```
@@ -82,7 +95,7 @@ TASK_ID="$(jq -er '.task_id // empty' video-submit.json)"
 
 任务 ID 可能包含冒号等字符。将它编码为路径片段后再查询，避免直接拼接特殊字符。
 
-```bash "查询一次任务状态"
+```bash 查询一次任务状态
 TASK_ID_ESCAPED="$(printf '%s' "$TASK_ID" | jq -sRr @uri)"
 curl --fail-with-body \
   "https://api.maxapi.ai/v2/videos/generations/$TASK_ID_ESCAPED" \
@@ -104,7 +117,7 @@ curl --fail-with-body \
 
 成功响应的常见结果字段包括 `data.video_url`、`data.output` 或顶层 `video_url`、`url`。下面只示意一种结构：
 
-```json "成功响应关键字段示意"
+```json 成功响应关键字段示意
 {
   "task_id": "your-task-id",
   "status": "SUCCESS",
@@ -116,6 +129,41 @@ curl --fail-with-body \
 ```
 
 确认成功状态和结果地址后，由服务端下载并保存到自己的存储。不要把临时生成地址当作永久资源地址，也不要向任意结果下载域名附带 MaxAPI 密钥。
+
+### 保存视频文件
+
+以下命令对应上面展示的 `status` 与 `data.video_url` 结构。若你的渠道返回另一种包装层，先按实际响应修改提取路径。命令会拒绝未完成的任务与空地址，不会在任意字段中猜测一个 URL。
+
+```bash 仅从成功任务提取视频地址
+VIDEO_URL="$(jq -er '
+  if .status != "SUCCESS" then error("任务尚未成功")
+  else (.data.video_url | select(type == "string" and startswith("https://")))
+  end
+' video-status.json)"
+: "${VIDEO_URL:?成功响应中没有可用的视频地址}"
+curl --fail --location --proto '=https' --proto-redir '=https' \
+  --connect-timeout 10 --max-time 300 \
+  --dump-header video-download.headers \
+  --output generated-video.download "$VIDEO_URL"
+```
+
+`--max-time 300` 是示例的文件下载等待上限，不是视频生成时长限制。检查响应头与文件实际格式后再保存为对应扩展名；JSON 错误页或 HTML 页面不能作为视频交付。应用可以把“生成完成”和“文件已保存”分成两个内部步骤，下载失败时仅重试后者。
+
+### 中断后恢复
+
+保存 `video-submit.json` 或业务记录中的原任务 ID，然后重新执行“查询状态”。已经有任务 ID 时，无需重新执行“提交任务”。轮询也只重复 GET 查询：为你的渠道明确映射等待、成功、失败状态，并使用 [异步任务指南](/zh/guides/async-tasks) 的有限等待与后台调度方式。
+
+## 常见问题
+
+| 现象 | 优先检查 |
+| --- | --- |
+| `images` 报错，或模型要求图片 | 当前模型是否为图生视频分支、图片数量与含义是否正确 |
+| 已拿到任务 ID，但没有视频 | 提交只代表受理，继续调用同一协议的查询接口 |
+| 轮询程序一直等待 | 原始状态字段的位置和大小写；不要直接套用另一个厂商的状态表 |
+| 返回成功，却找不到 `data.video_url` | 检查实际响应包装层，再明确调整解析器 |
+| 视频生成成功，但文件下载失败 | 查询最新结果链接，检查链接有效性与文件下载响应 |
+| 修改了模型后相同参数不再可用 | 回到最小请求，逐一验证时长、比例和参考图字段 |
+
 
 ## 超时、失败与重试
 

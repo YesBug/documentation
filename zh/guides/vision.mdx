@@ -1,100 +1,173 @@
 ---
 title: "视觉理解"
-description: "通过图片 URL 或 Base64 图片，让视觉模型描述、读取与比较图像。"
-keywords: ["MaxAPI", "视觉理解", "vision"]
+description: "通过 MaxAPI 分析图片直链或本地图片，构建文字与图片消息，运行 Python 和 Node.js 示例，并排查下载与编码问题。"
+keywords: ["MaxAPI", "视觉理解", "图片输入", "Base64", "多模态", "image_url"]
 ---
 
-支持视觉的模型可以在 [Chat Completions](/zh/api-reference/chat-completions) 中接收文字与图片，完成图像描述、截图分析或文字识别。使用前，先确认账户所选模型与通道支持图片输入。
+视觉模型可以在 Chat Completions 中接收图片，完成图片描述、截图分析或文字提取。本页分别演示图片直链和本地文件的接入方式；输出仍是对话文本，需要生成图片时请使用[图像生成接口](/zh/api-reference/images)。
 
-```http "Endpoint"
-POST https://api.maxapi.ai/v1/chat/completions
+## 选择图片传入方式
+
+先将 `MAXAPI_MODEL` 设置为账户可访问且支持图片输入的模型。模型列表中可见的 ID 不一定具备视觉能力。
+
+| 方式 | 适用场景 | 准备工作 |
+| --- | --- | --- |
+| HTTPS 图片直链 | 图片已经托管到可访问的存储中 | 确保服务端无需登录即可读取，链接在请求处理期间有效 |
+| Base64 data URL | 图片保存在本地，或不便单独开放链接 | 读取文件字节，使用匹配的 MIME 类型编码后放入请求 |
+
+直链可减少请求体中的图片数据，但服务端需要额外下载。Base64 会增大请求体。支持的图片格式、数量、分辨率、文件大小与细节等级取决于所选模型，不应套用所有模型通用的数值限制。
+
+## 图片消息的结构
+
+把用户消息的 `content` 从字符串改成数组，文字与每张图片分别占一项：
+
+```json 消息结构示意
+{
+  "role": "user",
+  "content": [
+    {"type": "text", "text": "描述截图中的主要功能，并列出看得清的按钮文字。"},
+    {"type": "image_url", "image_url": {"url": "YOUR_IMAGE_URL_OR_DATA_URL"}}
+  ]
+}
 ```
 
-## 图片消息格式
+`image_url` 是包含 `url` 的对象，不是字符串。将图片网址写在普通文本中，不能替代图片内容项。部分模型支持 `image_url.detail` 的 `auto`、`low` 或 `high` 值；确认模型支持后再添加，首次验证可省略。
 
-把用户消息的 `content` 从字符串改为内容数组。文字与图片分别作为一个内容项放入数组。
+## 使用图片直链
 
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `model` | `string` | 是 | 具有视觉能力的模型 ID |
-| `messages` | `array` | 是 | 对话消息列表 |
-| `messages[].role` | `string` | 是 | 这里使用 `user` |
-| `messages[].content` | `array` | 是 | 文字与图片内容项 |
-| 文本项的 `type` | `string` | 是 | 固定为 `text` |
-| 文本项的 `text` | `string` | 是 | 对图片提出的问题 |
-| 图片项的 `type` | `string` | 是 | 固定为 `image_url` |
-| 图片项的 `image_url.url` | `string` | 是 | 可访问的图片 URL，或完整的 Base64 data URL |
-| 图片项的 `image_url.detail` | `string` | 否 | 部分模型支持的细节等级，例如 `auto`、`low`、`high` |
+设置 `MAXAPI_API_KEY`、`MAXAPI_MODEL`，并将 `MAXAPI_IMAGE_URL` 设为你准备的 HTTPS 图片直链。以下命令需要 `jq`。
 
-图片数量、尺寸、格式和细节等级因模型而异。不要把图片 URL 直接放进普通文本，或把 `image_url` 写成字符串；它是包含 `url` 字段的对象。
+```bash URL 图片请求
+export MAXAPI_IMAGE_URL="替换为可访问的 HTTPS 图片直链"
 
-## 使用图片 URL
-
-设置 `MAXAPI_API_KEY`、视觉模型 `MAXAPI_MODEL`，并将 `MAXAPI_IMAGE_URL` 设为你准备的图片直链。示例使用 `jq` 构造 JSON。
-
-```bash "cURL"
-jq -n \
-  --arg model "$MAXAPI_MODEL" \
-  --arg image "$MAXAPI_IMAGE_URL" '{
-    model: $model,
-    messages: [{
-      role: "user",
-      content: [
-        {type: "text", text: "请描述这张图片，并列出可以辨认的文字。"},
-        {type: "image_url", image_url: {url: $image}}
-      ]
-    }]
-  }' | curl --fail-with-body https://api.maxapi.ai/v1/chat/completions \
+jq -n --arg model "$MAXAPI_MODEL" --arg image "$MAXAPI_IMAGE_URL" '{
+  model: $model,
+  messages: [{
+    role: "user",
+    content: [
+      {type: "text", text: "描述截图中的主要功能，并列出看得清的按钮文字。"},
+      {type: "image_url", image_url: {url: $image}}
+    ]
+  }]
+}' | curl --fail-with-body https://api.maxapi.ai/v1/chat/completions \
   -H "Authorization: Bearer $MAXAPI_API_KEY" \
   -H "Content-Type: application/json" \
   --data-binary @-
 ```
 
-图片 URL 必须能被服务端直接读取。浏览器里能打开的相册页面、需要登录的分享链接、`localhost` 和本地文件路径都不能直接代替图片直链。
+成功响应的 `choices[0].message.content` 包含图片分析文字。首先确认输出是否描述了实际图片，再逐步增加任务复杂度。相册页面、登录后分享链接、浏览器的 `blob:` 地址、`localhost` 或本地文件路径不能直接代替服务端可读取的图片链接。
 
-## 使用本地图片
+## 使用本地 PNG 或 JPEG
 
-本地图片可以编码成 data URL，其格式是 `data:图片MIME类型;base64,编码内容`。以下示例读取当前目录中的真实 PNG 文件 `image.png`；如改用 JPEG，应同时修改 MIME 类型。
+安装对应的 [Python SDK](/zh/guides/python) 或 [Node.js SDK](/zh/guides/nodejs)，将一张图片放入当前目录。下面的程序通过命令行接收文件路径，只演示 PNG 和 JPEG；模型支持其他格式时再按对应 MIME 类型扩展。
 
-```python "Python"
+<CodeGroup>
+```python vision.py
 import base64
 import os
+import sys
 from pathlib import Path
 from openai import OpenAI
 
-client = OpenAI(
+if len(sys.argv) != 2:
+    raise SystemExit("用法：python vision.py image.png")
+path = Path(sys.argv[1])
+mime = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}.get(path.suffix.lower())
+if not mime:
+    raise SystemExit("本示例只接收 PNG 或 JPEG 文件。")
+raw = path.read_bytes()
+if not raw:
+    raise SystemExit("图片文件为空。")
+encoded = base64.b64encode(raw).decode("ascii")
+
+with OpenAI(
     api_key=os.environ["MAXAPI_API_KEY"],
     base_url="https://api.maxapi.ai/v1",
-)
-encoded = base64.b64encode(Path("image.png").read_bytes()).decode("ascii")
-response = client.chat.completions.create(
-    model=os.environ["MAXAPI_MODEL"],
-    messages=[{
-        "role": "user",
-        "content": [
-            {"type": "text", "text": "这张截图中有哪些操作按钮？"},
-            {"type": "image_url", "image_url": {
-                "url": f"data:image/png;base64,{encoded}"
-            }},
-        ],
-    }],
-)
-print(response.choices[0].message.content)
+    timeout=60.0,
+    max_retries=0,
+) as client:
+    response = client.chat.completions.create(
+        model=os.environ["MAXAPI_MODEL"],
+        messages=[{
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "列出这张图片中可以清楚辨认的文字，不清楚的部分标注为无法辨认。"},
+                {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{encoded}"}},
+            ],
+        }],
+    )
+    if not response.choices:
+        raise RuntimeError("响应中没有候选结果。")
+    print(response.choices[0].message.content or "")
+    print("finish_reason:", response.choices[0].finish_reason, file=sys.stderr)
 ```
 
-运行前安装 `openai` 包。结果仍位于 `choices[].message.content`，响应解析与文本对话一致。
+```javascript vision.mjs
+import { readFile } from "node:fs/promises";
+import { extname } from "node:path";
+import OpenAI from "openai";
+
+const path = process.argv[2];
+if (!path) throw new Error("用法：node vision.mjs image.png");
+const mime = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg" }[extname(path).toLowerCase()];
+if (!mime) throw new Error("本示例只接收 PNG 或 JPEG 文件。");
+const raw = await readFile(path);
+if (!raw.length) throw new Error("图片文件为空。");
+const apiKey = process.env.MAXAPI_API_KEY;
+const model = process.env.MAXAPI_MODEL;
+if (!apiKey || !model) throw new Error("请设置 MAXAPI_API_KEY 和 MAXAPI_MODEL。");
+const client = new OpenAI({
+  apiKey, baseURL: "https://api.maxapi.ai/v1", timeout: 60_000, maxRetries: 0,
+});
+const response = await client.chat.completions.create({
+  model,
+  messages: [{
+    role: "user",
+    content: [
+      { type: "text", text: "列出这张图片中可以清楚辨认的文字，不清楚的部分标注为无法辨认。" },
+      { type: "image_url", image_url: { url: `data:${mime};base64,${raw.toString("base64")}` } },
+    ],
+  }],
+});
+const choice = response.choices[0];
+if (!choice) throw new Error("响应中没有候选结果。");
+console.log(choice.message.content ?? "");
+console.error("finish_reason:", choice.finish_reason);
+```
+</CodeGroup>
+
+<CodeGroup>
+```bash 运行 Python
+python vision.py image.png
+```
+
+```bash 运行 Node.js
+node vision.mjs image.png
+```
+</CodeGroup>
+
+示例根据扩展名选择 MIME 类型，但不会验证实际文件格式。不要只修改扩展名来转换图片；先用图片软件保存为正确格式。data URL 必须同时包含 `data:`、MIME 类型、`;base64,` 和完整编码数据。
 
 ## 比较多张图片
 
-若模型支持多图输入，在同一 `content` 数组中追加多个 `image_url` 内容项，并在问题中明确“第一张”“第二张”的含义。先用较少图片验证；图片数量与分辨率会影响请求体大小、处理时间与用量。
+模型支持多图时，在同一 `content` 数组中追加图片项，并用文字标明对应关系。例如依次放入“第一张：修改前截图”、第一张图片、“第二张：修改后截图”、第二张图片，最后要求“仅列出发生变化的按钮和布局”。
+
+先验证单张图片，再增加图片数量。避免把所有历史图片在每轮重复提交；只保留当前分析需要的内容。较多或较大的图片会影响请求体、处理时间与用量。
+
+## 提高结果可用性
+
+让问题指向具体任务，例如“把发票上看得清的项目名和金额列成表格”，而不是只问“图片里是什么”。对于小字或密集表格，裁剪重点区域并确保文字清晰。需要比对的数值由应用或人工校验，不把视觉模型的输出当作准确 OCR 的保证。
 
 ## 常见问题
 
-| 现象 | 处理方式 |
+| 现象 | 排查顺序 |
 | --- | --- |
-| 模型回复看不到图片 | 确认模型支持视觉，检查是否使用内容数组和正确的 `image_url` 对象 |
-| 图片下载失败 | 检查直链权限、有效期和响应是否确实为图片；也可改用 Base64 |
-| Base64 图片无效 | 检查 MIME 类型、`base64,` 前缀以及编码数据完整性 |
-| 小字识别不准确 | 裁剪重点区域、提高文字清晰度，并按模型支持情况设置细节等级 |
+| 模型表示看不到图片 | 确认模型支持视觉，再检查 `content` 数组和 `image_url` 对象 |
+| 图片下载失败 | 检查直链访问权限、有效期、重定向，以及实际响应是否为图片 |
+| 本地文件找不到 | 从文件所在目录运行，或传入完整路径 |
+| Base64 无效 | 检查真实格式与 MIME 是否一致，确认前缀与数据完整 |
+| 请求过大或处理很慢 | 减少图片数量、裁剪区域或调整分辨率，再查看模型限制 |
+| 小字或数字识别错误 | 提升清晰度并缩小分析范围，明确要求无法辨认时说明 |
+| `detail` 参数被拒绝 | 先移除该字段，再核对模型是否支持及其允许值 |
 
-需要生成或修改图片时，使用 [图像生成与编辑](/zh/api-reference/images)。HTTP 错误处理见 [错误排查](/zh/help/errors)。
+响应的结束原因和上下文处理与[文本生成](/zh/guides/text-generation)一致。HTTP 错误见[错误排查](/zh/help/errors)。

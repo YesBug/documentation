@@ -1,75 +1,229 @@
 ---
 title: "快速开始"
-description: "获取 API Key，选择模型，发送你的第一个 MaxAPI 请求。"
-keywords: ["MaxAPI", "快速开始", "quickstart"]
+description: "准备 API Key 和模型，用 Python、Node.js 或 cURL 完成首次调用，并读懂返回结果。"
+keywords: ["MaxAPI", "快速开始", "Python", "Node.js", "cURL", "API Key"]
 ---
 
-只需一个 API Key，就可以通过 OpenAI 兼容的接口将模型接入你的应用。本教程从终端发送一次对话请求，再带你使用熟悉的 SDK 继续开发。
+本指南带你从配置环境到收到第一条 AI 回复。完成后，你将拥有一个可以在本地运行、再接入服务端应用的最小示例。
 
-## 1. 准备 API Key
+## 1. 准备密钥与地址
 
-登录 [MaxAPI 控制台](https://platform.maxapi.ai)，获取用于调用接口的 API Key，并确认账户具备所选模型的调用权限。
+登录 [MaxAPI 控制台](https://platform.maxapi.ai)，在密钥管理入口创建或选择用于开发的 API Key。确认账户具备目标模型的调用权限与可用额度，然后将密钥保存到本机环境变量。
 
-将密钥保存为服务端环境变量。下方的值是占位符，请替换为你自己的密钥。
+| 配置 | 使用的值 |
+| --- | --- |
+| API Key | 你在 MaxAPI 控制台获取的密钥 |
+| SDK Base URL | `https://api.maxapi.ai/v1` |
+| HTTP 接口地址 | 例如 `https://api.maxapi.ai/v1/chat/completions` |
+| 模型 ID | 从账户可用模型中选择；下一步查询 |
 
-```bash "终端"
-export MAXAPI_API_KEY="替换为你的 API Key"
-```
+<Tabs>
+  <Tab title="macOS / Linux">
+    在运行示例的同一个终端中设置变量：
 
-API Key 具有账户访问权限。不要把它写入前端代码、公开仓库或客户端安装包。更多说明见 [身份验证](/zh/authentication)。
+    ```bash
+    export MAXAPI_API_KEY="替换为你的 MaxAPI API Key"
+    ```
+  </Tab>
+  <Tab title="Windows PowerShell">
+    ```powershell
+    $env:MAXAPI_API_KEY="替换为你的 MaxAPI API Key"
+    ```
 
-## 2. 选择一个模型
+    Python 和 Node.js 示例可在 PowerShell 中运行。下方 cURL 示例使用 Bash 续行语法，Windows 可在 WSL 或 Git Bash 中运行。
+  </Tab>
+</Tabs>
 
-查询当前密钥可见的模型列表：
+<Warning>
+示例应在本机终端或服务端运行。不要把密钥写进网页前端、公开仓库或可分享的截图。保存与轮换方法见 [身份验证](/zh/authentication)。
+</Warning>
 
-```bash "获取模型列表"
-curl --fail-with-body https://api.maxapi.ai/v1/models \
+## 2. 查询模型并选择 ID
+
+先验证鉴权和网络，再进行生成请求。在 Bash 中执行：
+
+```bash
+curl --fail-with-body "https://api.maxapi.ai/v1/models" \
   -H "Authorization: Bearer $MAXAPI_API_KEY"
 ```
 
-从响应中复制一个适合文本对话的模型 `id`，保存为环境变量。模型名称需要与返回的 ID 完全一致。
+PowerShell 中可使用：
 
-```bash "设置模型"
-export MAXAPI_MODEL="替换为模型 ID"
+```powershell
+(Invoke-RestMethod -Uri "https://api.maxapi.ai/v1/models" `
+  -Headers @{Authorization="Bearer $env:MAXAPI_API_KEY"}).data.id
 ```
 
-如果列表为空或请求失败，请先检查密钥、账户权限及返回的错误信息。可用模型和具体能力以控制台及实时接口结果为准。
+JSON 响应的 `data` 数组包含模型信息。取其中适合**文本对话**的 `id`，不要复制展示名称，也不要选用图片、语音或嵌入模型。
 
-## 3. 发送第一次请求
-
-下面使用 `jq` 构建 JSON，避免模型 ID 中的特殊字符影响请求体；请先确保本机已安装 `jq`。
-
-```bash "创建一条对话"
-jq -n --arg model "$MAXAPI_MODEL" '{
-  model: $model,
-  messages: [
-    {role: "user", content: "用一句话介绍你自己。"}
-  ]
-}' | curl --fail-with-body https://api.maxapi.ai/v1/chat/completions \
-  -H "Authorization: Bearer $MAXAPI_API_KEY" \
-  -H "Content-Type: application/json" \
-  --data-binary @-
+```json 模型列表结构示意
+{
+  "object": "list",
+  "data": [{"id": "YOUR_CHAT_MODEL_ID", "object": "model"}]
+}
 ```
 
-在兼容的非流式响应中，生成的文本位于 `choices[0].message.content`。完整响应还可能包含模型信息、结束原因与用量统计，具体字段随模型和响应类型变化。
+`YOUR_CHAT_MODEL_ID` 是占位符，需要替换成实际模型 ID：
 
-## 4. 接入你的应用
+<CodeGroup>
+```bash macOS / Linux
+export MAXAPI_MODEL="替换为实际的文本模型 ID"
+```
+```powershell Windows PowerShell
+$env:MAXAPI_MODEL="替换为实际的文本模型 ID"
+```
+</CodeGroup>
 
-MaxAPI 的 SDK Base URL 为：
+返回模型列表说明这次查询成功；输入类型、工具调用、流式能力和参数范围仍需单独确认，详见 [模型与能力](/zh/models)。
 
-```text
-https://api.maxapi.ai/v1
+## 3. 发送第一个请求
+
+选择一种方式即可。以下示例均调用 `POST /v1/chat/completions`，只发送 `model` 和 `messages`，便于先验证基础接入。
+
+<Tabs>
+  <Tab title="Python">
+    在项目目录安装 SDK：
+
+    ```bash
+    python -m pip install openai
+    ```
+
+    保存为 `hello.py`。如果系统使用 `python3` 命令，安装和运行时都用 `python3`。
+
+    ```python hello.py
+    import os
+    from openai import OpenAI
+
+    with OpenAI(
+        api_key=os.environ["MAXAPI_API_KEY"],
+        base_url="https://api.maxapi.ai/v1",
+        timeout=60.0,
+        max_retries=0,
+    ) as client:
+        response = client.chat.completions.create(
+            model=os.environ["MAXAPI_MODEL"],
+            messages=[{"role": "user", "content": "用一句话解释什么是 API。"}],
+        )
+        print(response.choices[0].message.content)
+        print("finish_reason:", response.choices[0].finish_reason)
+        if response.usage:
+            print("usage:", response.usage.model_dump())
+    ```
+
+    ```bash
+    python hello.py
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    在已安装 Node.js 的项目目录中执行：
+
+    ```bash
+    npm init -y
+    npm install openai
+    ```
+
+    保存为 `hello.mjs`。`.mjs` 让 Node.js 直接使用 ES module 导入方式。
+
+    ```javascript hello.mjs
+    import OpenAI from "openai";
+
+    if (!process.env.MAXAPI_API_KEY || !process.env.MAXAPI_MODEL) {
+      throw new Error("请先设置 MAXAPI_API_KEY 和 MAXAPI_MODEL");
+    }
+    const client = new OpenAI({
+      apiKey: process.env.MAXAPI_API_KEY,
+      baseURL: "https://api.maxapi.ai/v1",
+      timeout: 60_000,
+      maxRetries: 0,
+    });
+    const response = await client.chat.completions.create({
+      model: process.env.MAXAPI_MODEL,
+      messages: [{ role: "user", content: "用一句话解释什么是 API。" }],
+    });
+    console.log(response.choices[0].message.content);
+    console.log("finish_reason:", response.choices[0].finish_reason);
+    if (response.usage) console.log("usage:", response.usage);
+    ```
+
+    ```bash
+    node hello.mjs
+    ```
+  </Tab>
+  <Tab title="cURL">
+    安装 `curl` 和 `jq` 后，在 Bash 中执行。`jq` 会正确转义模型 ID 和文本，避免手动拼接 JSON。
+
+    ```bash
+    jq -n --arg model "$MAXAPI_MODEL" \
+      '{model: $model, messages: [{role: "user", content: "用一句话解释什么是 API。"}]}' \
+      > request.json
+
+    curl --fail-with-body --max-time 60 \
+      "https://api.maxapi.ai/v1/chat/completions" \
+      -H "Authorization: Bearer $MAXAPI_API_KEY" \
+      -H "Content-Type: application/json" \
+      --data-binary @request.json \
+      --output response.json
+    ```
+
+    命令成功退出后，再读取回复：
+
+    ```bash
+    jq -r '.choices[0].message.content' response.json
+    jq '{id, model, usage, finish_reason: .choices[0].finish_reason}' response.json
+    ```
+  </Tab>
+</Tabs>
+
+这里的 60 秒是示例客户端的超时设置，不是 MaxAPI 的响应时限承诺。首次调试关闭 SDK 自动重试，便于看到原始错误；生产环境的策略见 [超时、限流与重试](/zh/guides/production)。
+
+## 4. 读懂返回结果
+
+成功后会看到类似“API 是让不同程序交换数据和调用功能的一组约定”的文本。生成内容可能变化；下方为省略部分字段的**结构示意**，并非真实调用记录。
+
+```json
+{
+  "id": "chatcmpl-example",
+  "object": "chat.completion",
+  "model": "YOUR_CHAT_MODEL_ID",
+  "choices": [{
+    "index": 0,
+    "message": {"role": "assistant", "content": "API 是让不同程序交换数据和调用功能的一组约定。"},
+    "finish_reason": "stop"
+  }],
+  "usage": {"prompt_tokens": 20, "completion_tokens": 22, "total_tokens": 42}
+}
 ```
 
-在 OpenAI 兼容 SDK 中设置该地址和你的 MaxAPI API Key，就可以调用 `chat.completions.create`。
-
-| 接下来做什么 | 阅读文档 |
+| 字段 | 应用如何使用 |
 | --- | --- |
-| 用 Python 构建应用 | [Python SDK](/zh/guides/python) |
-| 用 JavaScript 或 TypeScript 构建应用 | [Node.js SDK](/zh/guides/nodejs) |
-| 逐步显示生成的内容 | [流式响应](/zh/guides/streaming) |
-| 了解请求字段和返回结构 | [创建对话](/zh/api-reference/chat-completions) |
+| `choices[0].message.content` | 展示模型生成的文本；工具调用等场景可能没有普通文本 |
+| `choices[0].finish_reason` | 判断正常结束、输出截断或转入工具调用；见 [文本生成](/zh/guides/text-generation) |
+| `id`、`model` | 记录响应标识与模型，便于定位问题；响应 ID 不等于任务查询 ID |
+| `usage` | 观察本次输入和输出用量；实际字段和可用性随响应变化 |
 
-## 请求没有成功？
+<Check>
+当你能查到模型，并从所选文本模型收到 `choices` 中的回复时，基础接入已完成。接下来再添加流式响应或业务参数。
+</Check>
 
-先确认请求地址包含且仅包含一段 `/v1`，再检查 API Key 和模型 ID。发生错误时保留 HTTP 状态码及已脱敏的响应内容，按照 [错误排查](/zh/help/errors) 逐项检查。
+## 第一次调用失败时
+
+| 现象 | 先做什么 |
+| --- | --- |
+| `KeyError` 或提示缺少环境变量 | 在运行程序的同一个终端设置变量；IDE 或容器需要单独配置环境 |
+| `401` | 检查密钥来源、是否撤销，以及 `Bearer` 后是否有一个空格 |
+| `404` 或返回 HTML | 确认使用 `api.maxapi.ai`，SDK 地址只包含一次 `/v1` |
+| 提示模型不存在或无权限 | 使用准确模型 ID，核对账户权限与接口类型 |
+| `400` | 先运行本页最小请求，暂时去掉新增的可选参数 |
+| `429` | 读取错误正文，区分暂时限流和额度问题，避免立即反复发送 |
+| 超时或连接失败 | 先测试模型列表，检查本机网络与代理；超时不表示请求一定未执行 |
+
+完整诊断步骤和提交支持信息的方法见 [错误排查](/zh/help/errors)。
+
+## 下一步
+
+<Columns cols={2}>
+  <Card title="文本生成与多轮对话" icon="comments" href="/zh/guides/text-generation">保存历史、组织消息，处理不同结束原因。</Card>
+  <Card title="流式响应" icon="bolt" href="/zh/guides/streaming">边生成边显示，识别中断与完整结束。</Card>
+  <Card title="迁移已有应用" icon="arrow-right-arrow-left" href="/zh/guides/migration">核对 Base URL、模型、参数和已有依赖。</Card>
+  <Card title="在线调试接口" icon="code" href="/zh/playground">使用文档中的鉴权、参数与请求控件。</Card>
+</Columns>

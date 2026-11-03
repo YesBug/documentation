@@ -1,0 +1,94 @@
+---
+title: "Migrate an existing application"
+description: "Connect an OpenAI-compatible application to MaxAPI and verify URLs, keys, models, parameters and complete workflows."
+keywords: ["MaxAPI", "migration", "OpenAI compatible", "base URL", "third-party clients"]
+---
+
+If your application already uses OpenAI-compatible Chat Completions, you can usually keep the SDK and message structure, replace the connection settings and validate each feature. Compatible request formats do not imply identical model behavior or upstream features.
+
+## Identify the endpoint your application uses
+
+Inspect SDK methods or redacted request paths. `client.chat.completions.create()` uses `/v1/chat/completions`. `client.responses.create()` has a different request and event structure; changing its base URL alone does not establish compatibility.
+
+| Existing feature | What to check |
+| --- | --- |
+| Chat Completions | Base URL, model ID, message roles and optional parameters |
+| Embeddings | Embedding model, dimensions and output encoding; reassess your vector index when switching models |
+| Image generation or editing | Image model, JSON / multipart input and URL / Base64 output |
+| Audio | Task-specific model, upload type, response format and binary handling |
+| Responses, Assistants, file management or native provider SDKs | Verify their routes and contracts separately; Chat Completions compatibility does not cover them |
+| Video, music and other asynchronous generation | Keep submission and polling in the same protocol and retain the original task ID |
+
+See the [API reference](/en/api-reference/index) for documented core contracts. A route in the extended catalog does not establish that your account can use it.
+
+## Replace three connection settings
+
+| Setting | MaxAPI value |
+| --- | --- |
+| API key | A key created in the MaxAPI console |
+| Base URL | `https://api.maxapi.ai/v1` |
+| Model | An actual model ID available to your MaxAPI account |
+
+<CodeGroup>
+```python Python
+import os
+from openai import OpenAI
+
+client = OpenAI(
+    api_key=os.environ["MAXAPI_API_KEY"],
+    base_url="https://api.maxapi.ai/v1",
+)
+```
+```javascript Node.js
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: process.env.MAXAPI_API_KEY,
+  baseURL: "https://api.maxapi.ai/v1",
+});
+```
+</CodeGroup>
+
+These examples explicitly read `MAXAPI_API_KEY`. The SDK does not automatically load it because its name contains MaxAPI. For third-party clients, use the variable names or settings fields that the client documents.
+
+## Configure a third-party client
+
+In a client that supports a custom OpenAI-compatible provider:
+
+1. Select the OpenAI-compatible or custom provider option.
+2. Enter your MaxAPI API key.
+3. If a “Base URL” field expects the client to append endpoint paths, use `https://api.maxapi.ai/v1`.
+4. If it explicitly requires a full endpoint URL, use `https://api.maxapi.ai/v1/chat/completions`.
+5. Set an exact model ID and test a short text prompt.
+
+Field names and URL assembly differ by client. If you see `/v1/v1/`, a repeated `/chat/completions`, or a request to the console website, correct the URL first. Rotating keys will not fix a path error.
+
+## Validate one layer at a time
+
+<Steps>
+  <Step title="Minimal text request">
+    Run the [quickstart](/en/quickstart) using only `model` and `messages`. Verify the hostname, authentication, model and response parsing.
+  </Step>
+  <Step title="Restore parameters">
+    Restore output limits, sampling and application parameters one at a time. Record which addition causes a failure and check model support. Do not carry over old defaults and limits without checking.
+  </Step>
+  <Step title="Restore advanced features">
+    Verify image inputs, tool calls and streaming separately. Complete the tool execution and result round trip. For streaming, check empty chunks, finish conditions and interruption handling.
+  </Step>
+  <Step title="Verify operations and errors">
+    Review exception types, timeouts, automatic retries, log redaction and usage tracking. Simulate error paths before increasing traffic gradually.
+  </Step>
+</Steps>
+
+## Common migration issues
+
+| Symptom | Likely cause and action |
+| --- | --- |
+| Model listing works but chat fails | Model type, generation access or parameters differ; start with a minimal request |
+| A parameter such as `temperature` fails | The model does not accept the previous field or value; adjust it according to model documentation |
+| Text is empty | Inspect `tool_calls`, the finish reason and the full response structure |
+| Non-streaming works but streaming stalls | Check proxy buffering, SSE parsing, read timeouts and frontend rendering |
+| Retrieval quality decreases | Different embedding models use different vector spaces; equal dimensions do not establish compatibility |
+| A third-party tool still calls the old address | Check configuration precedence, process environment and restart requirements |
+
+Keep a configuration rollback path. Use a fixed set of representative inputs to compare correctness, latency and usage. Evaluate business outcomes rather than requiring generated wording to match exactly.

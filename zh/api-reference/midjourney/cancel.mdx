@@ -1,0 +1,34 @@
+---
+title: "Cancel：取消任务"
+description: "向指定 Midjourney 任务发送取消请求，检查业务响应，再查询任务确认最终状态。"
+keywords: ["MaxAPI", "Midjourney", "cancel"]
+openapi: "openapi/midjourney-zh.json POST /mj/task/{id}/cancel"
+---
+
+Cancel 向指定的 Midjourney 任务发送取消请求。它是 `POST` 操作，任务 ID 放在 URL 路径中；不要把查询请求改成 `GET` 来取消任务。
+
+## 取消正确的任务
+
+提交前展示任务的提示词或业务记录，让用户确认所取消的对象。若取消某次放大或变化，使用那次动作的任务 ID，避免误用原图 ID。
+
+```bash 请求取消，使用与提交时相同的模式前缀
+: "${TASK_ID:?请先设置要取消的任务 ID}"
+TASK_ID_ESCAPED="$(printf '%s' "$TASK_ID" | jq -sRr @uri)"
+curl --fail-with-body -X POST \
+  "${MAXAPI_MJ_BASE_URL:-https://api.maxapi.ai/mj}/task/$TASK_ID_ESCAPED/cancel" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  --output mj-cancel.json
+```
+
+## 核实最终状态
+
+取消响应包含 `code` 与 `description`，不是一份完整任务对象，也不返回需要继续生成的新任务 ID。读取业务结果后，再调用 [查询任务](/zh/api-reference/midjourney/fetch)。
+
+| 查询结果 | 页面展示 |
+| --- | --- |
+| `CANCEL` | 已取消 |
+| `SUCCESS` | 任务已完成，保留已生成结果 |
+| `FAILURE` | 任务失败，查看 `failReason` |
+| 仍在执行或其他状态 | 显示实际状态与取消响应，不直接宣称已取消 |
+
+取消能否生效取决于任务所处阶段和渠道行为。不要承诺取消必然停止已提交到上游的生成，也不要由取消状态推断退款或计费规则。

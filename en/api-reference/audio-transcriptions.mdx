@@ -47,9 +47,59 @@ Install `openai` for Python. Let the client generate the multipart boundary. The
 
 Where supported, `language` is an ISO 639-1 input language code, such as `en` or `zh`. A transcription `prompt` can provide terminology and context in the source language.
 
-Some channels accept MP3, MP4, MPEG, MPGA, M4A, WAV or WebM. Confirm the format and limits for your model, and ensure the file extension matches the actual encoding.
+Confirm the accepted file formats and limits for your model, and ensure the file extension matches the actual encoding.
 
 Supported output formats can include `json`, `text`, `srt`, `verbose_json` and `vtt`. Save subtitle formats as text rather than parsing them as JSON. Extra timing and segment fields in `verbose_json` depend on the model.
+
+## Supply language and terminology
+
+Where supported, `language` identifies the source audio using an ISO 639-1 code such as `en` or `zh`; it does not select a translation target. Use `prompt` for source-language terms and context, not as a substitute for audio.
+
+```bash Transcribe with terminology hints
+curl --fail-with-body https://api.maxapi.ai/v1/audio/transcriptions \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -F "model=$MAXAPI_AUDIO_MODEL" \
+  -F "file=@meeting.mp3" \
+  -F "language=en" \
+  -F "prompt=This is a technical discussion about MaxAPI integration, API keys and streaming responses." \
+  -F "response_format=json" \
+  --output transcription.json
+```
+
+After the command succeeds, read `text` from the JSON. Do not depend on segment or timing fields being present.
+
+```python Save transcription text
+import json
+from pathlib import Path
+
+result = json.loads(Path("transcription.json").read_text(encoding="utf-8"))
+text = result.get("text")
+if not isinstance(text, str):
+    raise ValueError("No transcription text; inspect the original response")
+Path("transcript.txt").write_text(text, encoding="utf-8")
+print(text)
+```
+
+## Save subtitles
+
+Run this on a model supporting SRT. The result is subtitle text, so save it as `.srt` without a JSON parser.
+
+```bash Save SRT subtitles
+curl --fail-with-body https://api.maxapi.ai/v1/audio/transcriptions \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -F "model=$MAXAPI_AUDIO_MODEL" \
+  -F "file=@meeting.mp3" \
+  -F "response_format=srt" \
+  --output subtitles.srt
+```
+
+Use the subtitle file only after the command succeeds. Check its timing against the recording. Handle `vtt` as text as well. Segment and timing fields in `verbose_json` depend on the model, so do not expect one universal structure.
+
+## Handle long recordings
+
+Split recordings that exceed the selected model's limits. Retain each segment's start time and order, and prefer pauses or sentence boundaries for cuts. Add each segment's start offset when merging relative subtitle times. If segments overlap, remove duplicated text when combining results.
+
+A successful transcription does not establish speaker identification. Speaker labels and word timestamps require corresponding model and protocol support; they cannot be inferred from plain `text` output.
 
 ## Troubleshoot recognition
 

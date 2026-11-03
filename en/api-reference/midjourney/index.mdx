@@ -1,0 +1,54 @@
+---
+title: "Midjourney API overview"
+description: "Choose Midjourney endpoints for generation, image interactions, and task management, and understand the response shape used by each operation."
+keywords: ["MaxAPI", "Midjourney", "API", "MJ"]
+---
+
+Midjourney uses tasks: submit generation or an interaction, save the task ID, and retrieve progress and output. This reference groups endpoints by goal and provides dedicated parameters and an interactive playground for each operation. For a complete first image, follow the [Midjourney quickstart](/en/media/midjourney).
+
+## Create content and process inputs
+
+| Goal | Endpoint |
+| --- | --- |
+| Generate from text or reference images | [Imagine](/en/api-reference/midjourney/imagine) |
+| Combine reference images | [Blend](/en/api-reference/midjourney/blend) |
+| Get prompt suggestions from an image | [Describe](/en/api-reference/midjourney/describe) |
+| Simplify an existing prompt | [Shorten](/en/api-reference/midjourney/shorten) |
+
+## Continue working with an image
+
+| Goal | Endpoint |
+| --- | --- |
+| Execute a returned upscale, variation, or other button | [Action](/en/api-reference/midjourney/action) |
+| Supply a prompt or mask for an interactive task | [Modal](/en/api-reference/midjourney/modal) |
+| Retrieve an available image seed | [Seed](/en/api-reference/midjourney/seed) |
+
+## Retrieve and manage tasks
+
+| Goal | Endpoint |
+| --- | --- |
+| Track one task's status and output | [Fetch](/en/api-reference/midjourney/fetch) |
+| Refresh known task IDs | [Get tasks by ID list](/en/api-reference/midjourney/list-by-condition) |
+| Read visible tasks | [List tasks](/en/api-reference/midjourney/list) |
+| Filter and paginate history | [Query tasks](/en/api-reference/midjourney/query) |
+| Inspect queued tasks | [Get the queue](/en/api-reference/midjourney/queue) |
+| Request cancellation | [Cancel](/en/api-reference/midjourney/cancel) |
+
+## Response shapes differ
+
+| Operation | Result location |
+| --- | --- |
+| Imagine, Blend, Describe, Shorten, Action, Modal | `code`, `description`, and `result`; save the returned task ID when the operation can continue |
+| Fetch | Direct task object with fields such as `status`, `imageUrl`, and `buttons` |
+| ID batch, task list, queue | Direct array of task objects |
+| Paginated query | Pagination object with tasks in `content` |
+| Seed | `result` contains a seed string |
+| Cancel | Business `code` and `description`; retrieve the original task to verify its state |
+
+Store and pass task IDs as strings. Converting a long numeric-looking ID to a JavaScript `Number` can lose precision and cause subsequent lookups to fail.
+
+## Address and mode
+
+These endpoints start at `https://api.maxapi.ai/mj`. Do not add the OpenAI-compatible `/v1` prefix. When using another enabled mode, retain its prefix for submission, retrieval, actions, and cancellation, and save that prefix with each task. See the [Midjourney quickstart](/en/media/midjourney) for mode selection.
+
+Authenticate with `Authorization: Bearer YOUR_API_KEY`. The playground sends real API requests. Use your own valid key and task data, and replace example task IDs, action IDs, and image Base64 placeholders before sending.

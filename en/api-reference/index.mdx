@@ -9,6 +9,20 @@ Call MaxAPI at `https://api.maxapi.ai`. Compatible SDKs use `https://api.maxapi.
 
 Open an endpoint to inspect its generated schema and use the native **Try it** panel. See [online testing](/en/playground) before sending requests with your account key. Generation can consume account quota or balance.
 
+## Choose an endpoint for your goal
+
+| Goal | Start here | What your application does next |
+| --- | --- | --- |
+| Make the first request | [Quickstart](/en/quickstart) | Retain configuration, read the answer and finish reason |
+| Add a chat interface | [Chat Completions](/en/api-reference/chat-completions) | Store conversation history and choose regular or streaming display |
+| Search your knowledge base | [Embeddings](/en/api-reference/embeddings) | Build an index, retrieve source text and pass it to chat |
+| Generate or edit product images | [Generate images](/en/api-reference/images) / [Edit images](/en/api-reference/images-edits) | Decode or download images into application storage |
+| Turn recordings into text | [Transcription](/en/api-reference/audio-transcriptions) | Read `text` or save subtitle text |
+| Turn text into audio | [Speech](/en/api-reference/audio-speech) | Save bytes and play them using the actual media format |
+| Generate video or music | [Asynchronous tasks](/en/guides/async-tasks) | Save the task ID, query a terminal state and retain output |
+
+Each endpoint combines generated parameter definitions with practical usage. Verify required fields before adding model-specific options. A parameter's presence in the schema does not establish support on every model.
+
 ## Text and embeddings
 
 | Task | Method and path | Reference |
@@ -38,7 +52,7 @@ Use a compatible chat model for [vision](/en/guides/vision) or [tool calling](/e
 | --- | --- | --- |
 | Unified video | `/v2/videos/generations` | [Submit and query](/en/media/videos) |
 | Native video protocols | Veo, Wan, Seedance, Vidu, Hailuo, Luma, Kling and Runway | [Protocol differences](/en/media/video-providers) |
-| Midjourney images and actions | `/mj/submit/...`, `/mj/task/...` | [Midjourney](/en/media/midjourney) |
+| Midjourney images and actions | `/mj/submit/...`, `/mj/task/...` | [Quickstart](/en/media/midjourney) → [13 endpoints](/en/api-reference/midjourney/index) |
 | Suno music | `/suno/v2/...` or `/suno/submit/...` | [Music generation](/en/media/music) |
 
 Complete one protocol's workflow before adding another. Task identifiers, callback fields and state values cannot be substituted across formats.
@@ -55,3 +69,27 @@ The [173-operation catalog](/en/api-reference/catalog) preserves a sanitized str
 - Handle generation failure separately from network failure.
 - Preserve request and task IDs while redacting keys and sensitive inputs in logs.
 - Confirm prices, resolutions, durations and usage limits in the console and model documentation.
+
+## Choose the right response reader
+
+Do not use one JSON parser for every successful response. Streaming, file upload and the returned format are separate choices.
+
+| Endpoint or mode | Request encoding | Successful output | Reader |
+| --- | --- | --- | --- |
+| Regular chat, completions, embeddings | JSON | JSON | Read the relevant `choices` or `data` |
+| Streaming chat or completions | JSON with `stream: true` | SSE | Parse complete events, then assemble increments |
+| Image generation | JSON | JSON | Extract URLs or Base64 from `data`, then save files |
+| Image editing | Multipart file form | JSON | Uploading a file does not imply binary output; parse the image result first |
+| Speech generation | JSON | Audio bytes | Check status and media type, then write a binary file |
+| Audio transcription or translation | Multipart file form | JSON or text | Read `text` or subtitle contents according to `response_format` |
+| Model listing | No request body | JSON | Read `data[].id` |
+
+Errors may use a different format than successful responses. A failed speech request can return JSON rather than audio. Check HTTP status, then choose a reader for the actual content type. See [troubleshooting](/en/help/errors).
+
+## Check an integration before extending it
+
+1. Use `api.maxapi.ai`; compatible SDKs use `https://api.maxapi.ai/v1`.
+2. List models with the current key and confirm endpoint capability.
+3. Verify one minimal request using [online testing](/en/playground) or cURL.
+4. Implement success, error, timeout and empty-result branches before adding specialized options.
+5. Retain redacted status, model and request or task identifiers for reproduction.

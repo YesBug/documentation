@@ -15,7 +15,7 @@ openapi: "openapi/zh.json POST /v1/images/generations"
 
 设置 `MAXAPI_IMAGE_MODEL` 为可用模型。以下示例依赖 `jq`，不指定模型特有参数。
 
-```bash "cURL：生成图片"
+```bash cURL：生成图片
 jq -n --arg model "$MAXAPI_IMAGE_MODEL" '{
   model: $model,
   prompt: "清晨的极简工作室，桌面上有一盏白色台灯，自然光，干净的产品摄影构图"
@@ -32,7 +32,7 @@ jq -n --arg model "$MAXAPI_IMAGE_MODEL" '{
 
 下面代码读取已保存的响应，将第一张 Base64 图片写成原始二进制文件，或输出返回的 URL。
 
-```python "Python：读取结果"
+```python Python：读取结果
 import base64
 import json
 from pathlib import Path
@@ -51,3 +51,54 @@ else:
 ## 排查失败
 
 可选参数不支持时，删除该参数后验证。请求超时后先结合控制台记录确认执行结果，避免立即重复提交产生多次任务。完整步骤见 [错误排查](/zh/help/errors)。
+
+## 保存一批图片
+
+在生成命令成功后，使用下面的脚本保存 `data` 数组中的全部图片。示例支持 URL 和 Base64 两种结果；下载结果 URL 时不附加 MaxAPI 密钥。文件暂存为 `.bin`，按实际图片编码选择扩展名。
+
+```python 保存 URL 或 Base64 结果
+import base64
+import json
+import shutil
+import urllib.request
+from pathlib import Path
+
+result = json.loads(Path("image-response.json").read_text(encoding="utf-8"))
+if not result.get("data"):
+    raise ValueError("响应中没有图片，请检查原始响应")
+output = Path("generated-images")
+output.mkdir(exist_ok=True)
+for index, item in enumerate(result["data"]):
+    target = output / f"image-{index + 1}.bin"
+    if item.get("b64_json"):
+        target.write_bytes(base64.b64decode(item["b64_json"], validate=True))
+    elif item.get("url"):
+        request = urllib.request.Request(item["url"])
+        with urllib.request.urlopen(request, timeout=60) as response:
+            with target.open("wb") as file:
+                shutil.copyfileobj(response, file)
+            print("内容类型：", response.headers.get("Content-Type"))
+    else:
+        raise ValueError(f"第 {index + 1} 项缺少 url 或 b64_json")
+    print("已保存：", target)
+```
+
+示例的 60 秒是客户端单次网络操作超时，可按下载场景调整。保存后检查文件能否正常打开，再交给自己的存储系统；临时 URL 不应作为长期素材地址。不要根据 URL 后缀猜测实际图片编码。
+
+## 将生成结果接入产品
+
+1. 提交前保存自己的业务请求标识和提示词，便于关联一次生成操作。
+2. 收到结果后，逐项检查 `data`；不要只取第一张却丢弃其他返回图片。
+3. 模型返回 `revised_prompt` 时，可连同结果保存，帮助追踪实际生成提示词。
+4. 将图片保存到应用存储，再把应用自己的资源地址返回前端。
+5. 只在确认调用失败且适合重试时重新生成；下载失败可以先重试下载已有结果。
+
+## 常见输出问题
+
+| 现象 | 处理方式 |
+| --- | --- |
+| 没有 `url` | 检查 `b64_json`，部分模型固定返回 Base64 |
+| 返回 URL 但打不开 | 检查下载响应状态、链接有效性和下载环境网络；已过期的 URL 不能通过更换扩展名修复 |
+| Base64 解码成功但不能显示 | 核对实际图片格式和保存文件类型，不要把解码后的字节再次当作文本编码 |
+| 尺寸或数量与预期不同 | 对照模型支持的 `size`、`n` 等参数，检查响应中实际返回的图片数量 |
+| 想修改现有图片 | 使用 [图像编辑](/zh/api-reference/images-edits)，上传原图并说明需要保留的内容 |

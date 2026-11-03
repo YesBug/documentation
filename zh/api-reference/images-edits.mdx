@@ -13,7 +13,7 @@ openapi: "openapi/zh.json POST /v1/images/edits"
 
 把待编辑图片保存为当前目录下的 `source.png`，并将模型变量设为支持编辑的模型。
 
-```bash "cURL：单图编辑"
+```bash cURL：单图编辑
 curl --fail-with-body https://api.maxapi.ai/v1/images/edits \
   -H "Authorization: Bearer $MAXAPI_API_KEY" \
   -F "model=$MAXAPI_IMAGE_MODEL" \
@@ -28,7 +28,7 @@ curl --fail-with-body https://api.maxapi.ai/v1/images/edits \
 
 仅在所选模型与通道明确支持多图编辑时使用。兼容的多图表单使用重复的 `image[]` 文件字段，不能把本地文件名写成普通 JSON 字符串。
 
-```bash "cURL：多图编辑，需要相应能力"
+```bash cURL：多图编辑，需要相应能力
 curl --fail-with-body https://api.maxapi.ai/v1/images/edits \
   -H "Authorization: Bearer $MAXAPI_API_KEY" \
   -F "model=$MAXAPI_IMAGE_MODEL" \
@@ -43,3 +43,28 @@ curl --fail-with-body https://api.maxapi.ai/v1/images/edits \
 响应通常通过 `data[].url` 或 `data[].b64_json` 返回图片，具体字段取决于模型。读取与保存示例见 [处理图片结果](/zh/api-reference/images#处理图片结果)。
 
 文件参数为空时，检查上传路径是否存在，以及是否用 `@` 上传文件内容。遮罩没有生效时，确认透明通道、尺寸和模型是否支持遮罩；其他错误见 [错误排查](/zh/help/errors)。
+
+## 编写可执行的编辑指令
+
+一次修改先聚焦一个目标。对商品图，可以使用“保留瓶身、标签文字和比例，将背景替换为纯白色，保留自然阴影”。这样能同时说明修改对象、约束和输出用途。图片模型仍可能改变细节，生成后应检查标签、文字与主体是否符合要求。
+
+| 需求 | 输入准备 |
+| --- | --- |
+| 整体换背景 | 上传原图，描述要保留的主体和新的背景 |
+| 修改局部区域 | 模型支持遮罩时，提供原图及匹配的透明遮罩 |
+| 融合多张参考图 | 先确认多图编辑支持，在提示词中明确各图片的作用与顺序 |
+| 读取图片中的文字 | 使用 [视觉理解](/zh/guides/vision)，而不是编辑端点 |
+
+## 检查上传与结果
+
+请求成功只代表返回了结果，应继续保存并检查图片：读取 `data[].url` 或 `data[].b64_json`，按 [保存图片示例](/zh/api-reference/images#保存一批图片) 写入文件，然后比较需要保留和修改的区域。
+
+| 现象 | 优先检查 |
+| --- | --- |
+| 提示 `image` 缺失 | 是否使用了文件内容上传，cURL 文件参数是否有 `@` |
+| 文件存在但上传失败 | 当前工作目录、文件权限和实际编码是否正确 |
+| 遮罩区域没有变化 | 模型是否支持遮罩、透明通道是否存在、尺寸是否匹配 |
+| 多图请求被拒绝 | 通道是否支持 `image[]`，先恢复单图最小请求 |
+| 图片可以生成但主体变形 | 减少同时要求的改动，明确保留约束，并检查结果而非只检查 HTTP 状态 |
+
+上传文件时不要混用 JSON 请求体，也不要手动写一个缺少 boundary 的 multipart 头。鉴权和其他 HTTP 错误见 [错误排查](/zh/help/errors)。

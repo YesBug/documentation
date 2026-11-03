@@ -9,6 +9,8 @@ Select a MaxAPI model with the request's `model` field. Use the exact ID from th
 
 ## List visible models
 
+Browse [Model overview](https://platform.maxapi.ai/modelmak) for model information. Use the authenticated list endpoint below to configure your application. A public model listing and a particular key’s access can differ.
+
 ```bash List models
 curl --fail-with-body https://api.maxapi.ai/v1/models \
   -H "Authorization: Bearer $MAXAPI_API_KEY"
@@ -74,3 +76,36 @@ Start with `model` and `messages`, then add streaming, sampling and output limit
 | Generate video or music | Enabled asynchronous generation channel | [Multimedia](/en/media/index) |
 
 Do not use a chat model ID for an embedding, image or audio model. Native protocols can select models differently: Suno uses `mv`, and some Veo routes include the model in the URL. See [API formats](/en/guides/protocols) before switching protocols.
+
+## Keep a capability record before launch
+
+Keep a test record for each model you actually use, so switching models does not silently change application behavior.
+
+| Item | What to record |
+| --- | --- |
+| Model ID and test date | The exact identifier; access can change with account configuration |
+| Basic text | Whether a minimal request succeeds and your application parses the result |
+| Conversations and roles | History handling and support for the instruction roles you use |
+| Streaming | Content deltas, finish conditions and cancellation behavior |
+| Images and tools | Only the capabilities your application needs, with accepted inputs and observed failures |
+| Parameters | Accepted fields and values, including model-specific options |
+| Quality and latency | Task success, time to first content and total duration on a fixed test set |
+| Usage and cost | Returned usage fields and actual console billing records |
+
+This is an application acceptance record, not a server capability declaration. It helps distinguish model differences, parameter changes and integration bugs.
+
+## Understand usage and cost
+
+Chat Completions typically reports input, output and total usage as `prompt_tokens`, `completion_tokens` and `total_tokens` in `usage`. Tokens are not characters: language, tokenization, image inputs and model behavior can affect measurement.
+
+- Resubmitted conversation history becomes input to each request, so longer histories can increase input usage.
+- `usage` is a usage measurement, not a currency amount. `total_tokens` is not a bill.
+- If a model prices input and output tokens separately, multiply each usage amount by its corresponding price and convert according to the published pricing unit.
+- Images, audio, video and music may use different billing units; do not apply a text-token formula to them.
+- Verify model and account rules for cache discounts, failed requests and retries. One response does not establish those rules.
+
+For current rates, sign in and open [Model pricing](https://platform.maxapi.ai/account/pricing). Use model information and billing records in the console to check actual charges. Associate response ID, model, timestamp and usage for reconciliation. This documentation does not publish an unverified universal price table.
+
+## When listing and generation disagree
+
+Confirm that listing and generation use the same API key and account environment. Then check the endpoint type, full model ID and request parameters. If a minimal request still fails, retain the redacted error body and timestamp and use the support information template in [Error troubleshooting](/en/help/errors).

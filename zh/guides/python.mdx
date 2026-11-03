@@ -1,97 +1,159 @@
 ---
 title: "Python SDK"
-description: "使用 OpenAI Python SDK，通过 MaxAPI 发送对话请求。"
-keywords: ["MaxAPI", "Python SDK", "python"]
+description: "使用 OpenAI Python SDK 接入 MaxAPI，完成环境安装、同步和异步调用、响应读取，以及超时、重试与错误处理。"
+keywords: ["MaxAPI", "Python", "OpenAI SDK", "AsyncOpenAI", "超时", "重试"]
 ---
 
-通过自定义 `base_url`，可以使用 OpenAI Python SDK 调用 MaxAPI 的兼容接口。
+本指南将 MaxAPI 的文本请求接入一个可直接运行的 Python 程序。你会配置客户端、读取生成内容和用量，并在连接失败、超时和 API 报错时保留可定位的信息。
 
-## 安装
+## 1. 安装 SDK
 
-建议在项目的虚拟环境中安装依赖：
+建议为项目创建虚拟环境，避免影响其他项目的依赖。
 
-```bash "终端"
-python -m venv .venv
+<CodeGroup>
+```bash macOS / Linux
+python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install openai
+python -m pip install --upgrade openai
 ```
 
-以上激活命令适用于 macOS 和 Linux。Windows PowerShell 使用 `.venv\Scripts\Activate.ps1`。
+```powershell Windows PowerShell
+py -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install --upgrade openai
+```
+</CodeGroup>
 
-## 配置环境变量
+使用 `python -m pip show openai` 查看当前环境的 SDK 版本。已有生产项目应先测试升级，再更新依赖版本。
 
-```bash
+## 2. 设置密钥与模型
+
+在[控制台](https://platform.maxapi.ai)获取 API Key，从[模型列表](/zh/api-reference/models)选择可访问的文本模型 ID。
+
+<CodeGroup>
+```bash macOS / Linux
 export MAXAPI_API_KEY="替换为你的 API Key"
 export MAXAPI_MODEL="替换为模型 ID"
 ```
 
-在 [控制台](https://platform.maxapi.ai) 获取密钥，并通过 [模型列表](/zh/api-reference/models) 确认模型 ID。下面的程序直接读取进程环境变量，不会自动加载 `.env` 文件。
+```powershell Windows PowerShell
+$env:MAXAPI_API_KEY = "替换为你的 API Key"
+$env:MAXAPI_MODEL = "替换为模型 ID"
+```
+</CodeGroup>
 
-## 发送对话请求
+这些变量只对当前终端及其启动的程序生效。示例不会自动读取 `.env` 文件；在 IDE 中运行时，也要给对应运行配置设置变量。
 
-```python "main.py"
+## 3. 保存并运行完整程序
+
+将以下内容保存为 `main.py`。示例设置 60 秒客户端超时并关闭 SDK 自动重试，便于首次接入时观察每次请求的结果。这是示例的应用配置，不是 MaxAPI 的服务限制。
+
+```python main.py
 import os
+import sys
+import openai
 from openai import OpenAI
 
-client = OpenAI(
-    api_key=os.environ["MAXAPI_API_KEY"],
-    base_url="https://api.maxapi.ai/v1",
-)
+api_key = os.environ.get("MAXAPI_API_KEY")
+model = os.environ.get("MAXAPI_MODEL")
+if not api_key or not model:
+    raise SystemExit("请设置 MAXAPI_API_KEY 和 MAXAPI_MODEL。")
 
-completion = client.chat.completions.create(
-    model=os.environ["MAXAPI_MODEL"],
-    messages=[
-        {"role": "user", "content": "用三个要点解释什么是 API。"},
-    ],
-)
-
-print(completion.choices[0].message.content or "")
+try:
+    with OpenAI(
+        api_key=api_key,
+        base_url="https://api.maxapi.ai/v1",
+        timeout=60.0,
+        max_retries=0,
+    ) as client:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{
+                "role": "user",
+                "content": "为一款团队笔记应用写一段 50 字以内的产品介绍。",
+            }],
+        )
+    if not response.choices:
+        raise RuntimeError("响应中没有候选结果。")
+    choice = response.choices[0]
+    if choice.message.tool_calls:
+        raise RuntimeError("收到工具调用，请按工具调用流程处理。")
+    print(choice.message.content or "")
+    print(f"response_id={response.id}", file=sys.stderr)
+    print(f"finish_reason={choice.finish_reason}", file=sys.stderr)
+    if response.usage:
+        print(f"usage={response.usage.model_dump()}", file=sys.stderr)
+except openai.APITimeoutError:
+    raise SystemExit("请求超时；这不代表服务端一定没有处理请求。")
+except openai.APIConnectionError:
+    raise SystemExit("连接失败，请检查网络、代理与接口地址。")
+except openai.APIStatusError as error:
+    raise SystemExit(f"API 请求失败：HTTP {error.status_code}；请查看错误排查。")
 ```
 
-```bash "运行"
+```bash 运行
 python main.py
 ```
 
-客户端会为请求添加验证头。`base_url` 使用 `/v1` 结尾的根地址，不要在这里追加 `/chat/completions`。
+终端会输出模型生成的产品介绍，具体文字每次可能不同。诊断信息单独写入标准错误流；正常文本在 `response.choices[0].message.content` 中。`finish_reason` 为 `length` 时，应将回答视为可能被截断，参见[文本生成](/zh/guides/text-generation)。
 
-## 保留对话上下文
+## 4. 理解客户端配置
 
-Chat Completions 通过 `messages` 传递对话历史。发送后续问题时，将需要的历史消息一起放入本次请求。
+| 配置 | 本例值 | 作用 |
+| --- | --- | --- |
+| `api_key` | `MAXAPI_API_KEY` | SDK 自动生成验证头，密钥前不需要添加 `Bearer` |
+| `base_url` | `https://api.maxapi.ai/v1` | SDK 在此地址后拼接 `/chat/completions` |
+| `timeout` | `60.0` | 客户端超时配置，单位为秒 |
+| `max_retries` | `0` | 关闭 SDK 自动重试，由应用决定是否再次请求 |
 
-```python "多轮对话"
-messages = [
-    {"role": "user", "content": "什么是 REST API？"},
-    {"role": "assistant", "content": "REST API 是按资源组织的网络接口。"},
-    {"role": "user", "content": "给我一个简单的例子。"},
-]
+不要把完整接口地址 `.../v1/chat/completions` 当作 `base_url`，也不要重复添加 `/v1`。调试时先保留 `model` 与 `messages`，确认成功后再加入模型支持的可选参数。
 
-completion = client.chat.completions.create(
-    model=os.environ["MAXAPI_MODEL"],
-    messages=messages,
-)
+SDK 可以重试部分连接和临时服务错误。启用重试时，应同时考虑每次尝试的超时、总耗时和可能重复生成的结果，避免叠加应用层重试。服务端提供有效 `Retry-After` 时应遵守等待时间。密钥、权限、余额或请求参数错误需要先修正原因。
 
-print(completion.choices[0].message.content or "")
+## 5. 在异步程序中使用
+
+异步 Web 服务或已有 `asyncio` 程序可以使用 `AsyncOpenAI`，避免同步网络调用阻塞事件循环。保存为 `async_main.py`，仍使用前面的环境变量。
+
+```python async_main.py
+import asyncio
+import os
+from openai import AsyncOpenAI
+
+async def main():
+    async with AsyncOpenAI(
+        api_key=os.environ["MAXAPI_API_KEY"],
+        base_url="https://api.maxapi.ai/v1",
+        timeout=60.0,
+        max_retries=0,
+    ) as client:
+        response = await client.chat.completions.create(
+            model=os.environ["MAXAPI_MODEL"],
+            messages=[{"role": "user", "content": "给团队笔记应用起三个名字。"}],
+        )
+        if not response.choices:
+            raise RuntimeError("响应中没有候选结果。")
+        print(response.choices[0].message.content or "")
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
-历史消息会占用模型上下文。长期对话可以通过摘要或保留相关片段控制输入长度。
-
-## 处理失败请求
-
-将请求放入异常处理逻辑，区分网络连接问题与 API 返回的错误状态。
-
-```python "异常处理"
-import openai
-
-try:
-    completion = client.chat.completions.create(
-        model=os.environ["MAXAPI_MODEL"],
-        messages=[{"role": "user", "content": "你好！"}],
-    )
-    print(completion.choices[0].message.content or "")
-except openai.APIConnectionError:
-    print("连接失败，请检查网络与接口地址。")
-except openai.APIStatusError as error:
-    print(f"请求失败，HTTP 状态码：{error.status_code}")
+```bash 运行异步示例
+python async_main.py
 ```
 
-更详细的故障定位见 [错误排查](/zh/help/errors)。如果希望逐段接收文本，继续阅读 [流式响应](/zh/guides/streaming)。SDK 的完整配置选项可查阅 [官方 Python SDK 文档](https://github.com/openai/openai-python)。
+在现有异步服务中直接 `await` 调用，不要在运行中的事件循环内再次执行 `asyncio.run()`。异步调用不会提高账户限额；并发请求仍需按应用需求限制数量。
+
+## 常见接入问题
+
+| 现象 | 优先检查 |
+| --- | --- |
+| `ModuleNotFoundError: openai` | 安装和运行是否使用同一个 Python；用 `python -m pip show openai` 检查 |
+| 提示缺少环境变量 | 是否在同一终端设置；IDE 或后台服务是否继承了变量 |
+| 401 或 403 | MaxAPI 密钥是否有效，是否具有目标模型的访问权限 |
+| 404 | `base_url` 是否正确，是否重复拼接路径；再检查模型 ID |
+| 400 或不支持参数 | 去掉可选参数，用同一模型发最小文本请求，再逐项添加 |
+| 连接成功但文本为空 | 检查 `choices`、`tool_calls` 与 `finish_reason` |
+| 经常超时 | 区分连接失败与等待响应，检查网络及模型耗时，再调整应用超时 |
+
+继续添加[多轮对话](/zh/guides/text-generation)、[流式输出](/zh/guides/streaming)、[图片输入](/zh/guides/vision)或[工具调用](/zh/guides/tools)。SDK 安装及客户端行为参考 [OpenAI SDK 文档](https://developers.openai.com/api/docs/libraries)和[重试说明](https://developers.openai.com/api/docs/guides/rate-limits#retrying-with-exponential-backoff)；MaxAPI 接口能力以本站说明为准。

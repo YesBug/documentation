@@ -39,7 +39,7 @@ AI Studio 与 Vertex 格式以长任务操作对象表示生成请求。模型�
 
 下面示例只演示已开通的 AI Studio 文生视频分支：
 
-```bash "Veo AI Studio 提交"
+```bash Veo AI Studio 提交
 : "${MAXAPI_VEO_MODEL:?请设置已开通的 AI Studio Veo 模型 ID}"
 VEO_MODEL_ESCAPED="$(printf '%s' "$MAXAPI_VEO_MODEL" | jq -sRr @uri)"
 jq -n '{instances: [{prompt: "A small sailboat crosses a calm lake at sunrise."}]}' \
@@ -51,7 +51,7 @@ jq -n '{instances: [{prompt: "A small sailboat crosses a calm lake at sunrise."}
     --output veo-operation.json
 ```
 
-```bash "查询同一个 operation"
+```bash 查询同一个 operation
 OPERATION_NAME="$(jq -er '.name // empty' veo-operation.json)"
 : "${OPERATION_NAME:?响应缺少 operation 名称}"
 jq -n --arg operation "$OPERATION_NAME" '{operationName: $operation}' \
@@ -68,7 +68,7 @@ jq -n --arg operation "$OPERATION_NAME" '{operationName: $operation}' \
 
 Wan 格式通常把生成内容放在 `input`，把时长、分辨率等控制项放在 `parameters`。该协议还包含独立的文生视频与图生视频路径：
 
-```http "Wan 分支"
+```http Wan 分支
 POST /wan/api/v1/services/aigc/text2video/text-to-video
 POST /wan/api/v1/services/aigc/image2video/image-to-video
 GET  /wan/api/v1/tasks/{task_id}
@@ -102,7 +102,7 @@ Hailuo 格式把生成任务和文件下载分为两步资源查询。是否支�
 | `subject_image` | 支持主体参考的模型使用 |
 | `callback_url` | 已支持回调时使用的通知地址 |
 
-```bash "Hailuo 文生视频最小结构"
+```bash Hailuo 文生视频最小结构
 : "${MAXAPI_HAILUO_MODEL:?请设置支持文生视频的 Hailuo 模型 ID}"
 jq -n --arg model "$MAXAPI_HAILUO_MODEL" '{
   model: $model,
@@ -116,18 +116,109 @@ jq -n --arg model "$MAXAPI_HAILUO_MODEL" '{
 
 保存有效的 `task_id` 后，以 query 参数查询。资料示例中处理中为 `Processing`、成功为 `Success`，大小写与统一视频不同；业务错误还可能放在 `base_resp`。
 
-```http "后续查询"
+```http 后续查询
 GET /hailuo/v1/query/video_generation?task_id={task_id}
 GET /hailuo/v1/files/retrieve?file_id={file_id}
 ```
 
 任务成功后保存 `file_id`，再通过文件接口读取 `file.download_url`。`file_id` 不是任务 ID，不能代替 `task_id` 去查询生成进度。
 
+### Python：从任务到可下载文件
+
+保存上一步的 `hailuo-submit.json` 后，运行以下脚本。它按 Hailuo 的 `Queueing`、`Processing`、`Success`、`Failed` 判断状态，分别检查 HTTP 状态与 `base_resp.status_code`，成功后使用 `file_id` 查询文件信息。
+
+```bash 安装依赖
+python -m pip install requests
+```
+
+```python wait_for_hailuo.py
+import json
+import os
+import time
+from pathlib import Path
+
+import requests
+
+
+HEADERS = {"Authorization": f"Bearer {os.environ['MAXAPI_API_KEY']}"}
+BASE_URL = "https://api.maxapi.ai"
+
+
+def get_result(path, params):
+    response = requests.get(
+        BASE_URL + path, params=params, headers=HEADERS, timeout=(10, 30)
+    )
+    response.raise_for_status()
+    payload = response.json()
+    business = payload.get("base_resp") or {}
+    if business.get("status_code") != 0:
+        raise RuntimeError(business.get("status_msg") or "Unexpected Hailuo business response")
+    return payload
+
+
+def wait_for_file(task_id, timeout_seconds=600):
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        task = get_result("/hailuo/v1/query/video_generation", {"task_id": task_id})
+        Path("hailuo-task.json").write_text(
+            json.dumps(task, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        state = task.get("status")
+        print(f"{task_id}: {state}")
+        if state == "Success":
+            file_id = task.get("file_id")
+            if not file_id:
+                raise RuntimeError("Completed task has no file_id")
+            result = get_result("/hailuo/v1/files/retrieve", {"file_id": file_id})
+            if not (result.get("file") or {}).get("download_url"):
+                raise RuntimeError("File response has no download_url")
+            return result
+        if state == "Failed":
+            raise RuntimeError((task.get("error") or {}).get("message") or "Generation failed")
+        if state not in {"Queueing", "Processing"}:
+            raise RuntimeError(f"Unexpected task state: {state!r}")
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            time.sleep(min(5, remaining))
+    raise TimeoutError(f"Retain task ID {task_id} and query it again later")
+
+
+if __name__ == "__main__":
+    submission = json.loads(Path("hailuo-submit.json").read_text(encoding="utf-8"))
+    if (submission.get("base_resp") or {}).get("status_code") != 0:
+        raise RuntimeError("Submission was not accepted; inspect hailuo-submit.json")
+    task_id = submission.get("task_id")
+    if not task_id:
+        raise RuntimeError("Submission has no task_id")
+    file_result = wait_for_file(task_id)
+    Path("hailuo-file.json").write_text(
+        json.dumps(file_result, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    print("File metadata saved to hailuo-file.json")
+```
+
+```bash 等待生成并获取文件信息
+python wait_for_hailuo.py
+```
+
+这里的查询间隔和等待期限是应用示例策略。超时或网络失败后可以重新运行，仍使用 `hailuo-submit.json` 中的原任务 ID。不要因此重复执行提交命令。
+
+```bash 下载视频文件
+DOWNLOAD_URL="$(jq -er '.file.download_url | select(type == "string" and startswith("https://"))' hailuo-file.json)"
+: "${DOWNLOAD_URL:?文件信息中没有 HTTPS 下载地址}"
+curl --fail --location --proto '=https' --proto-redir '=https' \
+  --connect-timeout 10 --max-time 300 \
+  --dump-header hailuo-video.headers \
+  --output hailuo-video.download "$DOWNLOAD_URL"
+```
+
+检查 `hailuo-video.headers` 的 `Content-Type` 和文件信息中的 `file.bytes`、`file.filename`。确认内容后按真实格式保存。下载请求不添加 MaxAPI 鉴权头；文件链接本身若已失效，重新调用文件信息接口获取当前地址。下载失败只需重试文件处理，无需重新生成。
+
 ## Luma：user_prompt 与生成资源
 
 Luma v2 使用 `user_prompt`，而不是统一视频的 `prompt`。可选字段包括 `image_url`、`image_end_url`、`expand_prompt` 和 `notify_hook`；使用前确认当前渠道支持的模式。
 
-```bash "Luma v2 提交"
+```bash Luma v2 提交
 jq -n '{user_prompt: "A red kite floats over a sunlit meadow."}' \
   | curl --fail-with-body https://api.maxapi.ai/luma/v2/generations \
     -H "Authorization: Bearer $MAXAPI_API_KEY" \
@@ -142,7 +233,7 @@ jq -n '{user_prompt: "A red kite floats over a sunlit meadow."}' \
 
 Kling 文生视频和图生视频使用不同的操作路径。查询模板中的 `action` 和 `action2` 应与提交操作相匹配，例如 `videos` 和 `text2video`。
 
-```http "文生视频查询路径"
+```http 文生视频查询路径
 GET /kling/v1/videos/text2video/{task_id}
 ```
 

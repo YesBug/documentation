@@ -1,0 +1,35 @@
+---
+title: "Modal: submit interactive input"
+description: "Supply a prompt or region mask for a Midjourney task waiting for modal input, preserve the interaction task ID, and retrieve the resulting generation."
+keywords: ["MaxAPI", "Midjourney", "modal"]
+openapi: "openapi/midjourney-en.json POST /mj/submit/modal"
+---
+
+Modal supplies extra input requested by an interactive action, such as a new prompt or a region mask. It follows [Action](/en/api-reference/midjourney/action); it does not edit an arbitrary completed task.
+
+## Obtain the interaction task
+
+1. Retrieve the source image task and select an available interactive button.
+2. Execute Action and save the returned interaction task ID.
+3. Retrieve that task, confirm it is waiting for input, and send its ID as `taskId` to Modal.
+
+Use the ID from the current interaction, not a permanently stored copy of the original Imagine ID.
+
+```json Supply a new prompt
+{
+  "taskId": "YOUR_MODAL_TASK_ID",
+  "prompt": "A small observatory under a starry night sky"
+}
+```
+
+## When to supply a mask
+
+Send `maskBase64` only when the selected operation requires a region edit. It contains an encoded mask image, not the source image URL or a text description. See [Buttons and region edits](/en/media/midjourney/actions) for mask creation and encoding.
+
+Although `prompt` and `maskBase64` are optional in the request structure, the selected action may require one of them. Optional fields do not mean every interaction accepts empty input.
+
+## Continue after submission
+
+Inspect the business code and `description`, save `result`, and [retrieve the task](/en/api-reference/midjourney/fetch). Track the ID returned for this submission using the same mode prefix.
+
+If the response says the task is not waiting for input, retrieve the interaction task again. It may already have been processed or belong to a different action. Do not keep resending the same Modal request indefinitely.

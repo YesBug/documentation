@@ -1,0 +1,150 @@
+---
+title: "文本生成与多轮对话"
+sidebarTitle: "文本与对话"
+description: "使用 MaxAPI Chat Completions 生成文本、保存多轮消息，理解结束原因和用量，并控制上下文长度与输出截断。"
+keywords: ["MaxAPI", "文本生成", "多轮对话", "messages", "finish_reason", "上下文"]
+---
+
+MaxAPI 的 Chat Completions 使用 `messages` 数组表达输入。单轮生成只需一个问题；聊天应用则在每次请求中带上相关历史。本页将一次成功请求扩展为两轮对话，并说明什么时候可以把结果保存为完整回答。
+
+## 先选对请求方式
+
+| 任务 | 使用方式 | 继续阅读 |
+| --- | --- | --- |
+| 总结、改写、问答、聊天 | `POST /v1/chat/completions`，文本消息 | 本页 |
+| 逐步显示生成内容 | 同一接口，启用 `stream` | [流式响应](/zh/guides/streaming) |
+| 分析图片、截图或图中文字 | 同一接口，文字和图片内容数组 | [视觉理解](/zh/guides/vision) |
+| 查询业务数据后回答 | 同一接口，定义 `tools` 并回传结果 | [工具调用](/zh/guides/tools) |
+| 接入已有的旧式 prompt 应用 | `POST /v1/completions`，模型需支持 | [传统补全](/zh/api-reference/completions) |
+
+先完成[快速开始](/zh/quickstart)，设置 `MAXAPI_API_KEY` 与 `MAXAPI_MODEL`。模型列表用于发现可访问的 ID，具体能力仍需匹配所选模型与通道。
+
+## 消息的角色与顺序
+
+| 角色 | 由谁提供 | 用途 |
+| --- | --- | --- |
+| `system` | 应用 | 设置回答风格、任务边界等高层要求，需模型支持 |
+| `user` | 用户或应用 | 当前问题、要处理的材料、后续补充 |
+| `assistant` | 模型 | 上一轮实际返回的回答或工具调用 |
+| `tool` | 应用 | 工具执行结果，通过 `tool_call_id` 对应调用 |
+
+部分模型使用 `developer` 等角色。只使用目标模型支持的角色，不要为了兼容性同时堆叠多个系统指令。用户上传的资料应作为待处理内容，不能让用户任意指定消息角色。
+
+一个常见的两轮消息序列是：`user` → `assistant` → `user`。第二次请求要包含前三条消息。响应 ID 是本次结果的标识，本指南不会通过它自动恢复上一轮上下文。
+
+## 可运行的两轮对话
+
+以下程序先生成活动文案，再要求模型修改同一段文案。它将真实的第一轮回答存入历史，并在结果不完整时停止，避免把截断内容当成已完成回答。
+
+<CodeGroup>
+```python conversation.py
+import os
+from openai import OpenAI
+
+messages = []
+questions = [
+    "为团队笔记应用写一段新品发布文案，强调多人协作，100 字以内。",
+    "保留上一段的核心信息，改成适合发给现有客户的邮件，包含主题。",
+]
+
+with OpenAI(
+    api_key=os.environ["MAXAPI_API_KEY"],
+    base_url="https://api.maxapi.ai/v1",
+    timeout=60.0,
+    max_retries=0,
+) as client:
+    for question in questions:
+        pending = messages + [{"role": "user", "content": question}]
+        response = client.chat.completions.create(
+            model=os.environ["MAXAPI_MODEL"],
+            messages=pending,
+        )
+        if not response.choices:
+            raise RuntimeError("响应中没有候选结果。")
+        choice = response.choices[0]
+        if choice.finish_reason != "stop" or not choice.message.content:
+            raise RuntimeError(f"未得到完整文本：{choice.finish_reason}")
+        messages = pending + [{
+            "role": "assistant",
+            "content": choice.message.content,
+        }]
+        print(f"用户：{question}\n助手：{choice.message.content}\n")
+```
+
+```javascript conversation.mjs
+import OpenAI from "openai";
+
+const apiKey = process.env.MAXAPI_API_KEY;
+const model = process.env.MAXAPI_MODEL;
+if (!apiKey || !model) throw new Error("请设置 MAXAPI_API_KEY 和 MAXAPI_MODEL。");
+const client = new OpenAI({
+  apiKey, baseURL: "https://api.maxapi.ai/v1", timeout: 60_000, maxRetries: 0,
+});
+let messages = [];
+const questions = [
+  "为团队笔记应用写一段新品发布文案，强调多人协作，100 字以内。",
+  "保留上一段的核心信息，改成适合发给现有客户的邮件，包含主题。",
+];
+
+for (const question of questions) {
+  const pending = [...messages, { role: "user", content: question }];
+  const response = await client.chat.completions.create({ model, messages: pending });
+  const choice = response.choices[0];
+  if (choice?.finish_reason !== "stop" || !choice.message.content) {
+    throw new Error(`未得到完整文本：${choice?.finish_reason ?? "无候选结果"}`);
+  }
+  messages = [...pending, { role: "assistant", content: choice.message.content }];
+  console.log(`用户：${question}\n助手：${choice.message.content}\n`);
+}
+```
+</CodeGroup>
+
+安装对应 [Python SDK](/zh/guides/python) 或 [Node.js SDK](/zh/guides/nodejs) 后，运行 `python conversation.py` 或 `node conversation.mjs`。预期看到两次问答，第二次回答应基于第一次的产品文案。实际措辞由模型生成。
+
+本例只在内存保存历史，程序退出后即丢失。接入真实聊天应用时，按用户和会话隔离历史，保留消息顺序；不要让不同用户共用同一个全局 `messages` 数组。
+
+## 判断生成是否完成
+
+| 返回位置 | 如何使用 |
+| --- | --- |
+| `choices[0].message.content` | 读取本次候选回答的文本 |
+| `choices[0].finish_reason` | 判断是正常结束、长度限制还是需要工具结果 |
+| `choices[0].message.tool_calls` | 有值时进入工具执行流程，文本可能为空 |
+| `usage` | 记录接口实际返回的 token 用量；字段可能因模型而异 |
+| `id` | 保存响应标识，用于应用日志或问题定位 |
+
+常见结束原因的处理方式：
+
+- `stop`：正常停止；仍要根据业务需要校验文本是否满足要求。
+- `length`：达到输出或相关模型限制，内容可能不完整。可缩小任务或调整模型支持的输出上限，再明确发起新请求。
+- `tool_calls`：模型在等应用执行工具；不要直接将其展示为最终回答。
+- 其他值或没有结束原因：保留实际状态，按模型说明处理，不要一律当成成功。
+
+用量是接口返回的统计，不等于本页能直接计算的费用。价格、倍率及账户计费请以控制台当前说明为准。
+
+## 调整输出时，一次只改一项
+
+先通过提示词说明读者、目标、语言、长度与格式。例如，将“写介绍”改为“面向开发团队，写三条各不超过 30 字的产品特点”。
+
+参数支持随模型变化。需要控制生成长度时，按模型选用 `max_tokens` 或 `max_completion_tokens`，不要同时设置两者。需要调整采样时，通常选择 `temperature` 或 `top_p` 之一。`stop` 在支持的模型上用于停止序列，不是通用的业务格式验证器。
+
+如果业务需要 JSON，可以在提示词里要求字段和格式，并在应用端使用 JSON 解析与字段校验。只靠提示词不能保证返回有效 JSON；不要将未验证的文本直接写入数据库或执行。完整参数见[对话接口参考](/zh/api-reference/chat-completions)。
+
+## 管理长对话
+
+每次请求都会提交所需历史，历史消息也占用输入上下文。随着对话增长，优先保留当前任务、重要事实和最近相关轮次；较早内容可摘要后重新提交。摘要可能丢失细节，精确值应由应用保存并按需重新提供。
+
+裁剪时按完整交互单元处理。尤其不要保留 `tool` 结果却删除对应的 assistant 工具调用，也不要只剩一个等待结果的工具调用。输入和预期输出都需要留出模型上下文空间，具体窗口取决于模型。
+
+## 常见问题
+
+| 现象 | 排查方向 |
+| --- | --- |
+| 第二轮忘记上一轮内容 | 检查本次 `messages` 是否带上实际历史，顺序是否正确 |
+| 回答突然结束 | 查看 `finish_reason`，再检查输出预算与上下文长度 |
+| 参数被拒绝 | 从最小请求开始，按目标模型能力逐项添加参数 |
+| 每次回答不同 | 生成存在随机性，采样参数支持也因模型而异，不应依赖固定措辞 |
+| 空文本但 HTTP 成功 | 检查工具调用、候选数量和结束原因 |
+| 长对话变慢或费用增加 | 查看输入用量，减少不相关历史和重复材料 |
+
+想让用户更早看到内容，继续接入[流式响应](/zh/guides/streaming)。HTTP 错误与网络问题见[错误排查](/zh/help/errors)。

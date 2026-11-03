@@ -22,7 +22,7 @@ keywords: ["MaxAPI", "图像专用协议", "image-providers"]
 
 接口资料给出了 `gemini-2.5-flash-image` 的 `generateContent` 路由。使用其他模型 ID 前，需先确认该模型也开放同一协议。
 
-```http "资料中的图像路由"
+```http 资料中的图像路由
 POST https://api.maxapi.ai/v1beta/models/gemini-2.5-flash-image:generateContent
 ```
 
@@ -35,7 +35,7 @@ POST https://api.maxapi.ai/v1beta/models/gemini-2.5-flash-image:generateContent
 
 将 `MAXAPI_GEMINI_IMAGE_MODEL` 设置为当前已确认可用的模型 ID。下面以文本输入演示相同的内容块结构：
 
-```bash "Gemini 图像请求"
+```bash Gemini 图像请求
 : "${MAXAPI_GEMINI_IMAGE_MODEL:?请设置支持 generateContent 图像生成的模型 ID}"
 MODEL_ESCAPED="$(printf '%s' "$MAXAPI_GEMINI_IMAGE_MODEL" | jq -sRr @uri)"
 jq -n '{
@@ -56,11 +56,60 @@ jq -n '{
 
 此格式的结果是多模态内容，可能同时含文本和图片，也可能因输入或模型限制未返回图片。遍历返回的候选内容块，按实际类型读取；不要套用 OpenAI Images 的 `data[0].url` 解析逻辑。MaxAPI 此路由使用 Bearer 鉴权，示例中不要混入厂商直连域名或直连密钥。
 
+### 用本地参考图构造编辑请求
+
+在支持图像编辑的渠道中，把真实图片编码后放入 `inline_data.data`。下面示例读取 JPEG 或 PNG 文件；文件扩展名应与实际格式一致。它只生成请求体，不消耗生成额度。
+
+```python build_gemini_edit.py
+import base64
+import json
+import mimetypes
+import sys
+from pathlib import Path
+
+
+if len(sys.argv) != 2:
+    raise SystemExit("Usage: python build_gemini_edit.py IMAGE_FILE")
+image = Path(sys.argv[1])
+mime_type = mimetypes.guess_type(image.name)[0]
+if mime_type not in {"image/jpeg", "image/png"}:
+    raise ValueError("This example accepts a JPEG or PNG file with a matching extension")
+payload = {
+    "contents": [{
+        "role": "user",
+        "parts": [
+            {"text": "Keep the main subject unchanged and replace the background with a quiet garden."},
+            {"inline_data": {
+                "mime_type": mime_type,
+                "data": base64.b64encode(image.read_bytes()).decode("ascii"),
+            }},
+        ],
+    }],
+    "generationConfig": {"responseModalities": ["TEXT", "IMAGE"]},
+}
+Path("gemini-edit-request.json").write_text(json.dumps(payload), encoding="utf-8")
+print("Request body saved to gemini-edit-request.json")
+```
+
+```bash 构造并发送图像编辑请求
+python build_gemini_edit.py ./reference.png
+: "${MAXAPI_GEMINI_IMAGE_MODEL:?请设置已开通的图像编辑模型 ID}"
+MODEL_ESCAPED="$(printf '%s' "$MAXAPI_GEMINI_IMAGE_MODEL" | jq -sRr @uri)"
+curl --fail-with-body \
+  "https://api.maxapi.ai/v1beta/models/$MODEL_ESCAPED:generateContent" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @gemini-edit-request.json \
+  --output gemini-edit-response.json
+```
+
+保留 `gemini-edit-response.json` 检查实际输出结构。此路由的现有资料未完整定义响应 schema，因此不要把“HTTP 200”直接显示为“图片已生成”：先确认候选内容确实有图片块，再按返回的 MIME 类型解码保存。未返回图片时，读取文本或错误信息，检查模型是否支持图像输出及当前输入。
+
 ## Stable Diffusion 3：multipart 与 Accept
 
 SD3 接口通过 `mode` 区分文生图和图生图。模型、输出尺寸以及参数组合以当前 SD 渠道支持情况为准。
 
-```http "Endpoint"
+```http Endpoint
 POST https://api.maxapi.ai/sd/v2beta/stable-image/generate/sd3
 ```
 
@@ -76,7 +125,7 @@ POST https://api.maxapi.ai/sd/v2beta/stable-image/generate/sd3
 
 `Accept: image/*` 请求图片内容，`Accept: application/json` 请求包含 Base64 的 JSON。上传表单时不手写 `Content-Type`，由 cURL 生成带 boundary 的请求头。
 
-```bash "SD3 文生图，保存图片"
+```bash SD3 文生图，保存图片
 : "${MAXAPI_SD_MODEL:?请设置已开通的 SD3 模型 ID}"
 curl --fail-with-body https://api.maxapi.ai/sd/v2beta/stable-image/generate/sd3 \
   -H "Authorization: Bearer $MAXAPI_API_KEY" \
@@ -93,11 +142,33 @@ curl --fail-with-body https://api.maxapi.ai/sd/v2beta/stable-image/generate/sd3 
 
 SDXL 的 `/sd/v1/generation/{engine_id}/text-to-image` 是另一套字段结构，不应复用 SD3 的 multipart 参数。更多分支见 [接口目录](/zh/api-reference/catalog)。
 
+### SD3 图生图
+
+在支持 `image-to-image` 的模型上，提供文件和已确认有效的 `strength`。先把 `MAXAPI_SD_STRENGTH` 设置为该渠道接受的数值；不要把其他模型的强度参数范围当作这里的约束。
+
+```bash 上传参考图并保存生成结果
+: "${MAXAPI_SD_MODEL:?请设置已开通的 SD3 模型 ID}"
+: "${MAXAPI_SD_STRENGTH:?请设置该模型接受的 strength 数值}"
+curl --fail-with-body https://api.maxapi.ai/sd/v2beta/stable-image/generate/sd3 \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Accept: image/*" \
+  --form-string "model=$MAXAPI_SD_MODEL" \
+  --form-string "mode=image-to-image" \
+  --form-string "prompt=Keep the building layout and redraw the scene as a watercolor illustration" \
+  --form "image=@./reference.png" \
+  --form-string "strength=$MAXAPI_SD_STRENGTH" \
+  --form-string "output_format=png" \
+  --dump-header sd-edit.headers \
+  --output sd-edit.download
+```
+
+如果返回参数错误，检查上传的 `image` 是否为文件内容、`strength` 是否有效，以及所选模型是否支持图生图。保存成 `.download` 是为了先检查响应类型，避免把 JSON 错误内容误认为 PNG。
+
 ## Ideogram：image_request 包装层
 
 Ideogram 生成接口使用 JSON 对象 `image_request`。图像混合、放大和描述操作可能改用 multipart，需分别确认请求编码。
 
-```http "Endpoints"
+```http Endpoints
 POST https://api.maxapi.ai/ideogram/generate
 POST https://api.maxapi.ai/ideogram/remix
 POST https://api.maxapi.ai/ideogram/upscale
@@ -113,7 +184,7 @@ POST https://api.maxapi.ai/ideogram/describe
 | `image_request.magic_prompt_option` | 支持时控制提示词增强 |
 | `image_request.style_type` | 支持该风格参数的模型使用 |
 
-```bash "Ideogram 文生图"
+```bash Ideogram 文生图
 : "${MAXAPI_IDEOGRAM_MODEL:?请设置已开通的 Ideogram 模型值}"
 jq -n --arg model "$MAXAPI_IDEOGRAM_MODEL" '{
   image_request: {
@@ -128,6 +199,27 @@ jq -n --arg model "$MAXAPI_IDEOGRAM_MODEL" '{
 ```
 
 成功响应使用 `data[]`，可包含 `url`、`prompt`、`resolution` 和 `is_image_safe`。`url` 可能为空，需要逐项检查；不要默认每个数组元素都有可下载图片。取得结果后及时保存到自己的存储，不把生成链接的保存时长写死在业务逻辑中。
+
+### 读取并保存 Ideogram 图片
+
+保留整个 `data[]`，不要只保存第一张图的 URL：其中的提示词、分辨率和安全标记有助于应用展示和排错。下面选择第一张有 HTTPS 地址、且没有明确标记为不安全的图片：
+
+```bash 提取一张可用图片并下载
+IMAGE_URL="$(jq -er '
+  [.data[]? |
+    select(.is_image_safe != false) |
+    select(.url | type == "string") |
+    select(.url | startswith("https://"))
+  ][0].url // empty
+' ideogram-images.json)"
+: "${IMAGE_URL:?没有可用图片，请检查 data 和错误信息}"
+curl --fail --location --proto '=https' --proto-redir '=https' \
+  --connect-timeout 10 --max-time 120 \
+  --dump-header ideogram-image.headers \
+  --output ideogram-image.download "$IMAGE_URL"
+```
+
+检查下载响应的 `Content-Type`，确认是图片后按实际格式命名。生成请求和图片下载是两次独立请求：只有前者向 MaxAPI 发送 Bearer 密钥，下载链接使用其自身的访问方式。
 
 ## 异步图像：复用 videos 任务资源
 
@@ -144,3 +236,15 @@ jq -n --arg model "$MAXAPI_IDEOGRAM_MODEL" '{
 保存响应中的 `id`，根据该分支的状态判断任务完成，再读取内容。示例中 `status: "in_progress"` 表示处理中；不要借用统一视频接口的大写 `SUCCESS` 去判断所有 `/v1/videos` 任务。下载时检查真实 `Content-Type`，不要把二进制图片当作 JSON 解析。
 
 任务保存、有限轮询和下载处理建议见 [异步任务与回调](/zh/guides/async-tasks)。
+
+
+## 按输出类型排查
+
+| 现象 | 处理方式 |
+| --- | --- |
+| SDK 报未知参数或无法解析响应 | 确认是否在用 OpenAI SDK 调厂商专用协议；必要时改用普通 HTTP |
+| Gemini 返回文字，没有图片 | 检查模型的图像输出能力、`responseModalities` 和实际内容块 |
+| SD3 结果打不开 | 先检查 HTTP 状态和 `Content-Type`，避免把 JSON 错误保存成图片 |
+| Ideogram 的 `data[]` 存在但 URL 为空 | 检查每个元素与安全标记，不要盲目读取第一项 |
+| 参考图被拒绝 | 核对 MIME 类型、编码方式、文件内容，以及模型的输入约束 |
+| `/v1/videos` 图像任务一直未完成 | 使用该图像分支的状态规则，检查任务 ID 与结果下载步骤 |

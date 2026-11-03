@@ -1,0 +1,217 @@
+---
+title: "Midjourney 后续动作"
+sidebarTitle: "单图、变体与局部重绘"
+description: "理解 U/V 按钮和 customId，完整执行 Action、Modal、Remix、缩放、平移与局部重绘。"
+keywords: ["MaxAPI", "Midjourney", "Action", "Modal", "Remix", "局部重绘", "customId"]
+---
+
+生成图片后，下一步可执行的动作由任务的 `buttons` 决定。先查询任务，选择按钮，再将 **当前任务 ID 和该按钮的完整 `customId`** 交给 [Action 接口](/zh/api-reference/midjourney/action)。需要修改提示词或蒙版的动作，还要经过 [Modal 接口](/zh/api-reference/midjourney/modal)。
+
+## U1、V1 和其他按钮是什么意思
+
+四宫格的编号按从左到右、从上到下排列：
+
+| 左侧 | 右侧 |
+| --- | --- |
+| **1** · 左上 | **2** · 右上 |
+| **3** · 左下 | **4** · 右下 |
+
+| 常见按钮 | 作用 | 如何提交 |
+| --- | --- | --- |
+| `U1`–`U4` | 选择对应图片；具体是否同时提升分辨率取决于模型版本 | 查找当前任务中同名按钮，使用其 `customId` |
+| `V1`–`V4` | 基于对应图片生成变体 | 同上；启用 Remix 的通道可能要求 Modal 确认 |
+| 重新生成图标 | 使用原提示词重新生成 | 图标可能位于 `emoji`，不能只依赖 `label` 查找 |
+| Upscale、Vary 等 | 对选中的单图继续放大或变化 | 先查询单图任务，再使用它返回的新按钮 |
+| Zoom / Custom Zoom | 扩展画布；自定义缩放需要额外输入 | 以 Action 返回决定是否继续 Modal |
+| 方向箭头 / Pan | 向指定方向扩展画布 | 使用对应方向的按钮，Remix 通道可能要求确认 |
+| Vary Region | 修改画面中选定区域 | Action → Modal，提交蒙版和提示词 |
+
+按钮名称和可用动作随任务类型、模型版本及通道配置变化。这张表帮助理解常见操作；**以当前任务实际返回的按钮为准**。不要手写或拼接 `customId`，也不要跨任务复用。
+
+## 两条后续流程
+
+普通动作被接受后，直接查询返回的任务 ID。交互动作会先生成一个待确认任务，补充输入后才能继续。下面用示意 ID 演示两者的区别，不会发送 API 请求。
+
+<MjActionFlow />
+
+## 1. 从已完成的任务中选择按钮
+
+先完成 [快速开始](/zh/media/midjourney)，得到 `mj-task.json`。以下示例选择 `U1`；其他操作需要选择实际返回的对应按钮。
+
+```bash 生成 Action 请求
+python3 - <<'PY'
+import json
+from pathlib import Path
+
+task = json.loads(Path("mj-task.json").read_text(encoding="utf-8"))
+if task.get("status") != "SUCCESS":
+    raise SystemExit("Wait for the source task to succeed first")
+button = next((b for b in task.get("buttons", []) if b.get("label") == "U1"), None)
+if not button or not button.get("customId"):
+    raise SystemExit("This task has no U1 button; inspect its actual buttons")
+task_id = task.get("id")
+if isinstance(task_id, bool) or not isinstance(task_id, (str, int)) or str(task_id) == "":
+    raise SystemExit("The source task has no valid id")
+payload = {"taskId": str(task_id), "customId": button["customId"], "state": "product-photo-u1"}
+Path("mj-action-request.json").write_text(json.dumps(payload), encoding="utf-8")
+PY
+```
+
+脚本成功后发送请求：
+
+```bash
+curl --fail-with-body "$MAXAPI_MJ_BASE_URL/submit/action" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @mj-action-request.json \
+  --output mj-action.json
+```
+
+`state` 是本次动作的业务关联值，可按你的业务填写或省略。动作的 `taskId` 必须指向产生所选按钮的那个任务。
+
+## 2. 根据 Action 返回选择下一步
+
+| 返回情况 | 下一步 |
+| --- | --- |
+| `code: 1` 或 `code: 22`，并返回任务 ID | 保存 `result`，查询这个后续任务直到完成 |
+| `code: 21`，说明为交互等待，或查询到 `status: "MODAL"` | 保存 `result` 作为待确认任务 ID，继续下一节 |
+| 其他业务结果 | 阅读 `description`，不要将任何 `result` 都当作成功任务继续执行 |
+
+`21` 在不同接口或版本的说明中也可能表示已有任务。应结合 `description` 与查询得到的 `status` 判断；**`MODAL` 表示等待输入，继续轮询本身不能完成确认**。
+
+直接受理的示意响应：
+
+```json
+{"code": 1, "description": "提交成功", "result": "TASK_B"}
+```
+
+这时使用 [轮询脚本](/zh/media/midjourney/tasks) 查询 `TASK_B`，不是原始的 `TASK_A`。成功后，新的 `imageUrl` 和 `buttons` 属于 `TASK_B`；继续对它操作时，也应使用 `TASK_B` 的按钮。
+
+## 3. 需要交互时，提交 Modal
+
+Custom Zoom、Vary Region，以及 Describe/Shorten 的选择动作通常需要额外输入。Remix 通道中的变体、重新生成和平移，也可能进入此分支。
+
+交互等待的示意响应：
+
+```json
+{"code": 21, "description": "等待窗口确认", "result": "PENDING_TASK"}
+```
+
+将这里的 `PENDING_TASK` 换成实际返回值，填入 Modal 的 `taskId`。它不是最初的绘图 ID，也不是按钮的 `customId`。
+
+```bash 确认提示词
+export MJ_PENDING_TASK_ID="替换为 Action 返回的待确认任务 ID"
+
+python3 - <<'PY'
+import json
+import os
+from pathlib import Path
+
+payload = {
+    "taskId": os.environ["MJ_PENDING_TASK_ID"],
+    "prompt": "A handmade blue ceramic cup, soft studio lighting"
+}
+Path("mj-modal-request.json").write_text(json.dumps(payload), encoding="utf-8")
+PY
+```
+
+```bash 发送 Modal
+curl --fail-with-body "$MAXAPI_MJ_BASE_URL/submit/modal" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @mj-modal-request.json \
+  --output mj-modal.json
+```
+
+Modal 的必填字段是 `taskId`。只确认原提示词时，可省略 `prompt`；修改提示词时，提交你希望使用的完整内容。处理 Modal 的业务结果后，**以它返回的 `result` 作为后续查询 ID**，不要假定它一定等于或一定不同于待确认 ID。
+
+### 自定义缩放
+
+选择当前结果的 Custom Zoom 按钮，等待 Action 返回交互任务，然后在 Modal 的完整提示词中加入 `--zoom`。例如：
+
+```text
+A handmade ceramic cup on a large wooden table, soft studio lighting --zoom 1.5
+```
+
+该交互的缩放值范围为 `1` 到 `2`。先发起 Custom Zoom 动作，再提交提示词；单独给普通绘图请求增加这个参数不能替代整个动作流程。
+
+### 局部重绘
+
+1. 查询当前图片任务，找到 Vary Region 对应的真实按钮。
+2. 提交 Action，保存返回的待确认任务 ID。
+3. 在本地准备 `mask.png`：以当前结果图为参照，**黑色表示保留，白色表示要重绘的区域**。
+4. 使用下面的代码生成 Modal 请求，再运行上面的“发送 Modal”命令。
+
+```bash 生成局部重绘请求
+python3 - <<'PY'
+import base64
+import json
+import os
+from pathlib import Path
+
+mask = base64.b64encode(Path("mask.png").read_bytes()).decode("ascii")
+payload = {
+    "taskId": os.environ["MJ_PENDING_TASK_ID"],
+    "prompt": "A blue ceramic cup with a small white flower pattern",
+    "maskBase64": f"data:image/png;base64,{mask}"
+}
+Path("mj-modal-request.json").write_text(json.dumps(payload), encoding="utf-8")
+PY
+```
+
+`maskBase64` 是蒙版图片的 Data URI，不是原图 URL。确认 `MJ_PENDING_TASK_ID` 来自这一次局部重绘动作，避免把旧交互任务的 ID 用在新的蒙版上。
+
+### Remix 与账号筛选
+
+Remix 允许在后续动作中修改提示词，但是否需要交互，取决于通道账号的 Remix 和自动提交配置。普通 Action 与需要 Modal 的 Action 都应处理。
+
+`accountFilter.remix` 和 `accountFilter.remixAutoConsidered` 是提交时的**账号筛选条件**，不是为账号打开或关闭 Remix 的开关。如果并不需要限定通道，省略 `accountFilter` 即可；字段语义见 [Imagine 参数](/zh/api-reference/midjourney/imagine)。
+
+## 应用里如何保存动作关系
+
+| 保存项 | 示例 | 用途 |
+| --- | --- | --- |
+| 来源任务 ID | `TASK_A` | 关联原图与本次操作 |
+| 所选按钮 `customId` | 本次查询返回的完整值 | 记录究竟执行了哪个动作 |
+| 待确认任务 ID（如有） | `PENDING_TASK` | 给 Modal 提交用户输入 |
+| 最后一次受理返回的任务 ID | `TASK_B` | 查询最终结果，并作为下一次操作的来源 |
+| 完整模式前缀 | `https://api.maxapi.ai/mj` | 所有查询与后续动作使用同一模式 |
+
+提交超时后先核对已有任务和调用记录，避免自动重复发起收费生成。按钮不存在、业务返回拒绝或任务失败时，保留 `description` / `failReason`，按实际错误处理。
+
+export const MjActionFlow = () => {
+  const [modal, setModal] = useState(false);
+  const [step, setStep] = useState(0);
+  const direct = [
+    ["① 来源图片", "查询 TASK_A", "从 TASK_A.buttons 选择本次要执行的按钮。"],
+    ["② 发起动作", "Action：taskId = TASK_A", "customId 使用刚才选中的完整按钮标识；受理后返回 TASK_B。"],
+    ["③ 获取结果", "Fetch：id = TASK_B", "等待 TASK_B 成功，再读取它的图片和新按钮。"]
+  ];
+  const interactive = [
+    ["① 来源图片", "查询 TASK_A", "从 TASK_A.buttons 选择需要额外输入的动作。"],
+    ["② 进入交互", "Action：返回 PENDING_TASK", "响应提示交互等待，或查询状态为 MODAL；等待用户输入。"],
+    ["③ 确认输入", "Modal：taskId = PENDING_TASK", "提交提示词或蒙版；保存 Modal 受理后返回的任务 ID。"],
+    ["④ 获取结果", "Fetch：使用 Modal 返回的 ID", "查询最终任务；不继续查询最初的 TASK_A。"]
+  ];
+  const steps = modal ? interactive : direct;
+  const button = {padding:"8px 12px", border:"1px solid rgba(128,128,128,.3)", borderRadius:8, cursor:"pointer", color:"inherit", background:"transparent"};
+  return (
+    <div className="not-prose" style={{border:"1px solid rgba(128,128,128,.25)", borderRadius:12, padding:20, margin:"20px 0", color:"inherit"}}>
+      <div style={{fontWeight:600, marginBottom:12}}>任务 ID 流转演示</div>
+      <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>
+        <button type="button" aria-pressed={!modal} style={{...button, background:!modal?"rgba(59,130,246,.14)":"transparent"}} onClick={() => {setModal(false);setStep(0);}}>普通动作</button>
+        <button type="button" aria-pressed={modal} style={{...button, background:modal?"rgba(59,130,246,.14)":"transparent"}} onClick={() => {setModal(true);setStep(0);}}>需要 Modal 的动作</button>
+      </div>
+      <div aria-live="polite" style={{padding:"20px 0", minHeight:140}}>
+        <div style={{opacity:.65, fontSize:13, marginBottom:8}}>{steps[step][0]} · {step+1}/{steps.length}</div>
+        <div style={{fontFamily:"monospace", fontSize:16, overflowWrap:"anywhere"}}>{steps[step][1]}</div>
+        <p style={{marginTop:10, lineHeight:1.7}}>{steps[step][2]}</p>
+      </div>
+      <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>
+        <button type="button" style={{...button, opacity:step===0?.4:1}} disabled={step===0} onClick={() => setStep(step-1)}>上一步</button>
+        <button type="button" style={{...button, opacity:step===steps.length-1?.4:1}} disabled={step===steps.length-1} onClick={() => setStep(step+1)}>下一步</button>
+        <button type="button" style={button} onClick={() => setStep(0)}>重新开始</button>
+      </div>
+    </div>
+  );
+};

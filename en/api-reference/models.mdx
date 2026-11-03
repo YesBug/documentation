@@ -42,3 +42,57 @@ Install `openai` before using the Python example. The list's `data` array contai
 Choose a text-chat model for [Chat Completions](/en/api-reference/chat-completions). Presence in the list does not establish support for every endpoint, input type or optional parameter. Permissions and model state may change, so rely on the current response.
 
 If listing fails, check [authentication](/en/authentication). See [model selection](/en/models) for evaluating capabilities.
+
+## Save and inspect the raw response
+
+For direct HTTP debugging, save the response without adding a request body or `Content-Type` header.
+
+```bash Save the model list
+curl --fail-with-body https://api.maxapi.ai/v1/models \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  --output models.json
+```
+
+After the command succeeds, inspect IDs with the Python standard library. Do not treat a fixed example name as an available account model.
+
+```python Read model IDs
+import json
+from pathlib import Path
+
+result = json.loads(Path("models.json").read_text(encoding="utf-8"))
+models = result.get("data")
+if not isinstance(models, list):
+    raise ValueError("No model array; inspect the original response")
+for model in models:
+    print(model["id"])
+```
+
+This is the response shape. `YOUR_MODEL_ID` is a placeholder for an actual returned ID.
+
+```json Model list structure
+{
+  "object": "list",
+  "data": [{"id": "YOUR_MODEL_ID", "object": "model"}]
+}
+```
+
+## Use models in application configuration
+
+Use the list to inspect key visibility and build a menu of models you have verified. Do not automatically connect every listed model to one endpoint.
+
+| The list helps establish | Verify separately |
+| --- | --- |
+| Model IDs visible to this key | Whether each uses chat, image, audio or another protocol |
+| Exact `model` strings | Vision, tools, response formats and parameter support |
+| Metadata in this response | Context limits, prices, quotas and current channel state |
+
+Explicitly configure verified models and their intended tasks. If a refreshed list omits a configured model, show a clear error and check access. Silently substituting a different model can change output and usage expectations.
+
+## Diagnose list failures
+
+- `401`: check for a missing or invalid key and a duplicated `Bearer` prefix.
+- `404`: use `https://api.maxapi.ai/v1/models`, not the console domain or a repeated `/v1`.
+- Empty `data`: retain the original response and check the key and account configuration. Do not insert IDs from another platform.
+- Listing succeeds but generation fails: verify the generating endpoint's capabilities and parameters. A model listing is not a generation health check.
+
+See [troubleshooting](/en/help/errors) for the full diagnostic workflow.

@@ -1,0 +1,217 @@
+---
+title: "Midjourney follow-up actions"
+sidebarTitle: "Follow-up actions"
+description: "Use U/V buttons and customId to select images and create variations, then complete Action and Modal workflows for Remix, zoom, pan and region editing."
+keywords: ["MaxAPI", "Midjourney", "Action", "Modal", "Remix", "region editing", "customId"]
+---
+
+After an image is generated, the task's `buttons` determine the available next actions. Query the task, select a button, then submit **the current task ID and that button's complete `customId`** to the [Action endpoint](/en/api-reference/midjourney/action). Actions that need a prompt or mask also continue through the [Modal endpoint](/en/api-reference/midjourney/modal).
+
+## Understand U1, V1 and other buttons
+
+Images in a four-image grid are numbered from left to right, then top to bottom:
+
+| Left | Right |
+| --- | --- |
+| **1** · Top left | **2** · Top right |
+| **3** · Bottom left | **4** · Bottom right |
+
+| Common button | Purpose | How to submit |
+| --- | --- | --- |
+| `U1` through `U4` | Select the corresponding image; whether this also increases resolution depends on the model version | Find the matching button in the current task and use its `customId`. |
+| `V1` through `V4` | Generate variations of the corresponding image | Use the matching button; a Remix-enabled channel may require Modal confirmation. |
+| Reroll icon | Generate again from the original prompt | The icon may be in `emoji`, so do not rely only on `label`. |
+| Upscale, Vary and similar buttons | Further upscale or vary the selected image | Query the selected image's task first, then use its new buttons. |
+| Zoom / Custom Zoom | Extend the canvas; custom zoom needs additional input | Use Action's response to determine whether Modal is needed. |
+| Direction arrows / Pan | Extend the canvas in the chosen direction | Use the corresponding button; a Remix channel may require confirmation. |
+| Vary Region | Modify a selected part of the image | Follow Action → Modal and supply the mask and prompt. |
+
+Button names and available actions vary by task type, model version and channel configuration. This table explains common operations; **use the buttons actually returned by the current task**. Do not construct `customId` values yourself or reuse them across tasks.
+
+## Two follow-up workflows
+
+When a direct action is accepted, query its returned task ID. An interactive action first creates a pending task that needs input before it can continue. This demo uses illustrative IDs and makes no API requests.
+
+<MjActionFlow />
+
+## 1. Select a button from a completed task
+
+Complete the [quickstart](/en/media/midjourney) to obtain `mj-task.json`. This example selects `U1`; for other operations, choose the corresponding button returned by your task.
+
+```bash Build the Action request
+python3 - <<'PY'
+import json
+from pathlib import Path
+
+task = json.loads(Path("mj-task.json").read_text(encoding="utf-8"))
+if task.get("status") != "SUCCESS":
+    raise SystemExit("Wait for the source task to succeed first")
+button = next((b for b in task.get("buttons", []) if b.get("label") == "U1"), None)
+if not button or not button.get("customId"):
+    raise SystemExit("This task has no U1 button; inspect its actual buttons")
+task_id = task.get("id")
+if isinstance(task_id, bool) or not isinstance(task_id, (str, int)) or str(task_id) == "":
+    raise SystemExit("The source task has no valid id")
+payload = {"taskId": str(task_id), "customId": button["customId"], "state": "product-photo-u1"}
+Path("mj-action-request.json").write_text(json.dumps(payload), encoding="utf-8")
+PY
+```
+
+After the script succeeds, send the request:
+
+```bash
+curl --fail-with-body "$MAXAPI_MJ_BASE_URL/submit/action" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @mj-action-request.json \
+  --output mj-action.json
+```
+
+`state` is the business reference for this action. Set it to a value useful to your application or omit it. The action's `taskId` must identify the task that returned the selected button.
+
+## 2. Choose the next step from Action's response
+
+| Response | Next step |
+| --- | --- |
+| `code: 1` or `code: 22`, with a task ID | Save `result` and query that follow-up task until it completes. |
+| `code: 21` with an input-required description, or a queried `status: "MODAL"` | Save `result` as the pending task ID and continue to the next section. |
+| Another business result | Read `description`; do not treat every nonempty `result` as a successful task. |
+
+Some endpoints or versions describe `21` as an existing task. Use both `description` and the queried `status` to determine the next step. **`MODAL` means input is required; polling alone cannot confirm the interaction.**
+
+Example response for an accepted direct action:
+
+```json
+{"code": 1, "description": "Submitted successfully", "result": "TASK_B"}
+```
+
+Use the [polling script](/en/media/midjourney/tasks) to query `TASK_B`, not the original `TASK_A`. Once it succeeds, the new `imageUrl` and `buttons` belong to `TASK_B`. Use `TASK_B`'s buttons for further actions on that result.
+
+## 3. Submit Modal when input is required
+
+Custom Zoom, Vary Region, and selection actions following Describe or Shorten typically need additional input. Variations, rerolls and pans on a Remix channel can also take this path.
+
+Example response when input is required:
+
+```json
+{"code": 21, "description": "Waiting for input", "result": "PENDING_TASK"}
+```
+
+Replace `PENDING_TASK` with the actual returned value and use it as Modal's `taskId`. It is not the initial image task ID or the button's `customId`.
+
+```bash Confirm the prompt
+export MJ_PENDING_TASK_ID="REPLACE_WITH_THE_PENDING_TASK_ID_FROM_ACTION"
+
+python3 - <<'PY'
+import json
+import os
+from pathlib import Path
+
+payload = {
+    "taskId": os.environ["MJ_PENDING_TASK_ID"],
+    "prompt": "A handmade blue ceramic cup, soft studio lighting"
+}
+Path("mj-modal-request.json").write_text(json.dumps(payload), encoding="utf-8")
+PY
+```
+
+```bash Send Modal
+curl --fail-with-body "$MAXAPI_MJ_BASE_URL/submit/modal" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @mj-modal-request.json \
+  --output mj-modal.json
+```
+
+Modal requires `taskId`. You can omit `prompt` to confirm the original prompt; to change it, provide the complete text you want to use. After handling Modal's business response, **use its returned `result` for subsequent queries**. Do not assume that ID must be the same as, or different from, the pending task ID.
+
+### Custom zoom
+
+Select the current result's Custom Zoom button, wait for Action to return the pending interaction, then include `--zoom` in the complete Modal prompt. For example:
+
+```text
+A handmade ceramic cup on a large wooden table, soft studio lighting --zoom 1.5
+```
+
+This interaction accepts zoom values from `1` to `2`. Start the Custom Zoom action before submitting its prompt. Adding this parameter to an ordinary image request does not replace the action workflow.
+
+### Region editing
+
+1. Query the current image task and find its actual Vary Region button.
+2. Submit Action and save the pending task ID it returns.
+3. Prepare `mask.png` using the current image as a reference: **black marks areas to retain; white marks areas to redraw**.
+4. Build the Modal request below, then run the “Send Modal” command above.
+
+```bash Build a region-editing request
+python3 - <<'PY'
+import base64
+import json
+import os
+from pathlib import Path
+
+mask = base64.b64encode(Path("mask.png").read_bytes()).decode("ascii")
+payload = {
+    "taskId": os.environ["MJ_PENDING_TASK_ID"],
+    "prompt": "A blue ceramic cup with a small white flower pattern",
+    "maskBase64": f"data:image/png;base64,{mask}"
+}
+Path("mj-modal-request.json").write_text(json.dumps(payload), encoding="utf-8")
+PY
+```
+
+`maskBase64` is the mask image's Data URI, not the original image URL. Make sure `MJ_PENDING_TASK_ID` comes from this region-editing action, rather than an older interaction.
+
+### Remix and account filters
+
+Remix lets you change the prompt during follow-up actions. Whether an interaction is required depends on the channel account's Remix and automatic-submission settings. Handle both direct Action responses and those that need Modal.
+
+`accountFilter.remix` and `accountFilter.remixAutoConsidered` are **account-selection criteria** for submission. They do not switch an account's Remix setting on or off. Omit `accountFilter` if you do not need to restrict the channel; see the [Imagine parameters](/en/api-reference/midjourney/imagine) for field details.
+
+## Store the action relationships
+
+| Value to save | Example | Purpose |
+| --- | --- | --- |
+| Source task ID | `TASK_A` | Link the original image to this operation. |
+| Selected button's `customId` | The complete value returned by this query | Record which action was chosen. |
+| Pending task ID, when present | `PENDING_TASK` | Send the user's additional input to Modal. |
+| Task ID from the most recent accepted submission | `TASK_B` | Query the final result and use it as the source of the next action. |
+| Complete mode prefix | `https://api.maxapi.ai/mj` | Keep queries and follow-up actions on the same mode. |
+
+After a submission timeout, check existing tasks and call records before automatically submitting another paid generation request. If a button is missing, the operation is rejected or the task fails, retain `description` / `failReason` and handle the reported error.
+
+export const MjActionFlow = () => {
+  const [modal, setModal] = useState(false);
+  const [step, setStep] = useState(0);
+  const direct = [
+    ["① Source image", "Query TASK_A", "Choose the next action from TASK_A.buttons."],
+    ["② Submit action", "Action: taskId = TASK_A", "Use the selected button's complete customId; an accepted action returns TASK_B."],
+    ["③ Retrieve result", "Fetch: id = TASK_B", "Wait for TASK_B to succeed, then read its image and new buttons."]
+  ];
+  const interactive = [
+    ["① Source image", "Query TASK_A", "Choose an action that needs additional input from TASK_A.buttons."],
+    ["② Start interaction", "Action: returns PENDING_TASK", "The response requires input, or the queried status is MODAL. Wait for the user's input."],
+    ["③ Confirm input", "Modal: taskId = PENDING_TASK", "Submit the prompt or mask, then save the task ID returned by the accepted Modal request."],
+    ["④ Retrieve result", "Fetch: use the ID returned by Modal", "Query the final task instead of continuing to query the original TASK_A."]
+  ];
+  const steps = modal ? interactive : direct;
+  const button = {padding:"8px 12px", border:"1px solid rgba(128,128,128,.3)", borderRadius:8, cursor:"pointer", color:"inherit", background:"transparent"};
+  return (
+    <div className="not-prose" style={{border:"1px solid rgba(128,128,128,.25)", borderRadius:12, padding:20, margin:"20px 0", color:"inherit"}}>
+      <div style={{fontWeight:600, marginBottom:12}}>Follow the task IDs</div>
+      <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>
+        <button type="button" aria-pressed={!modal} style={{...button, background:!modal?"rgba(59,130,246,.14)":"transparent"}} onClick={() => {setModal(false);setStep(0);}}>Direct action</button>
+        <button type="button" aria-pressed={modal} style={{...button, background:modal?"rgba(59,130,246,.14)":"transparent"}} onClick={() => {setModal(true);setStep(0);}}>Action requiring Modal</button>
+      </div>
+      <div aria-live="polite" style={{padding:"20px 0", minHeight:140}}>
+        <div style={{opacity:.65, fontSize:13, marginBottom:8}}>{steps[step][0]} · {step+1}/{steps.length}</div>
+        <div style={{fontFamily:"monospace", fontSize:16, overflowWrap:"anywhere"}}>{steps[step][1]}</div>
+        <p style={{marginTop:10, lineHeight:1.7}}>{steps[step][2]}</p>
+      </div>
+      <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>
+        <button type="button" style={{...button, opacity:step===0?.4:1}} disabled={step===0} onClick={() => setStep(step-1)}>Previous</button>
+        <button type="button" style={{...button, opacity:step===steps.length-1?.4:1}} disabled={step===steps.length-1} onClick={() => setStep(step+1)}>Next</button>
+        <button type="button" style={button} onClick={() => setStep(0)}>Restart</button>
+      </div>
+    </div>
+  );
+};

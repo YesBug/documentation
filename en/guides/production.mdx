@@ -1,0 +1,134 @@
+---
+title: "Timeouts, rate limits and retries"
+description: "Set timeout budgets, control concurrency and recover from errors without duplicate requests or unlimited retries."
+keywords: ["MaxAPI", "timeouts", "rate limits", "429", "retries", "concurrency", "production"]
+---
+
+After your first successful call, prepare your application for slow responses, failures and traffic spikes. The durations and concurrency values here are application choices, not MaxAPI service limits.
+
+## Distinguish three kinds of waiting
+
+| Time | Where it occurs | Configuration principle |
+| --- | --- | --- |
+| Connection timeout | DNS, proxies, TLS and connection establishment | Detect unreachable services early and diagnose the network |
+| Read timeout | Connected, but no new data arrives | Match the task; long text and media tasks require different handling |
+| Overall deadline | Queue time, requests and retry delays combined | Decide how long the user can wait; a per-attempt timeout is insufficient |
+
+Python SDK timeout values use seconds; Node.js values use milliseconds. Reverse proxies, load balancers and browsers can impose separate timeouts. Increasing a client timeout does not extend the limits of intermediate services.
+
+<CodeGroup>
+```python Python client configuration
+import os
+from openai import OpenAI
+
+client = OpenAI(
+    api_key=os.environ["MAXAPI_API_KEY"],
+    base_url="https://api.maxapi.ai/v1",
+    timeout=60.0,
+    max_retries=0,
+)
+```
+```javascript Node.js client configuration
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: process.env.MAXAPI_API_KEY,
+  baseURL: "https://api.maxapi.ai/v1",
+  timeout: 60_000,
+  maxRetries: 0,
+});
+```
+</CodeGroup>
+
+These examples disable SDK retries so the application can own recovery decisions. If you use SDK retries, check your installed version's behavior and retry count before adding any application retry loop.
+
+## Decide whether to retry
+
+| Situation | Recommended action |
+| --- | --- |
+| `400`, invalid parameters or context errors | Fix the input; repeating the same request usually will not help |
+| `401`, `403` | Check credentials, permissions and account configuration |
+| `404` | Check the full path, protocol and model identifier |
+| `429` with a temporary rate-limit error | Reduce request rate and back off according to any server delay hint |
+| `429` with a quota or billing error | Stop automatic retries and resolve the account issue |
+| Temporary `5xx` | Retry within a bounded budget; consider duplicate execution for generation requests |
+| Timeout or dropped connection | The outcome is uncertain; processing may have started and is not necessarily canceled |
+| Streaming already produced text | Keep and label partial output; do not append a newly generated answer to it automatically |
+| An asynchronous task ID was received | Poll the original task instead of submitting it again |
+
+When a valid `Retry-After` is present, wait at least the specified number of seconds or until its HTTP date. Otherwise, use exponential backoff with jitter, such as application-chosen base intervals of `1s → 2s → 4s`. Limit both attempts and total waiting time. If the server delay exceeds the remaining business deadline, stop or defer the request rather than retrying early.
+
+<Note>
+Not every error includes `Retry-After`. Do not assume that adding `Idempotency-Key` prevents duplicate generation; depend on that behavior only when the endpoint explicitly supports it.
+</Note>
+
+## Bound concurrency and queues
+
+Concurrency is the number of requests in progress. Rate is the number started per unit of time. Even low concurrency can exceed a rate limit when requests finish quickly. Production systems often need concurrency limits, bounded queues and rate control together.
+
+This small batch example allows two requests at a time and retains either the result or failure type for each input. Install the Python SDK and set environment variables as described in the [quickstart](/en/quickstart). Save as `batch.py` and run `python batch.py`. It does not resend failed items automatically.
+
+```python batch.py
+import asyncio
+import os
+from openai import AsyncOpenAI, APIConnectionError, APIStatusError
+
+async def main():
+    limit = asyncio.Semaphore(2)  # Example application value; tune from measurements
+    prompts = ["Explain an API in one sentence.", "Explain JSON in one sentence.",
+               "Explain HTTPS in one sentence."]
+
+    async with AsyncOpenAI(
+        api_key=os.environ["MAXAPI_API_KEY"],
+        base_url="https://api.maxapi.ai/v1",
+        timeout=60.0,
+        max_retries=0,
+    ) as client:
+        async def run_one(index, prompt):
+            async with limit:
+                try:
+                    response = await client.chat.completions.create(
+                        model=os.environ["MAXAPI_MODEL"],
+                        messages=[{"role": "user", "content": prompt}],
+                    )
+                    if not response.choices:
+                        return {"index": index, "error": "invalid_response"}
+                    return {"index": index, "text": response.choices[0].message.content,
+                            "response_id": response.id}
+                except APIStatusError as exc:
+                    return {"index": index, "error": "http", "status": exc.status_code}
+                except APIConnectionError:
+                    return {"index": index, "error": "connection_or_timeout"}
+
+        for result in await asyncio.gather(*(run_one(i, p) for i, p in enumerate(prompts))):
+            print(result)
+
+asyncio.run(main())
+```
+
+This example makes three real generation requests. For larger batches, use a bounded queue or fixed worker pool instead of creating a coroutine for every input. Coordinate limits across instances when running multiple servers.
+
+## What to observe
+
+Record metrics by endpoint and model. Establish a normal baseline before choosing alert thresholds.
+
+| Information | Purpose |
+| --- | --- |
+| Timestamp, duration, HTTP status and model ID | Identify failures concentrated in a model, time window or endpoint |
+| Response ID and server tracing identifier, when returned | Correlate diagnostic information for support |
+| `finish_reason` and stream completion | Distinguish complete output, truncation, tool calls and interruptions |
+| Time to first content and total duration | Measure interactive experience separately from throughput |
+| `usage`, when available, and billing records | Analyze usage growth and costs |
+| Retry count, queue wait and in-flight requests | Detect retry amplification and growing backlogs |
+
+Do not log complete authorization headers, uploaded files, signed download URLs or raw user conversations by default. Keep a business request ID and the necessary redacted diagnostic fields.
+
+## Exercise recovery before launch
+
+1. Verify the production hostname, key, model and network with a minimal request.
+2. Simulate `401`, `429`, `5xx`, timeout and empty-response handling without generating large amounts of real traffic.
+3. Cancel a stream and confirm the UI does not label it as a completed answer.
+4. Simulate a process restart during an asynchronous task and resume polling from its saved ID.
+5. Prevent duplicate clicks and keep an application operation ID; this does not provide server-side idempotency.
+
+Continue with [Error troubleshooting](/en/help/errors), [Streaming](/en/guides/streaming) and [Asynchronous tasks](/en/guides/async-tasks). See [OpenAI's SDK retry guidance](https://developers.openai.com/api/docs/guides/rate-limits#retrying-with-exponential-backoff) for general SDK behavior; actual MaxAPI limits depend on account configuration and API responses.

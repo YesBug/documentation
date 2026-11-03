@@ -6,36 +6,67 @@ sidebarTitle: "Completions"
 openapi: "openapi/en.json POST /v1/completions"
 ---
 
-The Completions endpoint continues a `prompt` for existing integrations using the legacy format. It uses a different request and response shape from [Chat Completions](/en/api-reference/chat-completions). Confirm that the selected model supports this endpoint.
+The Completions endpoint continues a `prompt` for existing integrations using the legacy format. It differs from [Chat Completions](/en/api-reference/chat-completions), which accepts `messages`. Confirm your model supports this endpoint before calling it.
 
-## Send a minimal completion request
+## Complete a text prompt
 
-Set `MAXAPI_MODEL` to a completion-capable model, prepare `MAXAPI_API_KEY` and install `jq`:
+Configure `MAXAPI_API_KEY` and set `MAXAPI_MODEL` to a completion-capable model. This `jq` example sends only required fields.
 
 ```bash Complete a prompt
 jq -n --arg model "$MAXAPI_MODEL" '{
   model: $model,
-  prompt: "Continue this introduction: MaxAPI helps developers",
-  max_tokens: 128
+  prompt: "Continue this product introduction: MaxAPI helps developers"
 }' | curl --fail-with-body https://api.maxapi.ai/v1/completions \
   -H "Authorization: Bearer $MAXAPI_API_KEY" \
   -H "Content-Type: application/json" \
-  --data-binary @-
+  --data-binary @- \
+  --output completion-response.json
 ```
 
-The output limit in this example is a client request value, not a platform limit. Supported parameters and context limits depend on the model.
+After the command succeeds, read `choices[].text`. Treat it as the generated completion; do not depend on it including your original `prompt`.
 
-## Read generated text
+```python Read completion results
+import json
+from pathlib import Path
 
-Read `choices[].text`, rather than `choices[].message.content`. In streaming mode, incremental completion text still uses `choices[].text`; do not reuse chat's `delta.content` parser. See [streaming](/en/guides/streaming) for SSE framing.
+result = json.loads(Path("completion-response.json").read_text(encoding="utf-8"))
+if not result.get("choices"):
+    raise ValueError("No completion returned; inspect the original response")
+for choice in result["choices"]:
+    print("Candidate:", choice.get("index"))
+    print(choice.get("text", ""))
+    print("Finish reason:", choice.get("finish_reason"))
+print("Usage:", result.get("usage", {}))
+```
 
-## Check compatibility
+A `length` finish reason indicates a generation limit, so the output may be incomplete. Where supported, `max_tokens` sets the requested output cap; it is not a platform-wide quota.
+
+## Compare with Chat Completions
+
+| Stage | Completions | Chat Completions |
+| --- | --- | --- |
+| Input | A `prompt` string; string batches require support | Ordered `messages` |
+| Regular output | `choices[].text` | `choices[].message.content` |
+| Streaming text | `choices[].text` | `choices[].delta.content` |
+| Conversation history | Application assembles the complete prompt | Application retains roles and message history |
+| Tools and images | Chat fields cannot be copied directly | Requires corresponding chat capabilities |
+
+For a new chat application, start with the message-based interface. Migrating an existing completion integration requires updating both request construction and result parsing, not just the URL.
+
+## Stream completions
+
+Add `stream: true` and use `curl -N` to observe events, or use an SSE-aware client. Each event's `choices[].text` contains a fragment. Assemble fragments separately for each candidate `index`.
+
+Check the finish reason at completion. Do not parse every network chunk as JSON because a chunk need not contain a complete SSE event. Follow the event framing in [streaming](/en/guides/streaming), replacing the chat text extraction with `choices[].text`.
+
+## Troubleshooting
 
 | Problem | Action |
 | --- | --- |
-| Listed model rejects the request | Confirm that it supports `/v1/completions` |
-| Generated text appears missing | Read `choices[].text` |
+| Listed model rejects the request | Confirm `/v1/completions` support, then test minimal fields |
+| Output appears missing | Read `choices[].text`, not `message.content` |
 | Chat messages are rejected | Send `prompt`, or use Chat Completions |
-| Text is truncated | Inspect `finish_reason: "length"` and the model's context limits |
+| The answer stops mid-sentence | Check finish reason, requested output limit and context size |
+| `stop` or `logprobs` is rejected | Remove the option; optional fields are not supported by every model |
 
 See [troubleshooting](/en/help/errors) for other HTTP errors.

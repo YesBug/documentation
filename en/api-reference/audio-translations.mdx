@@ -22,6 +22,56 @@ curl --fail-with-body https://api.maxapi.ai/v1/audio/translations \
 
 The HTTP client generates the multipart boundary. File encoding, size and duration restrictions depend on the selected model and channel. Use an English `prompt` if the model supports contextual hints.
 
+## Save the English translation
+
+Add `--output translation.json` to the cURL command above. After it succeeds, save `text` as UTF-8 with this script.
+
+```python Save translated text
+import json
+from pathlib import Path
+
+result = json.loads(Path("translation.json").read_text(encoding="utf-8"))
+text = result.get("text")
+if not isinstance(text, str):
+    raise ValueError("No English translation; inspect the original response")
+Path("translation-en.txt").write_text(text, encoding="utf-8")
+print(text)
+```
+
+This illustrative response explains the format; its sentence is not the result of a real recording.
+
+```json Example JSON result
+{"text": "The meeting will begin at ten tomorrow morning."}
+```
+
+## Translate into another language
+
+For Japanese, Chinese or another target language, use two steps. First [transcribe](/en/api-reference/audio-transcriptions) the source and save it as `transcript.txt`. Then use a chat model supporting the target language to translate the text. This also retains the source for quality checks.
+
+This command requires `jq`. `--rawfile` reads the transcript and safely constructs JSON even when the text contains quotes or newlines.
+
+```bash Translate the transcript into Japanese
+jq -n --arg model "$MAXAPI_MODEL" --rawfile transcript transcript.txt '{
+  model: $model,
+  messages: [{
+    role: "user",
+    content: ("Translate this audio transcript into Japanese. Preserve proper names and paragraphs. Return only the translation:\n\n" + $transcript)
+  }]
+}' | curl --fail-with-body https://api.maxapi.ai/v1/chat/completions \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @-
+```
+
+The second result is in `choices[].message.content`, not the audio endpoint's `text`. Each step creates its own request and usage. Long transcripts must also fit the chat model's context.
+
+| Goal | Workflow |
+| --- | --- |
+| Preserve the recording's language | Audio transcription |
+| Produce English directly | This audio translation endpoint |
+| Produce another target language | Transcribe, then translate the text with chat |
+| Read the translation aloud | Send the translated text to [speech generation](/en/api-reference/audio-speech) |
+
 ## Read the translation
 
 For JSON output, read the translated English content from `text`. For supported `text`, `srt` or `vtt` output, read the response as text. Do not assume every model supports every output format.

@@ -18,7 +18,7 @@ openapi: "openapi/zh.json POST /v1/audio/transcriptions"
 <Tabs>
 <Tab title="cURL">
 
-```bash "cURL：转录"
+```bash cURL：转录
 curl --fail-with-body https://api.maxapi.ai/v1/audio/transcriptions \
   -H "Authorization: Bearer $MAXAPI_API_KEY" \
   -F "model=$MAXAPI_AUDIO_MODEL" \
@@ -31,7 +31,7 @@ curl --fail-with-body https://api.maxapi.ai/v1/audio/transcriptions \
 
 安装 `openai` 包后，也可以用二进制方式打开文件并传给 Python SDK：
 
-```python "Python"
+```python Python
 import os
 from openai import OpenAI
 
@@ -56,6 +56,56 @@ JSON 格式的转录文本位于 `text`。如果输出为空，检查音轨是�
 ## 字幕与时间信息
 
 支持字幕的模型可使用 `response_format=srt` 或 `vtt`，结果应作为文本保存，不能按 JSON 解析。`verbose_json` 可能包含分段、时间信息等额外字段，具体结构取决于模型。
+
+## 指定语言和术语
+
+模型支持时，`language` 指定输入音频语言，使用 `zh` 或 `en` 等 ISO 639-1 代码；它不是输出翻译语言。`prompt` 用来提供原语言的术语和上下文，不替代音频本身。
+
+```bash 带术语提示的中文转录
+curl --fail-with-body https://api.maxapi.ai/v1/audio/transcriptions \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -F "model=$MAXAPI_AUDIO_MODEL" \
+  -F "file=@meeting.mp3" \
+  -F "language=zh" \
+  -F "prompt=这是一段关于 MaxAPI 接入、API Key 和流式响应的技术讨论。" \
+  -F "response_format=json" \
+  --output transcription.json
+```
+
+确认命令成功后，从 JSON 中读取 `text`，不要依赖存在段落或时间戳字段。
+
+```python 保存转录文字
+import json
+from pathlib import Path
+
+result = json.loads(Path("transcription.json").read_text(encoding="utf-8"))
+text = result.get("text")
+if not isinstance(text, str):
+    raise ValueError("未收到转录文字，请检查原始响应")
+Path("transcript.txt").write_text(text, encoding="utf-8")
+print(text)
+```
+
+## 保存字幕文件
+
+在支持 SRT 的模型上运行下面的命令。返回的是字幕文本，应保存为 `.srt`，不调用 JSON 解析器。
+
+```bash 保存 SRT 字幕
+curl --fail-with-body https://api.maxapi.ai/v1/audio/transcriptions \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -F "model=$MAXAPI_AUDIO_MODEL" \
+  -F "file=@meeting.mp3" \
+  -F "response_format=srt" \
+  --output subtitles.srt
+```
+
+仅在命令成功后使用字幕文件。检查时间顺序和实际音频是否对应。`vtt` 同样应按文本处理；`verbose_json` 的分段和时间字段取决于模型，不应假定所有模型都返回相同结构。
+
+## 处理长录音
+
+当录音超出所用模型限制时，在应用中按时间拆分。记录每段的起始时间和顺序，优先在停顿或句子边界附近切分；合并字幕时应给相对时间加上该段起始偏移。若切分时保留了重叠音频，合并文字时需要去除重复内容。
+
+转录成功不等于已经识别说话人。说话人标注和逐词时间戳需要对应模型及协议支持，不能从普通 `text` 输出推导。
 
 ## 常见问题
 

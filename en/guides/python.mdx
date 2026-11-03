@@ -1,98 +1,159 @@
 ---
-title: "Integrate MaxAPI with Python"
-description: "Configure the OpenAI Python SDK for MaxAPI, send chat requests, preserve conversation history and distinguish connection failures from API errors."
-keywords: ["MaxAPI", "Integrate MaxAPI with Python", "API documentation"]
-sidebarTitle: "Python SDK"
+title: "Python SDK"
+description: "Connect a Python application to MaxAPI with complete sync and async examples, response handling, client timeouts, retry settings, and troubleshooting."
+keywords: ["MaxAPI", "Python", "OpenAI SDK", "AsyncOpenAI", "timeouts", "retries"]
 ---
 
-Use the OpenAI Python SDK with a custom `base_url` to call MaxAPI's compatible endpoints. The examples below read your key and model from the process environment.
+Connect MaxAPI text generation to a runnable Python program. Configure the client, read generated text and usage, and distinguish connection failures, timeouts, and API errors.
 
-## Install the SDK
+## 1. Install the SDK
 
-Use a virtual environment for your project:
+Create a virtual environment to keep dependencies separate from other projects.
 
-```bash Terminal
-python -m venv .venv
+<CodeGroup>
+```bash macOS / Linux
+python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install openai
+python -m pip install --upgrade openai
 ```
 
-The activation command above is for macOS and Linux. On Windows PowerShell, use `.venv\Scripts\Activate.ps1`.
+```powershell Windows PowerShell
+py -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install --upgrade openai
+```
+</CodeGroup>
 
-## Configure environment variables
+Run `python -m pip show openai` to check the installed version in this environment. Test SDK upgrades before updating an existing production application.
 
-```bash Set your credentials and model
-export MAXAPI_API_KEY="YOUR_MAXAPI_API_KEY"
+## 2. Set your key and model
+
+Get an API key from the [console](https://platform.maxapi.ai), then choose an accessible text model ID from the [model list](/en/api-reference/models).
+
+<CodeGroup>
+```bash macOS / Linux
+export MAXAPI_API_KEY="YOUR_API_KEY"
 export MAXAPI_MODEL="YOUR_MODEL_ID"
 ```
 
-Get your key from the [console](https://platform.maxapi.ai) and confirm the model ID with [List models](/en/api-reference/models). These examples do not load a `.env` file automatically.
+```powershell Windows PowerShell
+$env:MAXAPI_API_KEY = "YOUR_API_KEY"
+$env:MAXAPI_MODEL = "YOUR_MODEL_ID"
+```
+</CodeGroup>
 
-## Send a chat request
+These variables apply to the current terminal and programs started from it. The example does not load `.env` files automatically. When running from an IDE, set the variables in its run configuration too.
+
+## 3. Save and run the complete program
+
+Save this as `main.py`. It sets a 60-second client timeout and disables SDK retries so you can observe each request while integrating. These are application choices, not MaxAPI service limits.
 
 ```python main.py
 import os
+import sys
+import openai
 from openai import OpenAI
 
-client = OpenAI(
-    api_key=os.environ["MAXAPI_API_KEY"],
-    base_url="https://api.maxapi.ai/v1",
-)
+api_key = os.environ.get("MAXAPI_API_KEY")
+model = os.environ.get("MAXAPI_MODEL")
+if not api_key or not model:
+    raise SystemExit("Set MAXAPI_API_KEY and MAXAPI_MODEL.")
 
-completion = client.chat.completions.create(
-    model=os.environ["MAXAPI_MODEL"],
-    messages=[
-        {"role": "user", "content": "Explain APIs in three bullet points."},
-    ],
-)
-
-print(completion.choices[0].message.content or "")
+try:
+    with OpenAI(
+        api_key=api_key,
+        base_url="https://api.maxapi.ai/v1",
+        timeout=60.0,
+        max_retries=0,
+    ) as client:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{
+                "role": "user",
+                "content": "Write a product description for a team notes app in under 50 words.",
+            }],
+        )
+    if not response.choices:
+        raise RuntimeError("The response contains no choices.")
+    choice = response.choices[0]
+    if choice.message.tool_calls:
+        raise RuntimeError("Received tool calls; use the tool-calling flow.")
+    print(choice.message.content or "")
+    print(f"response_id={response.id}", file=sys.stderr)
+    print(f"finish_reason={choice.finish_reason}", file=sys.stderr)
+    if response.usage:
+        print(f"usage={response.usage.model_dump()}", file=sys.stderr)
+except openai.APITimeoutError:
+    raise SystemExit("Request timed out; the server may still have processed it.")
+except openai.APIConnectionError:
+    raise SystemExit("Connection failed. Check the network, proxy, and API address.")
+except openai.APIStatusError as error:
+    raise SystemExit(f"API request failed: HTTP {error.status_code}. See troubleshooting.")
 ```
 
-```bash Run the example
+```bash Run
 python main.py
 ```
 
-The client adds authentication headers. The `base_url` ends in `/v1`; do not append `/chat/completions` to it.
+The terminal prints a generated product description; wording can vary. Diagnostics go to standard error. Generated text is in `response.choices[0].message.content`. A `finish_reason` of `length` means the answer may be truncated. See [text generation](/en/guides/text-generation).
 
-## Preserve conversation history
+## 4. Understand the client settings
 
-Chat Completions receives history through `messages`. Include the relevant earlier turns when sending a follow-up question:
+| Setting | Example value | Purpose |
+| --- | --- | --- |
+| `api_key` | `MAXAPI_API_KEY` | The SDK adds the authorization header; do not prefix the key with `Bearer` |
+| `base_url` | `https://api.maxapi.ai/v1` | The SDK appends `/chat/completions` to this address |
+| `timeout` | `60.0` | Client timeout configuration, in seconds |
+| `max_retries` | `0` | Disables SDK retries so the application decides whether to try again |
 
-```python Continue a conversation
-messages = [
-    {"role": "user", "content": "What is a REST API?"},
-    {"role": "assistant", "content": "A REST API organizes network operations around resources."},
-    {"role": "user", "content": "Give me a simple example."},
-]
+Do not use the full `.../v1/chat/completions` endpoint as `base_url`, or append `/v1` twice. Start with only `model` and `messages`; add optional parameters after the minimal request succeeds and model support is confirmed.
 
-completion = client.chat.completions.create(
-    model=os.environ["MAXAPI_MODEL"],
-    messages=messages,
-)
+The SDK can retry some connection and temporary service errors. If you enable retries, account for each attempt's timeout, total elapsed time, and potentially repeated generation. Avoid multiplying retries in the application layer. Respect a valid `Retry-After` response when supplied. Key, permission, balance, and invalid-parameter errors require fixing their cause first.
 
-print(completion.choices[0].message.content or "")
+## 5. Use the asynchronous client
+
+Use `AsyncOpenAI` inside an asynchronous web service or an `asyncio` program to avoid blocking the event loop with synchronous network calls. Save this as `async_main.py` and use the same environment variables.
+
+```python async_main.py
+import asyncio
+import os
+from openai import AsyncOpenAI
+
+async def main():
+    async with AsyncOpenAI(
+        api_key=os.environ["MAXAPI_API_KEY"],
+        base_url="https://api.maxapi.ai/v1",
+        timeout=60.0,
+        max_retries=0,
+    ) as client:
+        response = await client.chat.completions.create(
+            model=os.environ["MAXAPI_MODEL"],
+            messages=[{"role": "user", "content": "Suggest three names for a team notes app."}],
+        )
+        if not response.choices:
+            raise RuntimeError("The response contains no choices.")
+        print(response.choices[0].message.content or "")
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
-History consumes context. Summarize a long conversation or retain relevant excerpts to control input length.
-
-## Handle failed requests
-
-Distinguish a connection failure from an HTTP error returned by the API:
-
-```python Handle errors with the configured client
-import openai
-
-try:
-    completion = client.chat.completions.create(
-        model=os.environ["MAXAPI_MODEL"],
-        messages=[{"role": "user", "content": "Hello!"}],
-    )
-    print(completion.choices[0].message.content or "")
-except openai.APIConnectionError:
-    print("Connection failed. Check the network and API URL.")
-except openai.APIStatusError as error:
-    print(f"Request failed with HTTP status {error.status_code}")
+```bash Run the async example
+python async_main.py
 ```
 
-See [troubleshooting](/en/help/errors) for diagnosis or [streaming](/en/guides/streaming) to read content incrementally. The [official Python SDK repository](https://github.com/openai/openai-python) documents additional client options.
+In an existing asynchronous service, `await` the call directly. Do not call `asyncio.run()` inside an active event loop. Asynchronous calls do not increase account limits; bound concurrency according to application needs.
+
+## Troubleshooting
+
+| Symptom | Check first |
+| --- | --- |
+| `ModuleNotFoundError: openai` | Install and run with the same Python interpreter; check with `python -m pip show openai` |
+| Missing environment variables | Use the same terminal; ensure the IDE or background service receives the variables |
+| 401 or 403 | Verify the MaxAPI key and access to the requested model |
+| 404 | Check `base_url` and duplicated path segments, then the model ID |
+| 400 or unsupported parameter | Remove optional parameters, send a minimal request, then add them one at a time |
+| Successful connection but no text | Inspect `choices`, `tool_calls`, and `finish_reason` |
+| Repeated timeouts | Distinguish connection failures from response waits, check network and model latency, then adjust application timeouts |
+
+Continue with [conversation history](/en/guides/text-generation), [streaming](/en/guides/streaming), [image input](/en/guides/vision), or [tool calling](/en/guides/tools). See the [OpenAI SDK documentation](https://developers.openai.com/api/docs/libraries) and [retry guidance](https://developers.openai.com/api/docs/guides/rate-limits#retrying-with-exponential-backoff) for SDK behavior. Use this site's reference for MaxAPI capabilities.
