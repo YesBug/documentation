@@ -1,0 +1,128 @@
+---
+title: "工具调用"
+description: "定义函数工具、校验参数、执行应用逻辑，并把结果交回模型。"
+keywords: ["MaxAPI", "工具调用", "tools"]
+---
+
+工具调用让模型提出一个函数名及参数，供你的应用执行。模型不会替应用运行函数、查询数据库或调用业务服务；执行、权限校验和返回结果都由应用完成。此能力需要所选模型与账户通道支持。
+
+## 一次完整调用
+
+1. 在 [对话请求](/zh/api-reference/chat-completions) 中发送 `messages` 与 `tools` 定义。
+2. 模型直接回答，或通过 `message.tool_calls` 提出一个或多个调用。
+3. 应用校验函数名、参数和权限，然后执行对应业务逻辑。
+4. 将原 assistant 消息加入历史，为每个调用追加一条 `role: "tool"` 的结果消息。
+5. 再次发送完整消息列表，让模型利用结果回答；必要时继续调用，直到完成或达到应用设定的轮数上限。
+
+## 参数与消息
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `tools` | `array` | 是 | 本次允许模型使用的工具列表 |
+| `tools[].type` | `string` | 是 | 本指南使用 `function` |
+| `tools[].function.name` | `string` | 是 | 应用能识别的函数名 |
+| `tools[].function.description` | `string` | 建议填写 | 描述工具用途和使用场景 |
+| `tools[].function.parameters` | `object` | 是 | 参数的 JSON Schema |
+| `tool_choice` | `string` 或 `object` | 否 | 常用 `auto` 允许模型选择；其他策略需模型支持 |
+| 结果消息的 `tool_call_id` | `string` | 是 | 原调用的 `id`，用于关联结果 |
+| 结果消息的 `content` | `string` | 是 | 工具执行结果，可使用 JSON 序列化后的字符串 |
+
+返回的 `function.arguments` 是 JSON 字符串，应先解析并校验，不能直接作为代码执行。一个 assistant 消息可能包含多个调用，必须为每个调用提供对应结果。
+
+## 可运行的 Python 示例
+
+示例使用本地字典模拟配送时效查询，数据仅供演示。安装 `openai` 包，设置 `MAXAPI_API_KEY`，并将 `MAXAPI_MODEL` 设为支持工具调用的模型。
+
+```python "Python：工具调用闭环"
+import json
+import os
+from openai import OpenAI
+
+client = OpenAI(
+    api_key=os.environ["MAXAPI_API_KEY"],
+    base_url="https://api.maxapi.ai/v1",
+)
+tools = [{
+    "type": "function",
+    "function": {
+        "name": "get_delivery_days",
+        "description": "查询演示数据中的配送天数，华东为 east，华西为 west。",
+        "parameters": {
+            "type": "object",
+            "properties": {"region": {"type": "string", "enum": ["east", "west"]}},
+            "required": ["region"],
+            "additionalProperties": False,
+        },
+    },
+}]
+
+def run_tool(call):
+    if call.type != "function" or call.function.name != "get_delivery_days":
+        return {"error": "unknown_tool"}
+    try:
+        args = json.loads(call.function.arguments)
+    except json.JSONDecodeError:
+        return {"error": "invalid_json"}
+    if not isinstance(args, dict) or set(args) != {"region"}:
+        return {"error": "invalid_arguments"}
+    region = args["region"]
+    if not isinstance(region, str) or region not in ("east", "west"):
+        return {"error": "invalid_region"}
+    return {"days": {"east": 2, "west": 4}[region], "source": "demo"}
+
+messages = [{"role": "user", "content": "请查询演示数据，华东配送预计需要几天？"}]
+for _ in range(4):
+    response = client.chat.completions.create(
+        model=os.environ["MAXAPI_MODEL"],
+        messages=messages,
+        tools=tools,
+        tool_choice="auto",
+    )
+    reply = response.choices[0].message
+    if not reply.tool_calls:
+        print(reply.content)
+        break
+    messages.append(reply.model_dump(exclude_none=True))
+    for call in reply.tool_calls:
+        messages.append({
+            "role": "tool",
+            "tool_call_id": call.id,
+            "content": json.dumps(run_tool(call), ensure_ascii=False),
+        })
+else:
+    raise RuntimeError("已达到工具调用轮数上限")
+```
+
+`auto` 允许模型直接回答，因此每轮都要判断是否存在 `tool_calls`。如果业务必须使用工具，可在模型明确支持时使用相应 `tool_choice` 策略。
+
+## 响应与结果关联
+
+以下为 assistant 消息结构示意，并非实际调用结果：
+
+```json "模型提出工具调用"
+{
+  "role": "assistant",
+  "content": null,
+  "tool_calls": [{
+    "id": "call-example",
+    "type": "function",
+    "function": {
+      "name": "get_delivery_days",
+      "arguments": "{\"region\":\"east\"}"
+    }
+  }]
+}
+```
+
+对应的结果消息使用 `tool_call_id: "call-example"`。保留原 assistant 消息及其中的完整工具调用，随后追加结果，再提交下一次请求。
+
+## 接入检查
+
+| 现象 | 处理方式 |
+| --- | --- |
+| `message.content` 为空 | 检查 `tool_calls`，模型可能正在等待执行结果 |
+| 提示工具消息顺序错误 | 保留原 assistant 消息，紧接着为每个调用追加对应结果 |
+| 参数 JSON 不完整 | 非流式场景先检查返回内容；流式场景须拼接完参数分片再解析 |
+| 模型反复调用工具 | 检查结果是否清晰，设置轮数、超时与业务执行上限 |
+
+生产环境应使用函数白名单与参数校验。涉及数据修改的业务工具，在应用侧实施权限检查与幂等控制；模型生成的参数不能作为已授权操作的依据。流式工具调用的事件读取方式见 [流式响应](/zh/guides/streaming)。

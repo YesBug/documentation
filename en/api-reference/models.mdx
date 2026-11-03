@@ -1,0 +1,44 @@
+---
+title: "List available models"
+description: "GET /v1/models: discover model identifiers visible to your MaxAPI API key, use exact IDs in subsequent requests, and verify capabilities separately."
+keywords: ["MaxAPI", "List available models", "API documentation"]
+sidebarTitle: "List models"
+openapi: "openapi/en.json GET /v1/models"
+---
+
+The model list returns identifiers visible to your MaxAPI key. Copy a returned `id` into the `model` field of an appropriate request, rather than using a display name.
+
+## Query the list
+
+This endpoint requires Bearer authentication and no request body:
+
+<CodeGroup>
+
+```bash cURL
+curl --fail-with-body https://api.maxapi.ai/v1/models \
+  -H "Authorization: Bearer $MAXAPI_API_KEY"
+```
+
+```python Python
+import os
+from openai import OpenAI
+
+client = OpenAI(
+    api_key=os.environ["MAXAPI_API_KEY"],
+    base_url="https://api.maxapi.ai/v1",
+)
+
+models = client.models.list()
+for model in models.data:
+    print(model.id)
+```
+
+</CodeGroup>
+
+Install `openai` before using the Python example. The list's `data` array contains model objects. Allow additional metadata fields in your parser.
+
+## Use the returned IDs
+
+Choose a text-chat model for [Chat Completions](/en/api-reference/chat-completions). Presence in the list does not establish support for every endpoint, input type or optional parameter. Permissions and model state may change, so rely on the current response.
+
+If listing fails, check [authentication](/en/authentication). See [model selection](/en/models) for evaluating capabilities.

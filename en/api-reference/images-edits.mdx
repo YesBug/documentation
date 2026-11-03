@@ -1,0 +1,46 @@
+---
+title: "Edit images"
+description: "POST /v1/images/edits: upload an image and editing prompt, optionally use a supported mask or multiple reference images, and read generated image results."
+keywords: ["MaxAPI", "Edit images", "API documentation"]
+sidebarTitle: "Edit images"
+openapi: "openapi/en.json POST /v1/images/edits"
+---
+
+Image editing uploads a real image file and a description of the change. Select an editing-capable MaxAPI model, and state both what should change and what should remain intact.
+
+## Upload one image
+
+Save your source as `source.png` and set `MAXAPI_IMAGE_MODEL` to a model supporting edits. cURL's `-F` creates the multipart boundary; do not set `Content-Type` manually.
+
+```bash Edit a local image
+curl --fail-with-body https://api.maxapi.ai/v1/images/edits \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -F "model=$MAXAPI_IMAGE_MODEL" \
+  -F "image=@source.png" \
+  -F "prompt=Preserve the subject and change the background to a light gray photography studio." \
+  --output image-response.json
+```
+
+File formats, dimensions and size limits depend on the selected model. The form needs file content, not a plain filename string.
+
+## Use a mask when supported
+
+Add `-F "mask=@mask.png"` for a model that supports masks. Match the source image dimensions and provide transparency as required by the model; transparent regions indicate areas to edit. Not every editing model supports this behavior.
+
+## Upload multiple reference images
+
+Use this only if your model and channel explicitly support multiple images. Compatible multipart requests use repeated `image[]` fields:
+
+```bash Edit with multiple references
+curl --fail-with-body https://api.maxapi.ai/v1/images/edits \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -F "model=$MAXAPI_IMAGE_MODEL" \
+  -F "image[]=@product.png" \
+  -F "image[]=@background.png" \
+  -F "prompt=Place the product from the first image naturally into the scene in the second image." \
+  --output image-response.json
+```
+
+## Read output and resolve errors
+
+Use the same URL or Base64 handling described in [image generation](/en/api-reference/images). If an upload appears empty, verify the file exists and cURL uses `@`. If a mask has no effect, verify transparency, dimensions and model support. Remove unsupported optional size or output settings and retry a minimal request. See [troubleshooting](/en/help/errors).

@@ -1,0 +1,72 @@
+---
+title: "选择接口格式"
+description: "区分 OpenAI 兼容、统一任务和厂商原生格式，正确设置地址与请求体。"
+keywords: ["MaxAPI", "选择接口格式", "protocols"]
+---
+
+一个模型可能有多种接入方式。先确定任务和接口格式，再设置 Base URL、模型 ID 与请求参数，可以避免大部分路径和参数错误。
+
+## 三种接入方式
+
+| 格式 | 适用场景 | 地址配置 | 调用方式 |
+| --- | --- | --- | --- |
+| OpenAI 兼容 | 文本对话、向量、图像、音频 | SDK Base URL 为 `https://api.maxapi.ai/v1` | OpenAI SDK 或 HTTP |
+| 统一任务接口 | 使用统一视频通道提交和查询任务 | HTTP 根地址 `https://api.maxapi.ai` | 按 `/v2/videos/...` 路径调用 |
+| 厂商原生兼容 | 需要特定模型的输入结构、视频参数或任务能力 | HTTP 根地址 `https://api.maxapi.ai`，保留协议前缀 | HTTP 或经过适配的厂商 SDK |
+
+具体格式是否可用，取决于账号已开通的模型与通道。同名模型的请求体和返回结构也可能因接口格式不同而变化。
+
+## OpenAI 兼容接口
+
+对于 `chat.completions.create` 这类 SDK 方法，库会添加 `/chat/completions`，因此 Base URL 应包含一段 `/v1`。
+
+```python "SDK 配置"
+import os
+from openai import OpenAI
+
+client = OpenAI(
+    api_key=os.environ["MAXAPI_API_KEY"],
+    base_url="https://api.maxapi.ai/v1",
+)
+```
+
+直接使用 HTTP 时，则传入完整地址，例如：
+
+```http
+POST https://api.maxapi.ai/v1/chat/completions
+POST https://api.maxapi.ai/v1/images/generations
+POST https://api.maxapi.ai/v1/embeddings
+```
+
+不要把 `/v1` 重复拼成 `/v1/v1`，也不要把官网 `maxapi.ai` 或控制台 `platform.maxapi.ai` 当作 API 根地址。
+
+## 统一接口与原生接口不能混用
+
+例如，统一视频接口使用 `/v2/videos/generations`；Wan 兼容接口使用 `/wan/api/v1/services/aigc/...`；Veo 还有 `predictLongRunning` 与 `fetchPredictOperation` 的操作对象格式。
+
+这些格式的输入字段、任务 ID 位置、查询方法和完成状态不同：
+
+- 不要把统一接口的 `images` 原样搬进另一个厂商的原生请求体。
+- 不要将原生 `operation.name` 当成统一接口的 `task_id`。
+- 查询接口有 GET 和 POST 两种，不能只替换路径而忽略方法。
+- 下载地址与任务查询地址是不同用途；成功提交后通常还没有最终文件。
+
+查看 [视频生成](/zh/media/videos)、[厂商视频接口](/zh/media/video-providers) 和 [异步任务](/zh/guides/async-tasks) 的完整流程。
+
+## 正确处理 JSON 与文件上传
+
+JSON 请求通常使用 `Content-Type: application/json`。图像编辑、音频转录等文件接口使用 `multipart/form-data`。
+
+使用 `curl -F`、浏览器 `FormData` 或 SDK 上传文件时，让客户端生成 multipart boundary。不要手动写死一个缺少 boundary 的 `Content-Type`。
+
+响应也不总是 JSON：[语音生成](/zh/api-reference/audio-speech) 可能直接返回音频；[图像生成](/zh/api-reference/images) 可能返回 URL 或 Base64。先检查 HTTP 状态、内容类型和所用接口格式，再解析正文。
+
+## 如何确认一条接口
+
+1. 在控制台确认所需模型与通道已开通。
+2. 在 [接口总览](/zh/api-reference/index) 找到任务对应的格式。
+3. 先运行最小请求，再逐步添加可选参数。
+4. 保存接口路径、模型 ID、任务 ID 和脱敏后的错误信息。
+5. 对于 [扩展接口目录](/zh/api-reference/catalog) 中标记“需核对”的条目，先核对路径和请求结构再集成。
+
+新增可选字段并不表示所有模型都支持它。分辨率、时长、输出格式、上下文限制与计费方式，以所用模型和控制台说明为准。

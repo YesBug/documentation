@@ -1,0 +1,97 @@
+---
+title: "异步任务与回调"
+description: "从提交到完成，正确处理任务 ID、状态轮询、结果下载与回调。"
+keywords: ["MaxAPI", "异步任务与回调", "async-tasks"]
+---
+
+视频、音乐和部分图像接口需要较长处理时间。提交成功通常只代表任务已被接收，应用应继续查询任务状态，直到任务完成或失败。
+
+## 一次任务的完整流程
+
+1. **提交任务**：按所选协议发送生成请求，保存接口族、模型与提交时间。
+2. **保存标识**：提取该协议返回的任务 ID、歌曲 ID 或操作对象名称。
+3. **等待结果**：轮询对应的查询接口，或接收该接口支持的回调。
+4. **判断终态**：确认成功后读取结果字段；失败时保存错误原因。
+5. **保存产物**：及时读取结果，按你的应用需求持久化到自己的存储。
+
+不要在每次刷新页面时重新提交生成请求。任务 ID 应与应用里的业务记录关联。
+
+## 不同格式的任务标识
+
+| 接口族 | 提交结果中的标识 | 查询方式 |
+| --- | --- | --- |
+| 统一视频 | `task_id` | `GET /v2/videos/generations/{task_id}` |
+| Midjourney | 提交结果的 `result` | `GET /mj/task/{id}/fetch` |
+| Suno NewAPI 兼容格式 | `data.task_id` | `GET /suno/fetch/{task_id}` |
+| Suno v2 | `clips[].id`，可能一次返回多个 | `GET /suno/v2/feed?ids=...` |
+| Hailuo 原生兼容 | `task_id` | `GET /hailuo/v1/query/video_generation?task_id=...` |
+| Veo 长时操作 | 操作对象中的 `name` | 向匹配的 `fetchPredictOperation` 路径提交操作名称 |
+
+表格说明各协议的约定；实际使用时，应检查当前通道返回的字段。不要将一种格式的 ID 直接交给另一种格式的查询端点。
+
+## 状态要按协议映射
+
+常见状态可以在应用中归一化为“等待、处理中、成功、失败”，但原始状态字符串并不统一。
+
+| 应用状态 | 参考资料中的常见值 | 处理方式 |
+| --- | --- | --- |
+| 等待 | `NOT_START`、`QUEUED`、`PENDING` | 保留任务，稍后查询 |
+| 处理中 | `IN_PROGRESS`、`RUNNING`、`processing` | 继续等待 |
+| 成功 | `SUCCESS`、`SUCCEEDED`、`completed`、`complete` | 按当前协议读取结果 |
+| 失败 | `FAILURE`、`FAILED`、`failed`、`error` | 停止轮询，记录错误 |
+
+这些是跨协议的示例，不是任何单一接口的完整枚举。对未知状态保留原始响应，在有限超时内继续观察或转为人工排查；不要将“不是失败”直接视为成功。
+
+## 使用有限轮询
+
+下面是应用侧的通用轮询工具。将 `fetch_status` 和 `classify` 换成所用接口的查询与状态适配函数；时间间隔是客户端策略，不是平台限额。
+
+```python "polling.py"
+import random
+import time
+
+
+def wait_for_task(fetch_status, classify, timeout_seconds=600):
+    deadline = time.monotonic() + timeout_seconds
+    delay = 2.0
+    while time.monotonic() < deadline:
+        # fetch_status 内还应设置一次 HTTP 请求的连接/读取超时。
+        payload = fetch_status()
+        state = classify(payload)
+        if state == "succeeded":
+            return payload
+        if state == "failed":
+            raise RuntimeError("任务失败，请查看已脱敏的错误详情")
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        time.sleep(min(remaining, delay + random.uniform(0, 0.5)))
+        delay = min(delay * 1.5, 15.0)
+    raise TimeoutError("等待超时；保留任务 ID，稍后可继续查询")
+```
+
+网络失败和任务失败是两回事。查询请求短暂失败时，可按 [错误排查](/zh/help/errors) 进行有限重试；生成任务已经失败时，不应继续无期限轮询。
+
+## 提交超时不代表没有创建任务
+
+提交请求发生超时后，上游仍可能已创建任务。盲目重发可能导致重复生成和重复消耗。
+
+优先使用已取得的任务 ID 查询，或在控制台核对调用记录。只有接口明确支持幂等键时才发送相应字段；不要假设所有接口都支持 `Idempotency-Key` 或自动去重。
+
+## 回调接收
+
+部分接口提供 `notifyHook`、`notify_hook` 或 `callback_url`。字段名称和事件内容属于各自协议，不能互换。
+
+- 接收端使用可访问的 HTTPS 地址，并快速返回确认响应，把耗时处理放入后台。
+- 使用任务 ID 与应用记录关联，重复回调只更新同一个任务。
+- 按接口已公布的签名机制验证回调；不要凭空假设固定签名头。
+- 未明确提供签名验证时，不应只凭回调声明发放权益或认定完成，可主动调用任务查询接口复核。
+- 保留查询方式作为补偿机制，处理回调丢失、乱序或服务短暂不可用。
+
+回调请求由服务端发起，`localhost` 或仅内网可访问的 URL 通常无法接收。
+
+## 结果地址与保留期限
+
+产物 URL 可能是临时签名地址。文档没有统一承诺保存时间，因此不要把上游地址当作永久存储。下载时先确认任务成功、资源内容类型和文件大小；如果下载失败，重新查询当前任务的有效结果地址。
+
+应用端可以展示任务状态和重试查询入口，同时保存原始 ID，让用户离开页面后仍能继续查看结果。

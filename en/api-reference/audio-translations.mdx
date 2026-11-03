@@ -1,0 +1,35 @@
+---
+title: "Translate audio into English"
+description: "POST /v1/audio/translations: upload speech for English text output, use a translation-capable model, and handle JSON, text or supported subtitle results."
+keywords: ["MaxAPI", "Translate audio into English", "API documentation"]
+sidebarTitle: "Translate audio"
+openapi: "openapi/en.json POST /v1/audio/translations"
+---
+
+The audio translation endpoint produces English text from an uploaded recording. It is not a general target-language selector. Use a model that explicitly supports this MaxAPI endpoint.
+
+## Submit a file
+
+Set `MAXAPI_AUDIO_MODEL` to a translation-capable model and upload an actual file. Do not set `language` to choose a target language:
+
+```bash Translate a recording
+curl --fail-with-body https://api.maxapi.ai/v1/audio/translations \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -F "model=$MAXAPI_AUDIO_MODEL" \
+  -F "file=@meeting.mp3" \
+  -F "response_format=json"
+```
+
+The HTTP client generates the multipart boundary. File encoding, size and duration restrictions depend on the selected model and channel. Use an English `prompt` if the model supports contextual hints.
+
+## Read the translation
+
+For JSON output, read the translated English content from `text`. For supported `text`, `srt` or `vtt` output, read the response as text. Do not assume every model supports every output format.
+
+For a different target language, [transcribe](/en/api-reference/audio-transcriptions) the recording first, then translate the recognized text using [Chat Completions](/en/api-reference/chat-completions).
+
+## Troubleshoot uploads and output
+
+Use `@` in the cURL file argument to send bytes rather than a path string. Verify the recording contains speech and its encoding matches the extension. Split large recordings while preserving segment order and timestamps. Start with a minimal request if optional formatting or sampling parameters are rejected.
+
+See [transcription](/en/api-reference/audio-transcriptions) for related file handling and [troubleshooting](/en/help/errors) for HTTP failures.

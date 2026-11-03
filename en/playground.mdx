@@ -1,0 +1,51 @@
+---
+title: "Try API requests in the documentation"
+description: "Use the interactive API reference to enter a key, edit request bodies, upload files and inspect responses from MaxAPI in your browser."
+keywords: ["MaxAPI", "Try API requests in the documentation", "API documentation"]
+sidebarTitle: "Online testing"
+---
+
+MaxAPI's API reference includes Mintlify's native **Try it** playground. Open an endpoint to inspect its parameters, provide authentication and send a real request without building a separate client first.
+
+<Warning>
+Requests sent from the playground use your MaxAPI account. Generation requests can consume your balance or quota. Use a key intended for testing and select a model enabled for your account.
+</Warning>
+
+## Send your first request
+
+<Steps>
+  <Step title="Open an endpoint">
+    Start with [List models](/en/api-reference/models) to check your connection, then open [Chat Completions](/en/api-reference/chat-completions).
+  </Step>
+  <Step title="Provide authentication">
+    Enter your MaxAPI API key in the Bearer authentication input. Keep your key out of screenshots and shared examples. See [authentication](/en/authentication) for key management.
+  </Step>
+  <Step title="Edit the request">
+    Replace placeholder model IDs with values available to your account. Use the form controls or JSON editor for JSON requests. Start with required fields before adding optional model-specific settings.
+  </Step>
+  <Step title="Send and inspect">
+    Use **Try it** to send the request. Inspect the HTTP status and response body, and compare generated code examples when moving the request into your application.
+  </Step>
+</Steps>
+
+## Files, streaming and binary results
+
+| Request | How to test |
+| --- | --- |
+| [Chat Completions](/en/api-reference/chat-completions) | Set `stream` to `true` for a model that supports SSE; streamed text is displayed as it arrives |
+| [Edit images](/en/api-reference/images-edits) | Select an actual image file in the multipart form |
+| [Transcribe audio](/en/api-reference/audio-transcriptions) | Upload a local audio file and select a compatible model |
+| [Translate audio](/en/api-reference/audio-translations) | Upload audio to produce English text with a compatible model |
+| [Generate speech](/en/api-reference/audio-speech) | Select a valid model and voice; audio responses use the response's media type |
+
+The playground can render image, audio and video responses when their `Content-Type` identifies the media. Other responses appear as text or code. Streamed SSE is protocol output; your application still needs to parse events or use an SDK.
+
+## Understand the request path
+
+The API server is `https://api.maxapi.ai`. This site's interactive playground is configured to use Mintlify's request proxy. Requests therefore pass through Mintlify's proxy to the API; do not treat browser testing as a substitute for your production server integration.
+
+For a direct terminal request, copy a generated cURL example and supply your own key locally. No API key is included in the documentation's example files.
+
+## Troubleshoot a test
+
+Check for placeholder values, missing required fields, unsupported model options and invalid uploaded files. A successful model list does not prove a specific model supports every endpoint. Use [troubleshooting](/en/help/errors) for status codes and [API formats](/en/guides/protocols) for JSON versus multipart behavior.

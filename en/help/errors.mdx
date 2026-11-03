@@ -1,0 +1,83 @@
+---
+title: "Troubleshoot failed API requests"
+description: "Diagnose MaxAPI authentication, parameters, model access, timeouts and task states using HTTP responses, minimal requests and redacted diagnostic details."
+keywords: ["MaxAPI", "Troubleshoot failed API requests", "API documentation"]
+sidebarTitle: "Troubleshooting"
+---
+
+When a MaxAPI request fails, inspect the HTTP status first, then the response's error details. Models and upstream services can return different error structures, so avoid relying on one exact error string.
+
+## Interpret HTTP status codes
+
+This table gives general HTTP troubleshooting directions, not a complete MaxAPI error specification. Use the actual response to identify the cause.
+
+| Status | Common direction | Action |
+| --- | --- | --- |
+| `400` | Invalid body, field type or model parameter | Check JSON and add options back to a minimal request one at a time |
+| `401` | Missing or invalid key or authorization header | Check environment variables, Bearer formatting and key validity |
+| `403` | Insufficient access | Verify account and model access conditions |
+| `404` | Route or resource not found | Check the base URL, endpoint and model ID |
+| `429` | Frequency, quota or usage restrictions | Read details, check account state, reduce concurrency and retry with backoff where appropriate |
+| `5xx` | Service or upstream failure | Retain the response, retry a bounded number of times and investigate persistent failures |
+
+## Start with a minimal request
+
+Check connectivity and authentication with the model list:
+
+```bash List models
+curl --fail-with-body https://api.maxapi.ai/v1/models \
+  -H "Authorization: Bearer $MAXAPI_API_KEY"
+```
+
+Then follow the [quickstart](/en/quickstart) with only `model` and `messages`. If that succeeds, restore optional parameters, larger inputs and streaming one at a time.
+
+## Check the final URL
+
+| Use | Correct address |
+| --- | --- |
+| Compatible SDK base URL | `https://api.maxapi.ai/v1` |
+| Direct HTTP chat | `https://api.maxapi.ai/v1/chat/completions` |
+| Direct HTTP model list | `https://api.maxapi.ai/v1/models` |
+
+Avoid a duplicate `/v1` and do not send API requests to the website or console domain.
+
+## Diagnose timeouts and connection failures
+
+If no HTTP response arrives, check network access, DNS, proxy settings and your server's access to the API domain. Long generations may need an application-appropriate timeout.
+
+For streaming, check whether an intermediate service buffers output or closes connections early. See [streaming](/en/guides/streaming).
+
+## Use bounded retries
+
+Network interruptions and some `429` or `5xx` errors may be retryable. Invalid keys, wrong model IDs and unsupported parameters generally need correction first.
+
+Increase the delay between attempts, add random jitter and set a maximum number of attempts. Respect `Retry-After` when provided and applicable. Check the SDK's existing retries before adding another loop.
+
+A timeout does not prove that the server performed no work. Retrying may generate duplicate output or additional usage.
+
+## Collect useful diagnostics
+
+When contacting support through your [console](https://platform.maxapi.ai), include the time and time zone, route, model ID, HTTP status, redacted response and request identifier if one was returned.
+
+Remove API keys, personal data and sensitive business content. Never share a complete `Authorization` header.
+
+## HTTP 200 with no generated output
+
+Task APIs can return a business `code`, `status` or error object inside a successful HTTP response:
+
+- Midjourney's submission `result` is a task ID, not a completed image.
+- Suno v2 generation status does not replace checking each item in `clips`.
+- A queued or processing video requires a matching task query.
+- Native protocols may use `base_resp` or other error fields instead of `choices`.
+
+Follow [asynchronous tasks](/en/guides/async-tasks).
+
+## Task queries return 404 or never finish
+
+Match the query protocol to the source of the ID. Do not mix `clips[].id`, `operation.name` and `data.task_id`, or reuse a fixed example ID. Retain unknown states and set an overall deadline. After a task fails, inspect inputs, permissions and the error instead of submitting new tasks to check progress.
+
+## Upload or download format errors
+
+Upload files as multipart data and let the client generate a boundary. Remote image URLs must be accessible to the processing service; local paths only identify files to upload from your client.
+
+Speech and file downloads can return bytes. If JSON parsing fails, check status and `Content-Type`. Do not treat an error JSON body as valid audio or image data.

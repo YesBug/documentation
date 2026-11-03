@@ -1,0 +1,89 @@
+---
+title: "Integrate MaxAPI with Node.js"
+description: "Use the OpenAI JavaScript or TypeScript SDK with MaxAPI, configure server-side environment variables, and handle API errors in your application."
+keywords: ["MaxAPI", "Integrate MaxAPI with Node.js", "API documentation"]
+sidebarTitle: "Node.js SDK"
+---
+
+The OpenAI JavaScript and TypeScript SDK supports a custom `baseURL`. Configure it with MaxAPI's address and your key to send requests from your Node.js server.
+
+## Install the SDK
+
+```bash Terminal
+npm install openai
+```
+
+## Set environment variables
+
+```bash Configure your process
+export MAXAPI_API_KEY="YOUR_MAXAPI_API_KEY"
+export MAXAPI_MODEL="YOUR_MODEL_ID"
+```
+
+Create a key in the [console](https://platform.maxapi.ai) and query [List models](/en/api-reference/models) for model IDs. If you use `.env`, ensure your runtime loads it before running these examples.
+
+## Make your first request
+
+Save this example as `main.mjs`. The `.mjs` extension lets Node.js run the ES module directly:
+
+```javascript main.mjs
+import OpenAI from "openai";
+
+const apiKey = process.env.MAXAPI_API_KEY;
+const model = process.env.MAXAPI_MODEL;
+
+if (!apiKey || !model) {
+  throw new Error("Set MAXAPI_API_KEY and MAXAPI_MODEL.");
+}
+
+const client = new OpenAI({
+  apiKey,
+  baseURL: "https://api.maxapi.ai/v1",
+});
+
+const completion = await client.chat.completions.create({
+  model,
+  messages: [
+    { role: "user", content: "Explain APIs in three bullet points." },
+  ],
+});
+
+console.log(completion.choices[0]?.message.content ?? "");
+```
+
+```bash Run the example
+node main.mjs
+```
+
+TypeScript projects use the same client and calls with the request and response types supplied by the SDK.
+
+## Handle API errors
+
+After configuring the client, catch errors and log the necessary status without exposing keys or sensitive inputs:
+
+```javascript Handle errors
+try {
+  const completion = await client.chat.completions.create({
+    model,
+    messages: [{ role: "user", content: "Hello!" }],
+  });
+
+  console.log(completion.choices[0]?.message.content ?? "");
+} catch (error) {
+  if (error instanceof OpenAI.APIError) {
+    console.error("Request failed with HTTP status:", error.status ?? "unavailable");
+  } else {
+    console.error("Request failed. Check runtime configuration and connectivity.");
+  }
+}
+```
+
+Before adding retries, check whether the SDK already retries the request. See [troubleshooting](/en/help/errors) to avoid stacking retry loops.
+
+## Use MaxAPI in a web application
+
+Send browser requests to your own backend, and let that backend attach the MaxAPI key. Authenticate your application's users and control request frequency and input length according to your product's needs.
+
+Do not put your key in browser code or enable client-side key access to bypass this separation. See [authentication](/en/authentication).
+
+Continue with [streaming](/en/guides/streaming). The [official JavaScript SDK repository](https://github.com/openai/openai-node) documents other client options.

@@ -1,0 +1,4 @@
+node_modules/
+.mintlify/cache/
+.DS_Store
+.mintlify/remote-*.json

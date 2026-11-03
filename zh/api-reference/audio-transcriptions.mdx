@@ -1,0 +1,69 @@
+---
+title: "转录音频"
+description: "使用 POST /v1/audio/transcriptions 上传音频并生成原语言文本，按模型能力选择 JSON、纯文本或字幕输出。"
+keywords: ["MaxAPI", "转录音频", "audio-transcriptions"]
+openapi: "openapi/zh.json POST /v1/audio/transcriptions"
+---
+
+音频转录接口接收音频文件，输出原语言文本。需要英文翻译时，请使用 [音频翻译](/zh/api-reference/audio-translations)。模型和文件限制取决于账户启用的通道。
+
+请求体使用 `multipart/form-data`。使用 cURL 的 `-F` 时，让客户端自动生成 boundary，不要手写缺少 boundary 的 Content-Type。
+
+使用前确认所选模型的文件格式、大小和音频时长限制；文件扩展名必须与实际编码相符。
+
+## 转录音频
+
+将音频保存为 `meeting.mp3`，准备密钥，并将 `MAXAPI_AUDIO_MODEL` 设为支持转录的模型。
+
+<Tabs>
+<Tab title="cURL">
+
+```bash "cURL：转录"
+curl --fail-with-body https://api.maxapi.ai/v1/audio/transcriptions \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -F "model=$MAXAPI_AUDIO_MODEL" \
+  -F "file=@meeting.mp3" \
+  -F "response_format=json"
+```
+
+</Tab>
+<Tab title="Python">
+
+安装 `openai` 包后，也可以用二进制方式打开文件并传给 Python SDK：
+
+```python "Python"
+import os
+from openai import OpenAI
+
+client = OpenAI(
+    api_key=os.environ["MAXAPI_API_KEY"],
+    base_url="https://api.maxapi.ai/v1",
+)
+with open("meeting.mp3", "rb") as audio:
+    result = client.audio.transcriptions.create(
+        model=os.environ["MAXAPI_AUDIO_MODEL"],
+        file=audio,
+        response_format="json",
+    )
+print(result.text)
+```
+
+</Tab>
+</Tabs>
+
+JSON 格式的转录文本位于 `text`。如果输出为空，检查音轨是否有效、是否存在语音，以及录音质量和语言设置。
+
+## 字幕与时间信息
+
+支持字幕的模型可使用 `response_format=srt` 或 `vtt`，结果应作为文本保存，不能按 JSON 解析。`verbose_json` 可能包含分段、时间信息等额外字段，具体结构取决于模型。
+
+## 常见问题
+
+| 现象 | 处理方式 |
+| --- | --- |
+| 提示缺少文件 | 确认使用 `-F "file=@meeting.mp3"` 上传文件内容 |
+| 识别结果为空或错误很多 | 检查音轨是否有效、是否有语音，以及录音质量和语言设置 |
+| 字幕格式不支持 | 使用该模型支持的输出格式，先用 `json` 验证 |
+| 上传过大 | 按时间切分音频，在应用中记录分段顺序与时间偏移 |
+
+其他认证或上游错误见 [错误排查](/zh/help/errors)。

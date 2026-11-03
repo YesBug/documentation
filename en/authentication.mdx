@@ -1,0 +1,86 @@
+---
+title: "Authenticate with MaxAPI"
+description: "Pass your MaxAPI API key in the Authorization header, configure compatible clients, and protect credentials through server-side storage and rotation."
+keywords: ["MaxAPI", "Authenticate with MaxAPI", "API documentation"]
+sidebarTitle: "Authentication"
+---
+
+MaxAPI authenticates requests with API keys. Send requests over HTTPS and pass your key in the `Authorization` header.
+
+## Send a Bearer token
+
+```http Authorization header
+Authorization: Bearer YOUR_MAXAPI_API_KEY
+```
+
+Keep one space between `Bearer` and the key. Do not place keys in URL query strings or print full keys in logs.
+
+```bash Check the connection
+curl --fail-with-body https://api.maxapi.ai/v1/models \
+  -H "Authorization: Bearer $MAXAPI_API_KEY"
+```
+
+A successful model list helps verify your key and network configuration. It does not confirm that all models support the same parameters or share the same access permissions.
+
+## Store keys on your server
+
+During local development, you can store a key in `.env`. Your runtime or an environment loader must read the file:
+
+```dotenv .env
+MAXAPI_API_KEY=YOUR_MAXAPI_API_KEY
+MAXAPI_MODEL=YOUR_MODEL_ID
+```
+
+Ignore files containing real keys in Git. You can commit an `.env.example` containing only placeholders:
+
+```text .gitignore
+.env
+.env.*
+!.env.example
+```
+
+For deployed applications, use your hosting platform's environment variables or secret manager. Avoid prefixes such as `NEXT_PUBLIC_` and `VITE_` that expose values to browsers.
+
+## Configure a compatible client
+
+<CodeGroup>
+
+```python Python
+import os
+from openai import OpenAI
+
+client = OpenAI(
+    api_key=os.environ["MAXAPI_API_KEY"],
+    base_url="https://api.maxapi.ai/v1",
+)
+```
+
+```javascript Node.js
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: process.env.MAXAPI_API_KEY,
+  baseURL: "https://api.maxapi.ai/v1",
+});
+```
+
+</CodeGroup>
+
+Always configure the MaxAPI base URL when using a MaxAPI key.
+
+## Rotate and revoke keys
+
+Manage separate keys for different applications and environments where your console supports this. Configure access scopes using the controls available to your account.
+
+To rotate a key, create a replacement, update your application configuration, verify a successful request, then revoke the old key. If a key is exposed, revoke it promptly, replace affected configuration and review related usage records.
+
+## Resolve authentication failures
+
+For a `401` response, check that:
+
+- Your environment variable reached the process actually running the application.
+- The key has no accidental spaces, line breaks or extra quotation marks.
+- The request includes the full `Authorization: Bearer ...` header.
+- The key is still valid and belongs to the MaxAPI account you are using.
+
+If authentication succeeds but a model request fails, check [model capabilities](/en/models) and [troubleshooting](/en/help/errors).

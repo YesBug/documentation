@@ -1,0 +1,83 @@
+---
+title: "文本转语音"
+description: "将文本合成为音频，选择音色、格式与语速并保存结果。"
+keywords: ["MaxAPI", "文本转语音", "audio-speech"]
+openapi: "openapi/zh.json POST /v1/audio/speech"
+---
+
+Speech 接口将文本合成为音频，适合语音播报和内容朗读。模型、音色及输出格式需要账户通道支持。
+
+不要把一个模型的音色 ID 或长度限制直接用于其他模型。首次接入先使用短文本与该模型确认支持的音色。
+
+## 合成并保存音频
+
+准备 `MAXAPI_API_KEY`，将 `MAXAPI_AUDIO_MODEL` 设为语音合成模型，将 `MAXAPI_VOICE` 设为该模型的有效音色。示例依赖 `jq`，并要求模型支持 MP3 输出。
+
+<Tabs>
+<Tab title="cURL">
+
+```bash "cURL"
+jq -n \
+  --arg model "$MAXAPI_AUDIO_MODEL" \
+  --arg voice "$MAXAPI_VOICE" '{
+    model: $model,
+    voice: $voice,
+    input: "欢迎使用 MaxAPI，开始构建你的智能应用。",
+    response_format: "mp3"
+  }' | curl --fail-with-body https://api.maxapi.ai/v1/audio/speech \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @- \
+  --output speech.mp3
+```
+
+</Tab>
+<Tab title="Python">
+
+安装 `openai` 包后，使用响应上下文将音频逐块保存，避免把整个文件一次性载入内存。
+
+```python "Python"
+import os
+from openai import OpenAI
+
+client = OpenAI(
+    api_key=os.environ["MAXAPI_API_KEY"],
+    base_url="https://api.maxapi.ai/v1",
+)
+with client.audio.speech.with_streaming_response.create(
+    model=os.environ["MAXAPI_AUDIO_MODEL"],
+    voice=os.environ["MAXAPI_VOICE"],
+    input="欢迎使用 MaxAPI。",
+    response_format="mp3",
+) as response:
+    response.stream_to_file("speech.mp3")
+```
+
+这里的流式读取指逐块接收音频字节，与 [对话 SSE 流](/zh/guides/streaming) 的事件解析不同。
+
+</Tab>
+</Tabs>
+
+## 响应内容
+
+成功响应的主体是音频字节，应写入文件或交给音频播放器。它不是带有音频 URL 的普通 JSON 对象。示意：
+
+```http "成功响应结构示意"
+HTTP/1.1 200 OK
+Content-Type: audio/mpeg
+
+[音频二进制数据]
+```
+
+实际 `Content-Type` 取决于输出格式。错误响应可能仍然是 JSON；应先判断 HTTP 状态，再将响应作为音频处理。上面的 cURL 在错误时也可能把错误体写入 `speech.mp3`，不要在命令失败后直接播放该文件。
+
+## 常见问题
+
+| 问题 | 处理方式 |
+| --- | --- |
+| 音频无法播放 | 检查 HTTP 状态，确认文件不是 JSON 错误体且扩展名与实际格式一致 |
+| 音色不存在 | 使用所选模型支持的音色 ID |
+| 文本过长 | 按句子或段落分段合成，并在应用中管理音频顺序 |
+| 需要将声音转成文字 | 使用 [语音转录与翻译](/zh/api-reference/audio-transcriptions) |
+
+鉴权、配额与限流问题见 [错误排查](/zh/help/errors)。

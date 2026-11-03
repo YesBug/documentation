@@ -1,0 +1,64 @@
+---
+title: "多媒体 API 概览"
+description: "按生成目标选择接口格式，理解同步结果与异步任务的接入方式。"
+keywords: ["MaxAPI", "多媒体 API 概览", "index"]
+---
+
+图像、视频和音乐可以采用不同的请求格式。接入前先确定模型支持的协议，再选择提交、查询和下载接口；同一个模型名称不能保证在每条路由上都可调用。
+
+所有请求使用 `https://api.maxapi.ai`。在 [MaxAPI 控制台](https://platform.maxapi.ai) 确认模型、分组和渠道权限后，使用该渠道对应的接口。下表描述接口格式，不代表所有账号均已开通全部能力。
+
+## 按任务选择入口
+
+| 你要完成的任务 | 接入入口 | 返回方式 |
+| --- | --- | --- |
+| 文生图、图像编辑 | [Images 接口](/zh/api-reference/images) | 常见为直接返回图像 URL 或 Base64；由模型决定 |
+| Gemini 图像、Stable Diffusion、Ideogram | [图像专用协议](/zh/media/image-providers) | 各自的请求结构与输出格式 |
+| 文生视频、图生视频 | [统一视频接口](/zh/media/videos) | 先提交，再按任务 ID 查询 |
+| 接入厂商原生视频格式 | [视频专用协议](/zh/media/video-providers) | 各协议独立的任务、状态和文件结构 |
+| Midjourney 绘图及后续动作 | [Midjourney](/zh/media/midjourney) | 提交任务、查询结果、选择动作 |
+| Suno 音乐及续写 | [Suno 音乐](/zh/media/music) | 生成后查询任务或歌曲片段 |
+| 语音合成、转录和翻译 | [语音合成](/zh/api-reference/audio-speech) / [转录与翻译](/zh/api-reference/audio-transcriptions) | 音频文件或文本结果 |
+
+## 同步与异步
+
+**同步接口**在一次请求内返回结果。应用应按响应的 `Content-Type` 和字段读取内容：图像可能是 URL 或 Base64，语音合成可能返回二进制音频。
+
+**异步接口**先返回受理结果。保存任务标识后，再查询进度，直到成功或失败。拿到任务 ID 并不表示内容已经生成完成。
+
+```text "异步任务的接入顺序"
+提交请求 → 保存任务 ID 与所用协议 → 定时查询状态
+                                      ├─ 处理中：等待后再次查询
+                                      ├─ 失败：记录错误原因
+                                      └─ 成功：读取结果并保存文件
+```
+
+某些接口支持回调。回调字段和状态值随协议变化；应用仍需保存任务信息，并准备查询结果的路径。实现方式见 [异步任务与回调](/zh/guides/async-tasks)。
+
+## 常见协议差异
+
+| 项目 | 可能出现的差异 | 接入时怎么处理 |
+| --- | --- | --- |
+| 请求体 | JSON、`multipart/form-data`、多模态 `parts` | 按具体接口编码，上传文件时让 HTTP 客户端生成 boundary |
+| 提示词 | `prompt`、`user_prompt`、`promptText`、嵌套的 `input.prompt` | 保留协议中的字段名称和层级 |
+| 模型字段 | `model`、`mv`、URL 中的模型 ID | 不要统一替换成一个 JSON 字段 |
+| 任务标识 | `id`、`task_id`、`result`、`operationName` | 同时保存标识值和协议类型 |
+| 结果标识 | 任务 ID、歌曲 `clip` ID、下载 `file_id` | 分别存储，不能相互替代 |
+| 状态 | 大写、小写、数字或布尔 `done` | 为每种协议建立独立判断逻辑 |
+| 回调地址 | `notifyHook`、`notify_hook`、`callback_url` | 仅在该接口明确支持时传入 |
+
+OpenAI SDK 适合它支持的兼容路由。厂商专用路由通常需要普通 HTTP 请求；只修改 SDK 的 `base_url` 不会自动转换请求体。更多选择建议见 [接口协议与兼容性](/zh/guides/protocols)。
+
+## 准备示例环境
+
+本组文档中的 cURL 示例使用 `jq` 生成 JSON。先在服务器环境中设置 `MAXAPI_API_KEY`，再根据页面设置 `MAXAPI_VIDEO_MODEL`、`MAXAPI_SUNO_MODEL` 等模型变量。变量值应来自你已确认可用的模型配置。
+
+```bash "检查密钥变量是否已设置"
+: "${MAXAPI_API_KEY:?请先设置 MAXAPI_API_KEY}"
+```
+
+密钥放在服务端。前端通过你的业务服务提交任务和查询状态，避免把密钥随网页、日志或代码仓库公开。
+
+## 查找更多接口
+
+[完整接口目录](/zh/api-reference/catalog) 按功能分组保留名称、方法、路径与字段。指南提供常用接入流程，目录保留更多协议分支；当资料中的示例与字段定义不一致时，以具体渠道确认的格式为准，再进行小范围验证。

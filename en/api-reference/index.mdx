@@ -1,0 +1,57 @@
+---
+title: "MaxAPI API reference"
+description: "Find the correct MaxAPI endpoint for text, embeddings, images and audio, and follow protocol-specific workflows for video, music and asynchronous tasks."
+keywords: ["MaxAPI", "MaxAPI API reference", "API documentation"]
+sidebarTitle: "Overview"
+---
+
+Call MaxAPI at `https://api.maxapi.ai`. Compatible SDKs use `https://api.maxapi.ai/v1` as their base URL. The reference separates documented core operations from protocol-specific extended workflows.
+
+Open an endpoint to inspect its generated schema and use the native **Try it** panel. See [online testing](/en/playground) before sending requests with your account key. Generation can consume account quota or balance.
+
+## Text and embeddings
+
+| Task | Method and path | Reference |
+| --- | --- | --- |
+| Conversations and streaming | `POST /v1/chat/completions` | [Chat Completions](/en/api-reference/chat-completions) |
+| Legacy prompt completion | `POST /v1/completions` | [Completions](/en/api-reference/completions) |
+| Text vectors | `POST /v1/embeddings` | [Embeddings](/en/api-reference/embeddings) |
+| Visible model IDs | `GET /v1/models` | [List models](/en/api-reference/models) |
+
+Use a compatible chat model for [vision](/en/guides/vision) or [tool calling](/en/guides/tools).
+
+## Images and audio
+
+| Task | Method and path | Reference |
+| --- | --- | --- |
+| Generate images | `POST /v1/images/generations` | [Generate images](/en/api-reference/images) |
+| Edit uploaded images | `POST /v1/images/edits` | [Edit images](/en/api-reference/images-edits) |
+| Generate speech | `POST /v1/audio/speech` | [Speech](/en/api-reference/audio-speech) |
+| Transcribe audio | `POST /v1/audio/transcriptions` | [Transcription](/en/api-reference/audio-transcriptions) |
+| Translate audio to English | `POST /v1/audio/translations` | [Translation](/en/api-reference/audio-translations) |
+
+[Provider-specific image formats](/en/media/image-providers) use different bodies and outputs, including Gemini content blocks and asynchronous tasks.
+
+## Video, music and extended tasks
+
+| Task | Entry points | Guide |
+| --- | --- | --- |
+| Unified video | `/v2/videos/generations` | [Submit and query](/en/media/videos) |
+| Native video protocols | Veo, Wan, Seedance, Vidu, Hailuo, Luma, Kling and Runway | [Protocol differences](/en/media/video-providers) |
+| Midjourney images and actions | `/mj/submit/...`, `/mj/task/...` | [Midjourney](/en/media/midjourney) |
+| Suno music | `/suno/v2/...` or `/suno/submit/...` | [Music generation](/en/media/music) |
+
+Complete one protocol's workflow before adding another. Task identifiers, callback fields and state values cannot be substituted across formats.
+
+## Extended operation catalog
+
+The [173-operation catalog](/en/api-reference/catalog) preserves a sanitized structural reference from the shared API system. It does not assert that all routes are enabled for MaxAPI accounts or verified by live calls. Confirm entries marked **Needs review** or **Example path** before integrating them.
+
+## Common conventions
+
+- Use HTTPS and [Bearer authentication](/en/authentication).
+- Match the [body encoding](/en/guides/protocols) to JSON or multipart uploads.
+- Check the HTTP status before parsing protocol-specific content.
+- Handle generation failure separately from network failure.
+- Preserve request and task IDs while redacting keys and sensitive inputs in logs.
+- Confirm prices, resolutions, durations and usage limits in the console and model documentation.

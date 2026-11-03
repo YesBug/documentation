@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="176" height="36" viewBox="0 0 176 36" fill="none" role="img" aria-labelledby="title">
+  <title id="title">MaxAPI</title>
+  <rect x="1" y="2" width="32" height="32" rx="9" fill="#2563EB"/>
+  <path d="M9 24V12L17 21L25 12V24" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="43" y="27" fill="#0F172A" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.9">Max<tspan fill="#2563EB">API</tspan></text>
+</svg>

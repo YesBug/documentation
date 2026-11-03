@@ -1,0 +1,129 @@
+---
+title: "Connect models to application tools"
+description: "Define function tools, validate model-generated arguments, execute application logic, and return correlated results to complete a MaxAPI conversation."
+keywords: ["MaxAPI", "Connect models to application tools", "API documentation"]
+sidebarTitle: "Tool calling"
+---
+
+Tool calling lets a model propose a function name and arguments for your application to execute. Your application performs the work, checks permissions and returns results. The selected MaxAPI model and channel must support tools.
+
+## Complete a tool calling cycle
+
+1. Send `messages` and `tools` in a [chat request](/en/api-reference/chat-completions).
+2. The model either answers directly or proposes one or more calls in `message.tool_calls`.
+3. Validate the function name, arguments and permissions, then execute your application logic.
+4. Append the original assistant message and one `role: "tool"` result for each call.
+5. Send the full message history again. Continue until the model answers or your application reaches its own turn limit.
+
+## Define tools and result messages
+
+| Field | Type | Requirement | Meaning |
+| --- | --- | --- | --- |
+| `tools` | `array` | Required for this flow | Functions allowed for this request |
+| `tools[].type` | `string` | Required | `function` in this guide |
+| `tools[].function.name` | `string` | Required | A function your application recognizes |
+| `tools[].function.description` | `string` | Recommended | What the function does and when to use it |
+| `tools[].function.parameters` | `object` | Required for this definition | Argument JSON Schema |
+| `tool_choice` | `string` or `object` | Optional | `auto` lets the model choose; other policies depend on support |
+| Result `tool_call_id` | `string` | Required | The original call's `id` |
+| Result `content` | `string` | Required | The result, often a serialized JSON string |
+
+`function.arguments` is a JSON string. Parse and validate it; never execute it as code. An assistant message can contain multiple calls, and each needs a matching result.
+
+## Run a complete Python example
+
+This example uses a local dictionary as demonstration delivery data. Install `openai`, set `MAXAPI_API_KEY`, and choose a tool-capable model in `MAXAPI_MODEL`.
+
+```python Tool calling loop
+import json
+import os
+from openai import OpenAI
+
+client = OpenAI(
+    api_key=os.environ["MAXAPI_API_KEY"],
+    base_url="https://api.maxapi.ai/v1",
+)
+tools = [{
+    "type": "function",
+    "function": {
+        "name": "get_delivery_days",
+        "description": "Look up demonstration delivery times for the east or west region.",
+        "parameters": {
+            "type": "object",
+            "properties": {"region": {"type": "string", "enum": ["east", "west"]}},
+            "required": ["region"],
+            "additionalProperties": False,
+        },
+    },
+}]
+
+def run_tool(call):
+    if call.type != "function" or call.function.name != "get_delivery_days":
+        return {"error": "unknown_tool"}
+    try:
+        args = json.loads(call.function.arguments)
+    except json.JSONDecodeError:
+        return {"error": "invalid_json"}
+    if not isinstance(args, dict) or set(args) != {"region"}:
+        return {"error": "invalid_arguments"}
+    region = args["region"]
+    if not isinstance(region, str) or region not in ("east", "west"):
+        return {"error": "invalid_region"}
+    return {"days": {"east": 2, "west": 4}[region], "source": "demo"}
+
+messages = [{"role": "user", "content": "Use the demo data to check delivery days for the east region."}]
+for _ in range(4):
+    response = client.chat.completions.create(
+        model=os.environ["MAXAPI_MODEL"],
+        messages=messages,
+        tools=tools,
+        tool_choice="auto",
+    )
+    reply = response.choices[0].message
+    if not reply.tool_calls:
+        print(reply.content)
+        break
+    messages.append(reply.model_dump(exclude_none=True))
+    for call in reply.tool_calls:
+        messages.append({
+            "role": "tool",
+            "tool_call_id": call.id,
+            "content": json.dumps(run_tool(call), ensure_ascii=False),
+        })
+else:
+    raise RuntimeError("Tool calling turn limit reached")
+```
+
+With `auto`, the model may answer without a tool call. Check `tool_calls` every turn. If your business flow requires a tool, use an appropriate `tool_choice` policy only when the model explicitly supports it.
+
+## Correlate results with calls
+
+An illustrative assistant message looks like this:
+
+```json Example call structure
+{
+  "role": "assistant",
+  "content": null,
+  "tool_calls": [{
+    "id": "call-example",
+    "type": "function",
+    "function": {
+      "name": "get_delivery_days",
+      "arguments": "{\"region\":\"east\"}"
+    }
+  }]
+}
+```
+
+The result message uses `tool_call_id: "call-example"`. Keep the full original assistant message before appending results and making the next request.
+
+## Check your integration
+
+| Symptom | Action |
+| --- | --- |
+| Empty `message.content` | Look for `tool_calls`; the model may need a tool result |
+| Invalid tool message order | Preserve the assistant message, followed by a result for every call |
+| Incomplete argument JSON | Inspect the response; for streaming, assemble all argument fragments first |
+| Repeated calls | Clarify results and set application turn, timeout and execution limits |
+
+Use an allowlist of functions and validate arguments. For tools that modify data, enforce permissions and idempotency in your application. A model-generated argument is not proof that an operation is authorized. See [streaming](/en/guides/streaming) for incremental events.

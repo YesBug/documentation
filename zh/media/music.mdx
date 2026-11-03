@@ -1,0 +1,147 @@
+---
+title: "Suno 音乐生成"
+description: "区分歌曲片段与任务 ID，完成音乐生成、查询和续写。"
+keywords: ["MaxAPI", "Suno 音乐生成", "music"]
+---
+
+Suno 接口提供多种兼容格式。选择一个已开通的格式完成整条流程，分别保存任务 ID 和歌曲片段 ID。音乐模型版本通过 `mv` 指定，其可用值以 [控制台](https://platform.maxapi.ai) 或渠道配置为准。
+
+## 两种常用格式
+
+| 项目 | Suno v2 格式 | NewAPI 兼容格式 |
+| --- | --- | --- |
+| 提交 | `POST /suno/v2/generate` | `POST /suno/submit/music` |
+| 查询 | `GET /suno/v2/feed?ids=...` | `GET /suno/fetch/{task_id}` |
+| 查询标识 | `clips[].id`，即歌曲片段 ID | `data.task_id`，即任务 ID |
+| 查询结果 | `clips[]` | 任务对象 `data` 及其歌曲列表 `data.data[]` |
+| 进度判断 | 分别检查每个 clip | 检查任务状态，再读取歌曲结果 |
+
+两种格式是否可用由渠道决定。`feed` 的 `ids` 不能填生成请求顶层的 `id`，也不能填 NewAPI 的 `task_id`。
+
+## Suno v2：生成并查询歌曲
+
+### 请求参数
+
+```http "Endpoints"
+POST https://api.maxapi.ai/suno/v2/generate
+GET  https://api.maxapi.ai/suno/v2/feed
+```
+
+| 字段 | 类型 | 使用条件 | 说明 |
+| --- | --- | --- | --- |
+| `mv` | `string` | 必填 | 当前渠道支持的音乐模型版本 |
+| `prompt` | `string` | 必填 | 该生成模式要求的提示内容；自定义歌曲通常填写歌词 |
+| `tags` | `string` | 可选 | 音乐风格描述 |
+| `title` | `string` | 可选 | 歌曲标题 |
+| `continue_clip_id` | `string` | 续写时 | 需要续写的歌曲片段 ID |
+| `continue_at` | `number` | 续写时按接口要求 | 从原曲的哪个时间点续写，单位为秒 |
+
+上传音频续写、纯音乐和其他高级模式可能有额外参数或版本要求。本例先演示自定义歌曲；不要将不同场景的全部参数一起发送。
+
+```bash "生成自定义歌曲"
+: "${MAXAPI_SUNO_MODEL:?请设置已开通的 Suno mv 值}"
+jq -n --arg mv "$MAXAPI_SUNO_MODEL" '{
+  mv: $mv,
+  prompt: "[Verse]\n晨光落在窗台\n新的旅程展开\n[Chorus]\n让心中的旋律\n随风慢慢盛开",
+  tags: "acoustic pop, warm vocals",
+  title: "新的旅程"
+}' | curl --fail-with-body https://api.maxapi.ai/suno/v2/generate \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @- \
+  --output suno-generate.json
+```
+
+### 保存每个 clip 的 ID
+
+生成响应中可能同时有顶层 `id` 和 `clips[].id`。以下是结构示意：
+
+```json "提交响应关键字段示意"
+{
+  "id": "generation-id",
+  "clips": [
+    {
+      "id": "song-clip-id",
+      "status": "submitted",
+      "audio_url": ""
+    }
+  ]
+}
+```
+
+顶层任务已受理或完成包装处理，不代表每个音频已完成。查询时使用歌曲片段 ID：
+
+```bash "按 clip ID 查询"
+CLIP_IDS="$(jq -er '[.clips[]?.id] | if length > 0 then join(",") else error("响应中没有 clip ID") end' suno-generate.json)"
+curl --fail-with-body --get https://api.maxapi.ai/suno/v2/feed \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  --data-urlencode "ids=$CLIP_IDS" \
+  --output suno-clips.json
+```
+
+`ids` 可传多个英文逗号分隔的 clip ID。逐首检查 `clips[].status`；资料示例中 `submitted` 表示已提交，`complete` 表示片段完成。取得有效 `audio_url` 后再交付给用户，视频或封面链接需要单独检查。
+
+对于未识别的状态，保留原始响应并在有限期限内继续查询。出现错误字段或明确失败时应停止等待并记录原因，不能仅凭 `audio_url` 非空认定整首歌曲已生成完成。
+
+## NewAPI：提交并查询任务
+
+该格式使用任务包装层。以下演示已存在歌曲的续写：先设置 `MAXAPI_SUNO_CLIP_ID` 为当前渠道中可续写的 clip ID，并设置 `MAXAPI_CONTINUE_AT` 为你选择的秒数。它不是首次生成歌曲的最小请求。
+
+```bash "续写已有歌曲"
+: "${MAXAPI_SUNO_CLIP_ID:?请设置可续写的歌曲 clip ID}"
+: "${MAXAPI_CONTINUE_AT:?请设置续写起点秒数}"
+jq -n \
+  --arg mv "$MAXAPI_SUNO_MODEL" \
+  --arg clip "$MAXAPI_SUNO_CLIP_ID" \
+  --argjson at "$MAXAPI_CONTINUE_AT" '{
+    mv: $mv,
+    task: "extend",
+    prompt: "[Verse]\n沿着微光继续走\n把新的故事唱出口",
+    tags: "acoustic pop, warm vocals",
+    title: "新的旅程 · 续篇",
+    continue_clip_id: $clip,
+    continue_at: $at
+  }' | curl --fail-with-body https://api.maxapi.ai/suno/submit/music \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @- \
+  --output suno-task.json
+```
+
+该格式的示例响应使用 `code: "success"`，任务 ID 位于 `data.task_id`。检查业务结果后再取 ID：
+
+```bash "查询 NewAPI 任务"
+TASK_ID="$(jq -er '
+  if .code == "success" then (.data.task_id // empty)
+  else error(.message // "Suno 任务提交失败") end
+' suno-task.json)"
+: "${TASK_ID:?响应缺少任务 ID}"
+TASK_ID_ESCAPED="$(printf '%s' "$TASK_ID" | jq -sRr @uri)"
+curl --fail-with-body \
+  "https://api.maxapi.ai/suno/fetch/$TASK_ID_ESCAPED" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  --output suno-task-status.json
+```
+
+| 响应字段 | 作用 |
+| --- | --- |
+| `code`、`message` | 本次查询的业务结果 |
+| `data.task_id` | 任务 ID |
+| `data.status` | 任务状态；示例包含 `SUBMITTED`、`SUCCESS` |
+| `data.fail_reason` | 任务失败详情 |
+| `data.data[]` | 任务产生的歌曲或片段，内容取决于任务类型 |
+| `data.data[].audio_url` | 可用时返回的音频地址 |
+
+不要把 v2 的小写 clip 状态判断直接套到 NewAPI 的任务状态上。生成音乐、歌词和续写等任务也可能返回不同的结果内容。
+
+## 续写流程中的标识关系
+
+1. 通过生成或已支持的上传接口取得原歌曲的 clip ID。
+2. 提交续写，指定 `continue_clip_id` 和续写起点。
+3. 保存新任务 ID，以及新返回的 clip ID。
+4. 使用该格式对应的查询接口等待新片段完成。
+5. 如果需要整曲拼接，确认渠道支持的拼接动作，再处理完整音频。
+
+续写结果可能只是新增片段。不能假定续写一次就返回完整歌曲，也不能将某个版本的上传后缀规则套到所有 `mv` 值。
+
+上传、歌词和其他音乐操作见 [完整接口目录](/zh/api-reference/catalog)。后台轮询、结果存储与重复请求处理见 [异步任务与回调](/zh/guides/async-tasks)。

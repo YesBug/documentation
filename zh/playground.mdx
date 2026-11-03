@@ -1,0 +1,45 @@
+---
+title: "在线调试"
+description: "在 Mintlify 原生调试面板填写鉴权、JSON 或文件参数，发送 MaxAPI 请求并查看响应、SSE 增量与音频结果。"
+keywords: ["MaxAPI", "在线调试", "playground"]
+---
+
+MaxAPI 的常用接口页面提供 Mintlify 原生在线调试面板。你可以查看请求方法与路径，填写鉴权和参数，再检查实际返回的状态、响应体或媒体内容。
+
+## 发送第一次请求
+
+<Steps>
+  <Step title="打开模型列表">
+    前往 [模型列表](/zh/api-reference/models)，选择接口页面中的 **Try it**（在线调试）入口。该接口无需请求体，适合先核对密钥与连接。
+  </Step>
+  <Step title="填写 API Key">
+    从 [控制台](https://platform.maxapi.ai) 获取密钥，在调试面板的 Bearer 鉴权字段填写密钥值。生成的请求头应为 `Authorization: Bearer 你的密钥`，不要重复添加 `Bearer`。
+  </Step>
+  <Step title="检查请求并发送">
+    确认目标地址为 `https://api.maxapi.ai/v1/models`，然后发送请求。成功时，从响应的 `data[].id` 选取适合任务的模型 ID。
+  </Step>
+  <Step title="尝试对话接口">
+    打开 [创建对话](/zh/api-reference/chat-completions)，填写支持对话的模型 ID 和 `messages`。先验证最小请求，再逐项增加可选参数。
+  </Step>
+</Steps>
+
+<Note>
+在线调试会发送真实请求，生成操作可能产生实际用量。不要在共享设备上留下密钥；分享截图和响应前，移除鉴权信息与敏感内容。
+</Note>
+
+## JSON、文件与流式输出
+
+| 请求类型 | 调试方式 |
+| --- | --- |
+| JSON | 在 **Form** 与 **JSON** 视图间切换；发送前确认 JSON 有效 |
+| 文件上传 | 在文件字段选择本地文件，适用于 [图像编辑](/zh/api-reference/images-edits) 与 [音频转录](/zh/api-reference/audio-transcriptions)；由客户端生成 multipart boundary |
+| SSE | 在支持流式的模型上设置 `stream: true`，响应按文本逐段显示；可点击 **Stop** 停止读取 |
+| 音频 | [文本转语音](/zh/api-reference/audio-speech) 返回受支持的音频内容类型时，使用响应中的播放器查看结果 |
+
+调试请求通过文档平台的代理转发。代码示例仍使用 MaxAPI 的正式接口地址；将示例接入应用时，请按 [身份验证](/zh/authentication) 在服务端管理密钥。
+
+## 请求失败时
+
+先检查 HTTP 状态与响应内容。`401` 优先核对密钥，参数错误先减少为最小请求，模型或路由错误则核对账户权限和 Base URL。完整步骤见 [错误排查](/zh/help/errors)。
+
+如果需要排查长时间流式连接，使用 [流式响应指南](/zh/guides/streaming) 中的 SDK 或 cURL 示例，对照确认网络、超时及响应缓冲情况。

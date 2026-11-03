@@ -1,0 +1,90 @@
+---
+title: "Node.js SDK"
+description: "使用 JavaScript 或 TypeScript，在服务端接入 MaxAPI。"
+keywords: ["MaxAPI", "Node.js SDK", "nodejs"]
+---
+
+OpenAI 的 JavaScript / TypeScript SDK 支持自定义 `baseURL`。配置 MaxAPI 地址和密钥后，就可以在 Node.js 服务端发起对话请求。
+
+## 安装
+
+在项目目录中安装依赖：
+
+```bash "终端"
+npm install openai
+```
+
+## 设置环境变量
+
+```bash
+export MAXAPI_API_KEY="替换为你的 API Key"
+export MAXAPI_MODEL="替换为模型 ID"
+```
+
+密钥从 [控制台](https://platform.maxapi.ai) 获取，模型 ID 可通过 [模型列表](/zh/api-reference/models) 查询。示例读取当前进程的环境变量；如果使用 `.env`，请确保运行环境已经加载它。
+
+## 创建第一个请求
+
+将以下代码保存为 `main.mjs`。使用 `.mjs` 扩展名可直接运行 ES Module 示例。
+
+```javascript "main.mjs"
+import OpenAI from "openai";
+
+const apiKey = process.env.MAXAPI_API_KEY;
+const model = process.env.MAXAPI_MODEL;
+
+if (!apiKey || !model) {
+  throw new Error("请设置 MAXAPI_API_KEY 和 MAXAPI_MODEL。");
+}
+
+const client = new OpenAI({
+  apiKey,
+  baseURL: "https://api.maxapi.ai/v1",
+});
+
+const completion = await client.chat.completions.create({
+  model,
+  messages: [
+    { role: "user", content: "用三个要点解释什么是 API。" },
+  ],
+});
+
+console.log(completion.choices[0]?.message.content ?? "");
+```
+
+```bash "运行"
+node main.mjs
+```
+
+在 TypeScript 项目中可以使用相同的客户端和调用方式，由 SDK 提供请求参数与响应的类型定义。
+
+## 处理 API 错误
+
+在已有的客户端配置后加入异常处理，向日志记录必要状态，并向应用用户展示可理解的失败提示。
+
+```javascript "异常处理"
+try {
+  const completion = await client.chat.completions.create({
+    model,
+    messages: [{ role: "user", content: "你好！" }],
+  });
+
+  console.log(completion.choices[0]?.message.content ?? "");
+} catch (error) {
+  if (error instanceof OpenAI.APIError) {
+    console.error("请求失败，HTTP 状态码：", error.status ?? "不可用");
+  } else {
+    console.error("请求失败，请检查运行配置与网络连接。");
+  }
+}
+```
+
+处理重试前，先确认 SDK 是否已经自动重试，避免多层重试叠加。具体排查步骤见 [错误排查](/zh/help/errors)。
+
+## 在 Web 应用中使用
+
+让浏览器请求你自己的后端，再由后端携带 API Key 调用 MaxAPI。生产环境中应在后端校验用户身份，并根据业务需求控制请求频率和输入长度。
+
+不要将 API Key 放在浏览器端代码中，也不要为了绕过限制启用客户端密钥访问。详细建议见 [身份验证](/zh/authentication)。
+
+接下来可以添加 [流式响应](/zh/guides/streaming)，或查看 [官方 JavaScript SDK 文档](https://github.com/openai/openai-node) 了解更多客户端选项。

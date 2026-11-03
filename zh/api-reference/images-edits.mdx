@@ -1,0 +1,45 @@
+---
+title: "编辑图像"
+description: "使用 POST /v1/images/edits 上传参考图和修改指令，在模型支持时添加遮罩或多张参考图。"
+keywords: ["MaxAPI", "编辑图像", "images-edits"]
+openapi: "openapi/zh.json POST /v1/images/edits"
+---
+
+图像编辑接口接收实际图片文件与修改指令。说明需要改变的部分和应当保留的主体，所用模型必须支持编辑能力；文件格式、尺寸和多图数量由具体模型与通道决定。
+
+使用 `multipart/form-data` 上传文件。cURL 的 `-F` 会生成带正确 boundary 的请求头，无需手工设置 `Content-Type`。
+
+## 上传图片编辑
+
+把待编辑图片保存为当前目录下的 `source.png`，并将模型变量设为支持编辑的模型。
+
+```bash "cURL：单图编辑"
+curl --fail-with-body https://api.maxapi.ai/v1/images/edits \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -F "model=$MAXAPI_IMAGE_MODEL" \
+  -F "image=@source.png" \
+  -F "prompt=保留主体外观，将背景改为浅灰色摄影棚背景。" \
+  --output image-response.json
+```
+
+上传遮罩时，增加 `-F "mask=@mask.png"`。遮罩应与原图尺寸一致，并按模型要求包含透明通道；并非每个编辑模型都支持遮罩。
+
+### 多张参考图
+
+仅在所选模型与通道明确支持多图编辑时使用。兼容的多图表单使用重复的 `image[]` 文件字段，不能把本地文件名写成普通 JSON 字符串。
+
+```bash "cURL：多图编辑，需要相应能力"
+curl --fail-with-body https://api.maxapi.ai/v1/images/edits \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -F "model=$MAXAPI_IMAGE_MODEL" \
+  -F "image[]=@product.png" \
+  -F "image[]=@background.png" \
+  -F "prompt=将第一张图片的产品自然放入第二张图片的场景中。" \
+  --output image-response.json
+```
+
+## 读取结果
+
+响应通常通过 `data[].url` 或 `data[].b64_json` 返回图片，具体字段取决于模型。读取与保存示例见 [处理图片结果](/zh/api-reference/images#处理图片结果)。
+
+文件参数为空时，检查上传路径是否存在，以及是否用 `@` 上传文件内容。遮罩没有生效时，确认透明通道、尺寸和模型是否支持遮罩；其他错误见 [错误排查](/zh/help/errors)。

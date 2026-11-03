@@ -1,0 +1,146 @@
+---
+title: "图像专用协议"
+description: "接入 Gemini、Stable Diffusion、Ideogram 与异步图像任务，区分各自的请求和输出格式。"
+keywords: ["MaxAPI", "图像专用协议", "image-providers"]
+---
+
+图像生成既有 [OpenAI 兼容 Images 格式](/zh/api-reference/images)，也有厂商专用格式和异步任务格式。选择前先确认当前模型开通的路由；相同的生成目标不意味着请求体可以通用。
+
+## 选择请求格式
+
+| 格式 | 常见入口 | 请求编码 | 结果读取方式 |
+| --- | --- | --- | --- |
+| OpenAI Images | `/v1/images/generations`、`/v1/images/edits` | JSON 或 multipart | 图像 URL 或 Base64 |
+| Gemini 原生图像 | `/v1beta/models/{model}:generateContent` | JSON `contents[].parts[]` | 从模型返回的内容块中读取 |
+| Stable Diffusion 3 | `/sd/v2beta/stable-image/generate/sd3` | multipart | 依据 `Accept` 读取图片或 JSON |
+| Ideogram | `/ideogram/generate` | JSON `image_request` | `data[]` 中的图像信息 |
+| 异步图像兼容格式 | `/v1/videos` | 该图像分支使用 multipart | 先查询任务，再下载内容 |
+
+下面各节仅适用于已开通对应格式的渠道。专用协议通常使用普通 HTTP 客户端；OpenAI SDK 不会自动把 `prompt` 转换为 Gemini 的内容块或 Ideogram 的 `image_request`。
+
+## Gemini：generateContent
+
+接口资料给出了 `gemini-2.5-flash-image` 的 `generateContent` 路由。使用其他模型 ID 前，需先确认该模型也开放同一协议。
+
+```http "资料中的图像路由"
+POST https://api.maxapi.ai/v1beta/models/gemini-2.5-flash-image:generateContent
+```
+
+| 字段 | 作用 |
+| --- | --- |
+| `contents[].role` | 消息角色，例如 `user` |
+| `contents[].parts[].text` | 图像描述或编辑指令 |
+| `contents[].parts[].inline_data` | 参考图内容块，使用时提供 `mime_type` 和 Base64 `data` |
+| `generationConfig.responseModalities` | 此图像协议示例使用 `TEXT` 与 `IMAGE` |
+
+将 `MAXAPI_GEMINI_IMAGE_MODEL` 设置为当前已确认可用的模型 ID。下面以文本输入演示相同的内容块结构：
+
+```bash "Gemini 图像请求"
+: "${MAXAPI_GEMINI_IMAGE_MODEL:?请设置支持 generateContent 图像生成的模型 ID}"
+MODEL_ESCAPED="$(printf '%s' "$MAXAPI_GEMINI_IMAGE_MODEL" | jq -sRr @uri)"
+jq -n '{
+  contents: [{
+    role: "user",
+    parts: [{text: "Create a watercolor illustration of a small library beside a river."}]
+  }],
+  generationConfig: {responseModalities: ["TEXT", "IMAGE"]}
+}' | curl --fail-with-body \
+  "https://api.maxapi.ai/v1beta/models/$MODEL_ESCAPED:generateContent" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @- \
+  --output gemini-image.json
+```
+
+编辑参考图时，在同一条消息的 `parts` 中添加图像内容块，保留其真实 MIME 类型。不要把整个 `data:image/...;base64,...` URL 当作纯 Base64 数据直接塞入 `data`。
+
+此格式的结果是多模态内容，可能同时含文本和图片，也可能因输入或模型限制未返回图片。遍历返回的候选内容块，按实际类型读取；不要套用 OpenAI Images 的 `data[0].url` 解析逻辑。MaxAPI 此路由使用 Bearer 鉴权，示例中不要混入厂商直连域名或直连密钥。
+
+## Stable Diffusion 3：multipart 与 Accept
+
+SD3 接口通过 `mode` 区分文生图和图生图。模型、输出尺寸以及参数组合以当前 SD 渠道支持情况为准。
+
+```http "Endpoint"
+POST https://api.maxapi.ai/sd/v2beta/stable-image/generate/sd3
+```
+
+| 字段 | 类型 | 使用条件 |
+| --- | --- | --- |
+| `prompt` | `string` | 必填，图像描述 |
+| `model` | `string` | 选择已开通的 SD3 模型 |
+| `mode` | `string` | `text-to-image` 或 `image-to-image` |
+| `image` | 文件 | 图生图模式使用 |
+| `strength` | `number` | 图生图模式使用，控制参考图影响程度 |
+| `aspect_ratio` | `string` | 文生图支持时指定比例 |
+| `output_format` | `string` | 选择支持的图片格式 |
+
+`Accept: image/*` 请求图片内容，`Accept: application/json` 请求包含 Base64 的 JSON。上传表单时不手写 `Content-Type`，由 cURL 生成带 boundary 的请求头。
+
+```bash "SD3 文生图，保存图片"
+: "${MAXAPI_SD_MODEL:?请设置已开通的 SD3 模型 ID}"
+curl --fail-with-body https://api.maxapi.ai/sd/v2beta/stable-image/generate/sd3 \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Accept: image/*" \
+  --form-string "model=$MAXAPI_SD_MODEL" \
+  --form-string "mode=text-to-image" \
+  --form-string "prompt=A small wooden cabin beside a quiet lake, ink illustration" \
+  --form-string "output_format=png" \
+  --dump-header sd-image.headers \
+  --output sd-image.png
+```
+
+检查 HTTP 状态和 `Content-Type` 后再把文件作为图片展示；出错响应仍可能是 JSON。图生图需添加文件上传与 `strength`，不能只改变 `mode`。
+
+SDXL 的 `/sd/v1/generation/{engine_id}/text-to-image` 是另一套字段结构，不应复用 SD3 的 multipart 参数。更多分支见 [接口目录](/zh/api-reference/catalog)。
+
+## Ideogram：image_request 包装层
+
+Ideogram 生成接口使用 JSON 对象 `image_request`。图像混合、放大和描述操作可能改用 multipart，需分别确认请求编码。
+
+```http "Endpoints"
+POST https://api.maxapi.ai/ideogram/generate
+POST https://api.maxapi.ai/ideogram/remix
+POST https://api.maxapi.ai/ideogram/upscale
+POST https://api.maxapi.ai/ideogram/describe
+```
+
+| 字段 | 说明 |
+| --- | --- |
+| `image_request.prompt` | 必填的图像描述 |
+| `image_request.model` | 当前渠道支持的 Ideogram 模型值 |
+| `image_request.aspect_ratio` | 此协议的比例标识，格式与普通 `16:9` 参数不同 |
+| `image_request.resolution` | 指定分辨率时使用；不能与 `aspect_ratio` 同时传入 |
+| `image_request.magic_prompt_option` | 支持时控制提示词增强 |
+| `image_request.style_type` | 支持该风格参数的模型使用 |
+
+```bash "Ideogram 文生图"
+: "${MAXAPI_IDEOGRAM_MODEL:?请设置已开通的 Ideogram 模型值}"
+jq -n --arg model "$MAXAPI_IDEOGRAM_MODEL" '{
+  image_request: {
+    model: $model,
+    prompt: "A minimal poster for a reading club, warm colors, the title READ TOGETHER"
+  }
+}' | curl --fail-with-body https://api.maxapi.ai/ideogram/generate \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @- \
+  --output ideogram-images.json
+```
+
+成功响应使用 `data[]`，可包含 `url`、`prompt`、`resolution` 和 `is_image_safe`。`url` 可能为空，需要逐项检查；不要默认每个数组元素都有可下载图片。取得结果后及时保存到自己的存储，不把生成链接的保存时长写死在业务逻辑中。
+
+## 异步图像：复用 videos 任务资源
+
+部分图像渠道通过兼容任务资源提交与查询图片。虽然路径叫 `/v1/videos`，该分支的返回对象可以是 `image`，生成内容仍是图片。
+
+| 步骤 | 方法和路径 | 作用 |
+| --- | --- | --- |
+| 提交 | `POST /v1/videos` | multipart 图像任务；示例包含 `model`、`prompt` 和可选 `input_reference` 文件 |
+| 查询 | `GET /v1/videos/{video_id}` | 使用提交返回的 `id` 查询 |
+| 下载 | `GET /v1/videos/{task_id}/content` | 获取完成后的图像内容 |
+
+这个路径同时出现在视频、角色和图像兼容流程中。接口汇总中同一路径可能只保留某一分支的示例，不能把角色创建字段当作图像生成参数。接入前需确认具体模型和图像任务分支，因此本节不提供混合多个分支的通用请求体。
+
+保存响应中的 `id`，根据该分支的状态判断任务完成，再读取内容。示例中 `status: "in_progress"` 表示处理中；不要借用统一视频接口的大写 `SUCCESS` 去判断所有 `/v1/videos` 任务。下载时检查真实 `Content-Type`，不要把二进制图片当作 JSON 解析。
+
+任务保存、有限轮询和下载处理建议见 [异步任务与回调](/zh/guides/async-tasks)。

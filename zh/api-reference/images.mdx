@@ -1,0 +1,53 @@
+---
+title: "生成图像"
+description: "使用 POST /v1/images/generations 根据提示词生成图片，并处理返回的 URL 或 Base64 图像数据。"
+keywords: ["MaxAPI", "生成图像", "images"]
+openapi: "openapi/zh.json POST /v1/images/generations"
+---
+
+图像生成接口根据提示词返回图片。模型、尺寸、质量和返回格式取决于账户已启用的图像通道。需要上传原图修改时，使用 [图像编辑](/zh/api-reference/images-edits)；需要理解图片内容时，使用 [视觉理解](/zh/guides/vision)。
+
+## 编写提示词
+
+描述主体、场景、构图和视觉风格。首次请求只设置当前模型需要的字段，确认调用成功后，再按模型说明增加 `size`、`quality` 或 `response_format`。
+
+## 发送生成请求
+
+设置 `MAXAPI_IMAGE_MODEL` 为可用模型。以下示例依赖 `jq`，不指定模型特有参数。
+
+```bash "cURL：生成图片"
+jq -n --arg model "$MAXAPI_IMAGE_MODEL" '{
+  model: $model,
+  prompt: "清晨的极简工作室，桌面上有一盏白色台灯，自然光，干净的产品摄影构图"
+}' | curl --fail-with-body https://api.maxapi.ai/v1/images/generations \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @- \
+  --output image-response.json
+```
+
+## 处理图片结果
+
+常见响应在 `data` 数组中返回图片，具体字段由模型决定。`b64_json` 需要解码，`url` 指向可读取的结果地址；取得需要保留的图片后，及时保存到自己的存储。
+
+下面代码读取已保存的响应，将第一张 Base64 图片写成原始二进制文件，或输出返回的 URL。
+
+```python "Python：读取结果"
+import base64
+import json
+from pathlib import Path
+
+result = json.loads(Path("image-response.json").read_text())
+item = result["data"][0]
+if item.get("b64_json"):
+    Path("generated-image.bin").write_bytes(base64.b64decode(item["b64_json"]))
+    print("已保存原始图片数据；按实际图片格式设置扩展名。")
+elif item.get("url"):
+    print(item["url"])
+else:
+    raise ValueError("响应中没有可读取的图片字段")
+```
+
+## 排查失败
+
+可选参数不支持时，删除该参数后验证。请求超时后先结合控制台记录确认执行结果，避免立即重复提交产生多次任务。完整步骤见 [错误排查](/zh/help/errors)。

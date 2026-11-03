@@ -1,0 +1,58 @@
+---
+title: "Create text embeddings"
+description: "POST /v1/embeddings: turn text into numeric vectors for semantic retrieval, map batch results to inputs, and keep index models and dimensions consistent."
+keywords: ["MaxAPI", "Create text embeddings", "API documentation"]
+sidebarTitle: "Embeddings"
+openapi: "openapi/en.json POST /v1/embeddings"
+---
+
+Embeddings encode text into numeric vectors. Index document fragments, then embed a query to retrieve related content for a later chat request. Use an embedding-capable model enabled for your account.
+
+## Embed a batch
+
+Set `MAXAPI_EMBEDDING_MODEL` to an available embedding model. This example requires `jq`:
+
+```bash Embed two inputs
+jq -n --arg model "$MAXAPI_EMBEDDING_MODEL" '{
+  model: $model,
+  input: ["How do I create an API key?", "How do I list available models?"]
+}' | curl --fail-with-body https://api.maxapi.ai/v1/embeddings \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @-
+```
+
+Remove empty text before submitting, split long documents into meaningful fragments and retain each fragment's source and position. Input lengths, batch sizes and output dimensions depend on the model.
+
+## Map results to inputs
+
+Use `data[].index` to map each vector back to its input. With float encoding, vectors are in `data[].embedding`. If you request supported Base64 encoding, decode according to that encoding.
+
+```python Read batch results
+import os
+from openai import OpenAI
+
+client = OpenAI(
+    api_key=os.environ["MAXAPI_API_KEY"],
+    base_url="https://api.maxapi.ai/v1",
+)
+result = client.embeddings.create(
+    model=os.environ["MAXAPI_EMBEDDING_MODEL"],
+    input=["How do I create an API key?", "How do I list available models?"],
+)
+for item in sorted(result.data, key=lambda item: item.index):
+    print(item.index, len(item.embedding))
+```
+
+## Build retrieval into an application
+
+1. Store document fragments with their source text and vectors.
+2. Embed the user's question with the same model and dimensions.
+3. Retrieve related fragments from your vector database.
+4. Add the retrieved text to a [chat request](/en/api-reference/chat-completions).
+
+Rebuild the affected index when changing the embedding model or dimension. Vectors from different models should not be mixed even if they have the same length.
+
+## Troubleshooting
+
+Empty inputs, oversized text, excessive batch size or an unsupported `dimensions` value can cause parameter errors. Start with one short text and minimal fields. For rate limits, reduce batch size and concurrency and follow [troubleshooting](/en/help/errors).

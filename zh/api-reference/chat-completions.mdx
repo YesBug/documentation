@@ -1,0 +1,35 @@
+---
+title: "创建对话"
+description: "发送文本或多模态消息，处理模型回复、用量与工具调用。"
+keywords: ["MaxAPI", "创建对话", "chat-completions"]
+openapi: "openapi/zh.json POST /v1/chat/completions"
+---
+
+Chat Completions 根据消息列表生成下一条回复，适合聊天、摘要、翻译和代码生成。图片输入与工具调用需要所选模型和账户通道支持。
+
+## 从最小请求开始
+
+先在 [控制台](https://platform.maxapi.ai) 创建密钥，并选择可用模型。首次请求只传 `model` 和 `messages`；环境变量配置见 [快速开始](/zh/quickstart)。
+
+确认模型要求后，再添加采样、长度和工具参数；不要同时传两种输出长度参数。可见模型列表不等于所有模型都支持每个可选字段。
+
+## 保留对话上下文
+
+多轮对话需要把之前的用户消息和 assistant 回复一并发送。服务端不会仅凭上一次响应的 `id` 自动恢复对话。图片消息的 `content` 数组格式见 [视觉理解](/zh/guides/vision)。
+
+工具调用时，保留原 assistant 消息中的 `tool_calls`，由应用执行工具，再用 `tool_call_id` 关联结果。完整示例见 [工具调用](/zh/guides/tools)。
+
+## 流式输出
+
+设置 `stream: true` 后，响应为 SSE 事件流，文本位于 `choices[].delta.content`，不再是完整的 `message.content`。工具参数也可能分片到达；收集完整后再解析 JSON。实现细节见 [流式响应](/zh/guides/streaming)。
+
+## 常见问题
+
+| 现象 | 处理方式 |
+| --- | --- |
+| 提示参数不支持 | 回到仅含 `model`、`messages` 的最小请求，再逐项添加参数 |
+| 回复没有记住上一轮 | 在本次 `messages` 中包含需要保留的历史记录 |
+| `content` 为空 | 检查 `tool_calls`、结束原因和模型返回的其他字段 |
+| 回复被截断 | 检查 `finish_reason`，按模型支持的参数提高输出上限或缩短上下文 |
+
+认证失败、限流和上游错误的处理见 [错误排查](/zh/help/errors)。

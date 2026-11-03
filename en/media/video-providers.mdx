@@ -1,0 +1,158 @@
+---
+title: "Use provider-specific video protocols"
+description: "Compare Veo, Wan, Seedance, Vidu, Hailuo, Luma, Kling and Runway routes, task identifiers and result handling, including definitions that need confirmation."
+keywords: ["MaxAPI", "Use provider-specific video protocols", "API documentation"]
+sidebarTitle: "Video protocols"
+---
+
+Provider-specific video protocols preserve their own fields, task objects and download flows. Use them when your application needs that format, or start with [unified video](/en/media/videos) for a common submission route.
+
+All routes below use `https://api.maxapi.ai` and `Authorization: Bearer $MAXAPI_API_KEY`. Confirm each capability separately. Sharing an API system does not mean every model, protocol version or feature is enabled.
+
+## Route comparison
+
+| Protocol | Submission | Query | Body structure |
+| --- | --- | --- | --- |
+| Veo AI Studio | `POST /aistudio/v1beta/models/{model}:predictLongRunning` | POST to matching `:fetchPredictOperation` with `operationName` | `instances[]`, `parameters` |
+| Veo Vertex | `POST /vertex/v1/publishers/google/models/{model}:predictLongRunning` | Matching `:fetchPredictOperation` | `instances[]`, `parameters` |
+| Wan | `POST /wan/api/v1/services/aigc/video-generation/video-synthesis` | `GET /wan/api/v1/tasks/{task_id}` | `model`, `input`, `parameters` |
+| Seedance | `POST /seedance/api/v3/contents/generations/tasks` | `GET /seedance/api/v3/contents/generations/tasks/{id}` | Source conflicts need review |
+| Vidu | `POST /vidu/ent/v2/text2video` or `/vidu/ent/v2/img2video` | `GET /vidu/ent/v2/tasks/{id}/creations` | Operation-specific text and references |
+| Hailuo | `POST /hailuo/v1/video_generation` | `GET /hailuo/v1/query/video_generation?task_id=...` | `model`, `prompt`, optional frames |
+| Luma v2 | `POST /luma/v2/generations` | Query the generation resource; see caveat below | `user_prompt`, optional references |
+| Kling | `POST /kling/v1/videos/text2video` or `/kling/v1/videos/image2video` | `GET /kling/v1/{action}/{action2}/{task_id}` | `prompt`, `model`, operation fields |
+| Runway | `POST /runwayml/v1/image_to_video` | Not specified in the supplied reference | `promptImage`, `promptText`, `model` |
+
+See the [catalog](/en/api-reference/catalog) for more branches. Do not infer that MaxAPI exposes every route documented by a provider's direct service.
+
+## Veo: preserve the operation name
+
+AI Studio and Vertex use long-running operation objects. The model is in the URL, submission uses `instances`, and queries use the returned operation name. Keep submission and query prefixes aligned and confirm access to each.
+
+| Field | Location | Purpose |
+| --- | --- | --- |
+| `model` | URL | Enabled Veo model ID |
+| `instances[].prompt` | Submission body | Scene description |
+| `parameters` | Submission body | Supported duration, aspect ratio and other settings |
+| `name` | Submission response | Save the complete operation name |
+| `operationName` | Query body | The saved operation name |
+| `done` | Query response | Whether it ended; still inspect errors or results |
+
+This example applies to a confirmed AI Studio text-to-video branch:
+
+```bash Submit a Veo task
+: "${MAXAPI_VEO_MODEL:?Set an enabled AI Studio Veo model ID}"
+VEO_MODEL_ESCAPED="$(printf '%s' "$MAXAPI_VEO_MODEL" | jq -sRr @uri)"
+jq -n '{instances: [{prompt: "A small sailboat crosses a calm lake at sunrise."}]}' \
+  | curl --fail-with-body \
+    "https://api.maxapi.ai/aistudio/v1beta/models/$VEO_MODEL_ESCAPED:predictLongRunning" \
+    -H "Authorization: Bearer $MAXAPI_API_KEY" \
+    -H "Content-Type: application/json" \
+    --data-binary @- \
+    --output veo-operation.json
+```
+
+```bash Query the same operation
+OPERATION_NAME="$(jq -er '.name // empty' veo-operation.json)"
+: "${OPERATION_NAME:?Response has no operation name}"
+jq -n --arg operation "$OPERATION_NAME" '{operationName: $operation}' \
+  | curl --fail-with-body \
+    "https://api.maxapi.ai/aistudio/v1beta/models/$VEO_MODEL_ESCAPED:fetchPredictOperation" \
+    -H "Authorization: Bearer $MAXAPI_API_KEY" \
+    -H "Content-Type: application/json" \
+    --data-binary @-
+```
+
+`done: true` is not proof of successful generation. Inspect `error` or `response`. Branches may return file references or Base64 video rather than a top-level `video_url`.
+
+## Wan: separate input and parameters
+
+Wan commonly places generation inputs in `input` and controls such as duration or resolution in `parameters`. It also has distinct text-to-video and image-to-video routes:
+
+```http Wan branches
+POST /wan/api/v1/services/aigc/text2video/text-to-video
+POST /wan/api/v1/services/aigc/image2video/image-to-video
+GET  /wan/api/v1/tasks/{task_id}
+```
+
+The supplied text-to-video schema mixes in image-to-video `image_url` requirements, while its example uses `input.prompt`. Do not force an image into a text request because of this conflict or treat the image-model enum as a text-model list. Confirm fields for your model or check for a [unified format](/en/media/videos).
+
+Wan query responses can have business wrappers. Distinguish HTTP success, successful status lookup and successful generation.
+
+## Seedance and Vidu: resolve schema conflicts
+
+The routes appear in the supplied material, but conflicting fields prevent a reliable generic runnable body.
+
+| Protocol | Observed conflict | Confirm before integration |
+| --- | --- | --- |
+| Seedance | Some schemas contain Wan models and `input`; another example uses `content[]` text and image parts | Model ID, content structure and media references |
+| Vidu | A text-to-video schema lists Hailuo models while the example uses Vidu; some operations omit `/vidu` | Exact route, model and fields for the operation |
+
+Locate the operation in the [catalog](/en/api-reference/catalog) and confirm its accepted format. Do not use a conflicting generated example in production.
+
+## Hailuo: retrieve the file after completion
+
+Hailuo separates generation status from file retrieval. Text-to-video, first-frame, first-and-last-frame and subject-reference support depend on the model.
+
+| Field | Use |
+| --- | --- |
+| `model` | Enabled model |
+| `prompt` | Scene description |
+| `first_frame_image` | First frame for a supported image-to-video mode |
+| `last_frame_image` | Last frame with the first frame for a supported mode |
+| `subject_image` | Reference for supported subject modes |
+| `callback_url` | Callback where supported |
+
+```bash Minimal Hailuo text-to-video
+: "${MAXAPI_HAILUO_MODEL:?Set a Hailuo model supporting text-to-video}"
+jq -n --arg model "$MAXAPI_HAILUO_MODEL" '{
+  model: $model,
+  prompt: "A white paper plane glides slowly through a bright room."
+}' | curl --fail-with-body https://api.maxapi.ai/hailuo/v1/video_generation \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @- \
+  --output hailuo-submit.json
+```
+
+Save a valid `task_id` and query it as a query parameter. Referenced states include `Processing` and `Success`, which differ in case from unified video. Business errors can appear in `base_resp`.
+
+```http Follow-up resources
+GET /hailuo/v1/query/video_generation?task_id={task_id}
+GET /hailuo/v1/files/retrieve?file_id={file_id}
+```
+
+After successful generation, save `file_id` and retrieve `file.download_url`. A file ID cannot replace the task ID in a progress query.
+
+## Luma: user_prompt and generation resources
+
+Luma v2 uses `user_prompt`. Optional fields include `image_url`, `image_end_url`, `expand_prompt` and `notify_hook`; confirm supported modes before using them.
+
+```bash Submit with Luma v2
+jq -n '{user_prompt: "A red kite floats over a sunlit meadow."}' \
+  | curl --fail-with-body https://api.maxapi.ai/luma/v2/generations \
+    -H "Authorization: Bearer $MAXAPI_API_KEY" \
+    -H "Content-Type: application/json" \
+    --data-binary @- \
+    --output luma-submit.json
+```
+
+The example response includes `id` and `state`. The source lists `/luma/v2/generations/task_id`, where `task_id` is an example position to replace. Confirm whether the actual route is `/luma/v2/generations/{id}`; do not call the literal `task_id` path. Related download and extension routes need the same check.
+
+## Kling: query the matching operation
+
+Text-to-video and image-to-video use different routes. Match `action` and `action2` to submission, for example `videos` and `text2video`:
+
+```http Text-to-video query
+GET /kling/v1/videos/text2video/{task_id}
+```
+
+The source's `data.task_status` values include `submitted`, `processing`, `succeed` and `failed`. Read successful output from the task result object. Its optional `callback_url` is distinct from Midjourney's `notifyHook`. Choose model, duration and reference fields for the specific operation.
+
+## Runway: preserve camelCase fields
+
+The referenced body uses `promptImage`, `promptText`, `model` and `ratio`. `promptImage` can also use objects with `uri` and `position` for frame references; this differs from unified `images`.
+
+The supplied material does not define a matching query operation or complete fields for every version. Confirm the submission and query contract before using `/runwayml/v1/image_to_video`. This guide does not invent a query route.
+
+Preserve original responses, model, protocol and task identifiers for all provider formats. See [asynchronous tasks](/en/guides/async-tasks) for polling and callback handling.

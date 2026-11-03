@@ -1,0 +1,124 @@
+---
+title: "Submit and query unified video tasks"
+description: "Use the unified video format to submit text or image prompts, preserve the correct task identifier, query status and retrieve generated video results."
+keywords: ["MaxAPI", "Submit and query unified video tasks", "API documentation"]
+sidebarTitle: "Unified video"
+---
+
+The unified video format shares submission and query routes and selects a model with `model`. It applies to channels that enable this format. Confirm available models, image input semantics and optional settings in the [console](https://platform.maxapi.ai).
+
+```http Unified video endpoints
+POST https://api.maxapi.ai/v2/videos/generations
+GET  https://api.maxapi.ai/v2/videos/generations/{task_id}
+```
+
+For existing native integrations, see [video protocols](/en/media/video-providers). `/v2/videos/generations` and `/v1/videos` are different formats; changing the path alone does not translate parameters.
+
+## Prepare submission fields
+
+Use Bearer authentication and a JSON body.
+
+| Field | Type | Requirement | Meaning |
+| --- | --- | --- | --- |
+| `model` | `string` | Required | Enabled model supporting unified video |
+| `prompt` | `string` | Required | Subject, motion, setting and camera description |
+| `images` | `string[]` | Model-dependent for image-to-video | Reference URLs or Base64; first/last frame and subject semantics depend on the model |
+| `aspect_ratio` | `string` | Model-dependent | A supported ratio, such as `16:9` or `9:16` |
+| `duration` | `number` | Model-dependent | Duration in seconds with model-specific allowed values |
+| `enhance_prompt` | `boolean` | Some Veo channels | Prompt enhancement |
+
+Do not send every model's optional fields together. Image-to-video may require `images` where text-to-video does not, and no one duration/resolution combination applies to every model.
+
+## Submit text-to-video
+
+Set `MAXAPI_VIDEO_MODEL` to a confirmed unified text-to-video model. These examples require `jq`:
+
+```bash Submit and save the response
+: "${MAXAPI_VIDEO_MODEL:?Set a model supporting unified text-to-video}"
+jq -n --arg model "$MAXAPI_VIDEO_MODEL" '{
+  model: $model,
+  prompt: "A paper boat floats slowly across a quiet pond, soft morning light, fixed camera."
+}' | curl --fail-with-body https://api.maxapi.ai/v2/videos/generations \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @- \
+  --output video-submit.json
+```
+
+## Submit image-to-video
+
+Set `MAXAPI_IMAGE_URL` to a reference image you may use and that the generation service can access. Confirm the model's image count and semantics:
+
+```bash Include one reference image
+: "${MAXAPI_IMAGE_URL:?Set an accessible reference image URL}"
+jq -n --arg model "$MAXAPI_VIDEO_MODEL" --arg image "$MAXAPI_IMAGE_URL" '{
+  model: $model,
+  prompt: "Keep the main subject consistent. A gentle breeze moves through the scene.",
+  images: [$image]
+}' | curl --fail-with-body https://api.maxapi.ai/v2/videos/generations \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @- \
+  --output video-submit.json
+```
+
+## Save the task identifier
+
+This example handles a unified branch returning top-level `task_id`. Some Wan examples use `id` and `output.task_id`; confirm their relationship to the query endpoint and adapt your parser explicitly. Do not send an arbitrary ID from another protocol to this query route.
+
+```json Illustrative submission identifier
+{"task_id": "your-task-id"}
+```
+
+```bash Validate the task ID
+TASK_ID="$(jq -er '.task_id // empty' video-submit.json)"
+: "${TASK_ID:?No task ID in response; inspect error details}"
+```
+
+Store model, protocol, original response and task ID together. HTTP 200 may only indicate acceptance; inspect business-level errors as well.
+
+## Query status
+
+Encode the identifier as a path segment to handle special characters:
+
+```bash Query once
+TASK_ID_ESCAPED="$(printf '%s' "$TASK_ID" | jq -sRr @uri)"
+curl --fail-with-body \
+  "https://api.maxapi.ai/v2/videos/generations/$TASK_ID_ESCAPED" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  --output video-status.json
+```
+
+| State seen in reference examples | Common meaning | Action |
+| --- | --- | --- |
+| `NOT_START`, `QUEUED`, `SUBMITTED` | Waiting | Retain the task and query later |
+| `IN_PROGRESS` | Generating | Continue and show available progress |
+| `SUCCESS` | Succeeded | Inspect result fields |
+| `FAILURE` | Failed | Read `fail_reason` or other error details |
+| Other values | Channel-specific state or shape | Retain the original response and query within a deadline |
+
+These values span different examples; they are not one fixed enum returned by every model. State can be top-level or wrapped. Build rules from the actual channel response.
+
+## Retrieve the video
+
+Common result locations include `data.video_url`, `data.output`, top-level `video_url` or `url`. This illustrates only one possible shape:
+
+```json Illustrative completed task
+{
+  "task_id": "your-task-id",
+  "status": "SUCCESS",
+  "progress": "100%",
+  "data": {"video_url": "https://your-storage.example/generated-video.mp4"}
+}
+```
+
+Confirm the successful state and result URL, then download and persist it from your server. Generated links may be temporary. Do not attach your MaxAPI key to arbitrary result-download domains.
+
+## Handle timeouts and retries
+
+- If submission times out with an unknown outcome, inspect existing tasks before creating another.
+- Retry temporary query failures with delays and an overall deadline.
+- For a failed generation, retain the task ID, model and reason before deciding whether to change inputs and resubmit.
+- Reaching your local waiting deadline does not cancel the server-side task.
+
+See [asynchronous tasks](/en/guides/async-tasks) for bounded polling, callbacks and persistent task records.

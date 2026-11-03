@@ -1,0 +1,52 @@
+---
+title: "MaxAPI 开发者文档"
+description: "通过 MaxAPI 接入文本、图像和音频接口，查阅 SDK 示例、异步任务指南与可在线调试的 API 参考。"
+keywords: ["MaxAPI", "API 文档", "快速开始", "开发者", "OpenAI 兼容"]
+---
+
+MaxAPI 提供 OpenAI 兼容的 API 接口。配置 API Key、Base URL 和模型标识，即可使用熟悉的 SDK 发起请求；需要视频、音乐或厂商专用格式时，再按对应协议接入。
+
+<Columns cols={2}>
+  <Card title="快速开始" icon="rocket" href="/zh/quickstart">
+    获取密钥、查询模型，发送你的第一个对话请求。
+  </Card>
+  <Card title="API 参考" icon="code" href="/zh/api-reference/index">
+    查看参数、响应结构与代码示例，并在接口页面直接调试。
+  </Card>
+  <Card title="身份验证" icon="key" href="/zh/authentication">
+    使用 Bearer Token 验证请求，在服务端管理 API Key。
+  </Card>
+  <Card title="模型与能力" icon="layer-group" href="/zh/models">
+    查询当前账户可见的模型，核对输入、参数与输出能力。
+  </Card>
+</Columns>
+
+## 选择接入方式
+
+<Columns cols={2}>
+  <Card title="Python SDK" icon="python" href="/zh/guides/python">
+    配置兼容客户端，处理多轮对话与错误响应。
+  </Card>
+  <Card title="Node.js SDK" icon="node-js" href="/zh/guides/nodejs">
+    在 JavaScript 或 TypeScript 服务端发送请求。
+  </Card>
+  <Card title="流式响应" icon="bolt" href="/zh/guides/streaming">
+    逐段接收生成内容，处理完成、中断与取消。
+  </Card>
+  <Card title="图像、视频与音乐" icon="photo-film" href="/zh/media/index">
+    选择生成协议，完成提交、任务查询与结果读取。
+  </Card>
+</Columns>
+
+## 服务地址
+
+| 入口 | 地址 | 用途 |
+| --- | --- | --- |
+| 官网 | [maxapi.ai](https://maxapi.ai) | 了解 MaxAPI |
+| 控制台 | [platform.maxapi.ai](https://platform.maxapi.ai) | 管理账户、获取密钥并查看模型权限 |
+| API 服务 | `https://api.maxapi.ai` | 发送原始 HTTP 请求 |
+| SDK Base URL | `https://api.maxapi.ai/v1` | 配置 OpenAI 兼容客户端 |
+
+<Note>
+可用模型、价格、配额和协议支持范围，以当前控制台与实际接口结果为准。扩展接口目录用于核对共用系统的结构，不代表所有功能均已对账户开通。
+</Note>

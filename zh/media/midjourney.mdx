@@ -1,0 +1,128 @@
+---
+title: "Midjourney 绘图"
+description: "提交绘图任务，查询生成结果，再执行放大、变化等关联动作。"
+keywords: ["MaxAPI", "Midjourney 绘图", "midjourney"]
+---
+
+Midjourney 使用任务接口。先提交绘图，取得任务 ID，再查询图片和可执行动作。调用前需确认你的密钥所在分组已开通 Midjourney；可用模式和动作由渠道决定。
+
+## 常用接口
+
+| 方法 | 路径 | 用途 |
+| --- | --- | --- |
+| `POST` | `/mj/submit/imagine` | 根据提示词创建绘图任务 |
+| `GET` | `/mj/task/{id}/fetch` | 查询任务状态与结果 |
+| `POST` | `/mj/submit/action` | 对现有任务执行按钮动作 |
+| `POST` | `/mj/submit/blend` | 混合参考图 |
+| `POST` | `/mj/submit/describe` | 根据图片生成描述 |
+| `POST` | `/mj/submit/modal` | 提交需要额外输入的交互动作 |
+
+本页演示常用流程。更多参数见 [完整接口目录](/zh/api-reference/catalog)。示例均使用 `https://api.maxapi.ai` 和 Bearer 密钥。
+
+## 1. 提交绘图
+
+```http "Endpoint"
+POST https://api.maxapi.ai/mj/submit/imagine
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `prompt` | `string` | 是 | 绘图提示词 |
+| `base64Array` | `string[]` | 否 | 使用参考图时提供的 Base64 数组；具体编码要求按渠道确认 |
+| `notifyHook` | `string` | 否 | 该任务的回调地址 |
+| `state` | `string` | 否 | 关联业务记录的自定义值，避免存放密钥等敏感信息 |
+
+```bash "创建 Imagine 任务"
+jq -n '{
+  prompt: "A tiny observatory on a green hill, watercolor illustration",
+  state: "illustration-job-001"
+}' | curl --fail-with-body https://api.maxapi.ai/mj/submit/imagine \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @- \
+  --output mj-submit.json
+```
+
+### 先检查业务状态
+
+```json "提交响应示意"
+{
+  "code": 1,
+  "description": "提交成功",
+  "result": "your-mj-task-id"
+}
+```
+
+| `code` | 资料中的含义 | 处理方式 |
+| --- | --- | --- |
+| `1` | 提交成功 | 保存 `result` 中的任务 ID |
+| `21` | 已存在 | 检查返回的任务信息，避免重复创建 |
+| `22` | 排队中 | 保存有效任务 ID，并查询后续状态 |
+| 其他值 | 错误 | 读取 `description`，不要当作成功任务 |
+
+这些是提交结果的业务码，和 HTTP 状态码、后续任务状态不同。`result` 才是此接口返回任务 ID 的位置。
+
+```bash "取得可继续查询的任务 ID"
+TASK_ID="$(jq -er '
+  if (.code == 1 or .code == 21 or .code == 22)
+  then (.result // empty | tostring)
+  else error(.description // "Midjourney 提交失败")
+  end
+' mj-submit.json)"
+: "${TASK_ID:?响应缺少任务 ID}"
+```
+
+## 2. 查询任务
+
+```bash "查询一次"
+TASK_ID_ESCAPED="$(printf '%s' "$TASK_ID" | jq -sRr @uri)"
+curl --fail-with-body \
+  "https://api.maxapi.ai/mj/task/$TASK_ID_ESCAPED/fetch" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  --output mj-task.json
+```
+
+| 字段 | 含义 |
+| --- | --- |
+| `id` | 当前任务 ID |
+| `status` | 常见为 `NOT_START`、`SUBMITTED`、`IN_PROGRESS`、`SUCCESS`、`FAILURE` |
+| `progress` | 接口提供的进度信息 |
+| `imageUrl` | 生成图片地址，成功后检查是否存在 |
+| `failReason` | 失败原因 |
+| `state` | 任务关联的自定义值 |
+| `buttons` | 部分渠道返回的可执行按钮列表，以实际响应为准 |
+
+等待成功或失败后停止轮询。遇到其他状态时记录原始响应，并设置总等待期限；不要无限请求。通用实现建议见 [异步任务与回调](/zh/guides/async-tasks)。
+
+## 3. 执行后续动作
+
+放大、变化等操作通过 `taskId` 关联原任务，通过 `customId` 指定具体动作。`customId` 通常由返回的按钮信息提供，例如可用时读取 `buttons[].customId`；它不是让开发者自行拼接的固定编号。
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `taskId` | `string` | 是 | 原任务 ID |
+| `customId` | `string` | 是 | 当前任务实际提供的动作标识 |
+| `notifyHook` | `string` | 否 | 此次动作任务的回调地址 |
+| `state` | `string` | 否 | 此次动作关联的业务值 |
+
+将 `MAXAPI_MJ_ACTION_ID` 设置为用户选中的可用动作标识后提交：
+
+```bash "执行选中的动作"
+: "${MAXAPI_MJ_ACTION_ID:?请设置查询结果中可用的 customId}"
+jq -n --arg task "$TASK_ID" --arg action "$MAXAPI_MJ_ACTION_ID" '{
+  taskId: $task,
+  customId: $action
+}' | curl --fail-with-body https://api.maxapi.ai/mj/submit/action \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @- \
+  --output mj-action.json
+```
+
+动作提交会返回自己的提交结果。检查业务码、保存新的 `result`，然后查询新任务；不要继续用原任务 ID 等待新图片。如果动作要求额外输入，按该动作对应的交互接口提交，不能假定一次 `action` 请求就完成所有步骤。
+
+## 回调和运行模式
+
+`notifyHook` 只在已支持回调的渠道使用。收到通知后按任务 ID 关联记录，并处理重复通知；签名、重试次数和投递顺序不能从这个字段推断。详见 [异步任务与回调](/zh/guides/async-tasks)。
+
+相关协议还存在 `/mj-turbo/mj`、`/mj-relax/mj` 等前缀。是否开放、与默认模式的关系和计费以你的渠道配置为准；本页的 `/mj` 示例不代表其他前缀已开通。

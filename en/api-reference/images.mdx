@@ -1,0 +1,50 @@
+---
+title: "Generate images"
+description: "POST /v1/images/generations: create images from text, choose only model-supported options, and handle URL or Base64 results in your application."
+keywords: ["MaxAPI", "Generate images", "API documentation"]
+sidebarTitle: "Generate images"
+openapi: "openapi/en.json POST /v1/images/generations"
+---
+
+Generate images from a text prompt using an enabled MaxAPI image model. Size, quality, result format and image count depend on your channel and model. To inspect an existing image, use [vision](/en/guides/vision); to modify it, use [image editing](/en/api-reference/images-edits).
+
+## Send a text-to-image request
+
+Set `MAXAPI_IMAGE_MODEL` to an available model. This `jq` example avoids model-specific options:
+
+```bash Generate an image
+jq -n --arg model "$MAXAPI_IMAGE_MODEL" '{
+  model: $model,
+  prompt: "A minimal studio at dawn, a white desk lamp, natural light, clean product photography composition"
+}' | curl --fail-with-body https://api.maxapi.ai/v1/images/generations \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @- \
+  --output image-response.json
+```
+
+Add `size`, `quality`, `n` or `response_format` only after confirming support. Some models return a fixed image format.
+
+## Save the result
+
+Results commonly appear in `data[]`. `b64_json` contains Base64 image data, `url` contains a result link, and some models also return `revised_prompt` or `usage`. The console remains the source for billing.
+
+This reads the saved response and writes the first Base64 result as raw bytes, or prints a URL:
+
+```python Read image output
+import base64
+import json
+from pathlib import Path
+
+result = json.loads(Path("image-response.json").read_text())
+item = result["data"][0]
+if item.get("b64_json"):
+    Path("generated-image.bin").write_bytes(base64.b64decode(item["b64_json"]))
+    print("Saved image bytes; choose the extension from the actual image format.")
+elif item.get("url"):
+    print(item["url"])
+else:
+    raise ValueError("The response has no readable image field")
+```
+
+Persist assets you need rather than treating generated URLs as permanent storage. On timeout, check execution records before resubmitting and potentially creating duplicate work. See [troubleshooting](/en/help/errors).

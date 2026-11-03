@@ -1,0 +1,1744 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MaxAPI API reference",
+    "version": "1.0.0",
+    "description": "Access text, image, and audio models through a unified API. Select an endpoint to inspect request parameters, response structures, and code examples, then send a request from the interactive playground.\n\n**Make your first request**: Create an API key in the [console](https://platform.maxapi.ai), enter it in the authentication field, and replace `YOUR_MODEL_ID` with a model available to your account that supports the endpoint. The SDK base URL is `https://api.maxapi.ai/v1`.\n\n[Quickstart](/en/quickstart) · [Authentication](/en/authentication) · [Models and capabilities](/en/models) · [Error handling](/en/help/errors)\n\nThis reference covers 9 common compatible endpoints. Optional parameters, input limits, and model capabilities depend on your account channels. Example content and usage values illustrate response structures. For asynchronous APIs, see [Video generation](/en/media/videos), [Music generation](/en/media/music), and [Asynchronous tasks](/en/guides/async-tasks).\n\nChanging the documentation language changes explanations and example text. API paths, parameter names, and enum values stay the same."
+  },
+  "servers": [
+    {
+      "url": "https://api.maxapi.ai",
+      "description": "MaxAPI API base URL"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Text",
+      "description": "Create chat responses, complete text, and generate embeddings. Each endpoint requires a model with the corresponding capability."
+    },
+    {
+      "name": "Images",
+      "description": "Generate images from text or upload files to edit images."
+    },
+    {
+      "name": "Audio",
+      "description": "Convert text to speech, transcribe audio, and translate audio into English."
+    },
+    {
+      "name": "Models",
+      "description": "List the model IDs visible to your API key."
+    }
+  ],
+  "paths": {
+    "/v1/chat/completions": {
+      "post": {
+        "operationId": "createChatCompletion",
+        "summary": "Create chat completion",
+        "tags": [
+          "Text"
+        ],
+        "description": "Generate the next response from a message list for chat, summarization, translation, or code generation.\n\n- Read non-streaming text from `choices[].message.content`.\n- With `stream: true`, read SSE text deltas from `choices[].delta.content`.\n- Image messages and function tools require model support. Include the conversation history in `messages` for each turn.\n\n[Streaming](/en/guides/streaming) · [Vision](/en/guides/vision) · [Tool calling](/en/guides/tools)",
+        "responses": {
+          "200": {
+            "description": "Returns JSON for non-streaming requests or SSE when stream is true.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatResponse"
+                },
+                "examples": {
+                  "text": {
+                    "summary": "Text response",
+                    "value": {
+                      "id": "chatcmpl-example",
+                      "object": "chat.completion",
+                      "choices": [
+                        {
+                          "index": 0,
+                          "message": {
+                            "role": "assistant",
+                            "content": "An API is an interface that applications use to exchange information."
+                          },
+                          "finish_reason": "stop"
+                        }
+                      ],
+                      "usage": {
+                        "prompt_tokens": 18,
+                        "completion_tokens": 24,
+                        "total_tokens": 42
+                      }
+                    }
+                  },
+                  "tool": {
+                    "summary": "Tool calling",
+                    "value": {
+                      "id": "chatcmpl-example",
+                      "object": "chat.completion",
+                      "choices": [
+                        {
+                          "index": 0,
+                          "message": {
+                            "role": "assistant",
+                            "content": null,
+                            "tool_calls": [
+                              {
+                                "id": "call-example",
+                                "type": "function",
+                                "function": {
+                                  "name": "get_delivery_days",
+                                  "arguments": "{\"region\":\"east\"}"
+                                }
+                              }
+                            ]
+                          },
+                          "finish_reason": "tool_calls"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string",
+                  "description": "An SSE stream with events separated by blank lines. data: [DONE] marks the end. Chat text deltas are in choices[].delta.content; completion text is in choices[].text. See [Streaming](/en/guides/streaming)."
+                },
+                "examples": {
+                  "stream": {
+                    "summary": "SSE event sequence",
+                    "value": "data: {\"id\":\"chatcmpl-example\",\"object\":\"chat.completion.chunk\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-example\",\"object\":\"chat.completion.chunk\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"An API is an interface that applications use to exchange information.\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-example\",\"object\":\"chat.completion.chunk\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n",
+                    "description": "Separate complete events by blank lines, then parse each data field. A network read does not necessarily contain one complete event."
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequest"
+              },
+              "examples": {
+                "basic": {
+                  "summary": "Text chat",
+                  "value": {
+                    "model": "YOUR_MODEL_ID",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "Explain what an API is in three sentences."
+                      }
+                    ],
+                    "stream": false
+                  }
+                },
+                "stream": {
+                  "summary": "Streaming chat",
+                  "value": {
+                    "model": "YOUR_MODEL_ID",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "Write a short passage about exploration."
+                      }
+                    ],
+                    "stream": true
+                  }
+                },
+                "tools": {
+                  "summary": "Function tool",
+                  "value": {
+                    "model": "YOUR_MODEL_ID",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "Using the demo data, how many days does delivery to the east region take?"
+                      }
+                    ],
+                    "tools": [
+                      {
+                        "type": "function",
+                        "function": {
+                          "name": "get_delivery_days",
+                          "description": "Look up delivery times in the demo data.",
+                          "parameters": {
+                            "type": "object",
+                            "properties": {
+                              "region": {
+                                "type": "string",
+                                "enum": [
+                                  "east",
+                                  "west"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "region"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      }
+                    ],
+                    "tool_choice": "auto"
+                  },
+                  "description": "Requires a model that supports tool calling. The model returns a call request; your application executes the tool."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/completions": {
+      "post": {
+        "operationId": "createCompletion",
+        "summary": "Create text completion",
+        "tags": [
+          "Text"
+        ],
+        "description": "Continue text from a `prompt` in applications that use the legacy Completions API. Select a model that supports this endpoint.\n\nRead text from `choices[].text` in both non-streaming and streaming responses. For chat, use the chat completions endpoint with `messages`.",
+        "responses": {
+          "200": {
+            "description": "Returns JSON for non-streaming requests. Streaming text deltas are in choices[].text.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompletionResponse"
+                },
+                "examples": {
+                  "text": {
+                    "summary": "Illustrative response",
+                    "value": {
+                      "id": "cmpl-example",
+                      "object": "text_completion",
+                      "choices": [
+                        {
+                          "index": 0,
+                          "text": "connect to models through a unified API.",
+                          "finish_reason": "stop"
+                        }
+                      ],
+                      "usage": {
+                        "prompt_tokens": 12,
+                        "completion_tokens": 10,
+                        "total_tokens": 22
+                      }
+                    }
+                  }
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string",
+                  "description": "An SSE stream with events separated by blank lines. data: [DONE] marks the end. Chat text deltas are in choices[].delta.content; completion text is in choices[].text. See [Streaming](/en/guides/streaming)."
+                },
+                "examples": {
+                  "stream": {
+                    "summary": "SSE event sequence",
+                    "value": "data: {\"id\":\"cmpl-example\",\"object\":\"text_completion\",\"choices\":[{\"index\":0,\"text\":\"connect to models through a unified API.\",\"finish_reason\":null}]}\n\ndata: [DONE]\n\n",
+                    "description": "Separate complete events by blank lines, then parse each data field. A network read does not necessarily contain one complete event."
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompletionRequest"
+              },
+              "examples": {
+                "basic": {
+                  "summary": "Create text completion",
+                  "value": {
+                    "model": "YOUR_MODEL_ID",
+                    "prompt": "Continue this introduction: MaxAPI helps developers",
+                    "stream": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/embeddings": {
+      "post": {
+        "operationId": "createEmbeddings",
+        "summary": "Create embeddings",
+        "tags": [
+          "Text"
+        ],
+        "description": "Encode one or more texts as vectors for semantic search, similarity matching, and knowledge bases.\n\nUse `data[].index` to match the input order. Use the same model and dimensions for documents and queries; rebuild the index when changing models.",
+        "responses": {
+          "200": {
+            "description": "Vectors for each input and usage information when available.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmbeddingResponse"
+                },
+                "examples": {
+                  "vectors": {
+                    "summary": "Float vector",
+                    "value": {
+                      "object": "list",
+                      "data": [
+                        {
+                          "object": "embedding",
+                          "index": 0,
+                          "embedding": [
+                            0.12,
+                            -0.04,
+                            0.08
+                          ]
+                        },
+                        {
+                          "object": "embedding",
+                          "index": 1,
+                          "embedding": [
+                            0.07,
+                            0.11,
+                            -0.02
+                          ]
+                        }
+                      ],
+                      "usage": {
+                        "prompt_tokens": 20,
+                        "total_tokens": 20
+                      }
+                    },
+                    "description": "Only three illustrative values are shown. They do not represent actual model dimensions or usage."
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmbeddingRequest"
+              },
+              "examples": {
+                "batch": {
+                  "summary": "Batch text input",
+                  "value": {
+                    "model": "YOUR_MODEL_ID",
+                    "input": [
+                      "How do I create an API key?",
+                      "How do I list available models?"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/images/generations": {
+      "post": {
+        "operationId": "generateImages",
+        "summary": "Generate images",
+        "tags": [
+          "Images"
+        ],
+        "description": "Generate images from a text description. Start with only `model` and `prompt`, then set size, count, and quality according to model capabilities.\n\nResults are in the `data` array as `url` or `b64_json`, depending on the model and requested format.",
+        "responses": {
+          "200": {
+            "description": "Image URLs or Base64 data, depending on the model and request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageResponse"
+                },
+                "examples": {
+                  "base64": {
+                    "summary": "Base64 image",
+                    "value": {
+                      "data": [
+                        {
+                          "b64_json": "BASE64_IMAGE_DATA"
+                        }
+                      ]
+                    },
+                    "description": "BASE64_IMAGE_DATA is a placeholder for image data. Some models return a url field instead."
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImageGenerationRequest"
+              },
+              "examples": {
+                "basic": {
+                  "summary": "Text to image",
+                  "value": {
+                    "model": "YOUR_MODEL_ID",
+                    "prompt": "A minimalist studio in the morning, a white desk lamp on the table, natural light, clean product photography composition"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/images/edits": {
+      "post": {
+        "operationId": "editImage",
+        "summary": "Edit images",
+        "tags": [
+          "Images"
+        ],
+        "description": "Upload a source image and describe the changes. This definition accepts one image; masks require model support.\n\nUpload file contents using `multipart/form-data` and let the client set the boundary. A file path string cannot replace a file upload.",
+        "responses": {
+          "200": {
+            "description": "The edited image as a URL or Base64 data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageResponse"
+                },
+                "examples": {
+                  "base64": {
+                    "summary": "Base64 image",
+                    "value": {
+                      "data": [
+                        {
+                          "b64_json": "BASE64_IMAGE_DATA"
+                        }
+                      ]
+                    },
+                    "description": "BASE64_IMAGE_DATA is a placeholder for image data. Some models return a url field instead."
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/ImageEditRequest"
+              },
+              "encoding": {
+                "image": {
+                  "contentType": "application/octet-stream"
+                },
+                "mask": {
+                  "contentType": "application/octet-stream"
+                }
+              },
+              "examples": {
+                "basic": {
+                  "summary": "Upload an image",
+                  "description": "The model ID is a placeholder. Prepare the local file before running the code, or use the file picker when sending a request in the playground.",
+                  "value": {
+                    "model": "YOUR_MODEL_ID",
+                    "image": "@image.png",
+                    "prompt": "Keep the subject unchanged and replace the background with a light gray studio backdrop."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/audio/speech": {
+      "post": {
+        "operationId": "createSpeech",
+        "summary": "Create speech",
+        "tags": [
+          "Audio"
+        ],
+        "description": "Synthesize text into audio. Set a voice ID supported by the selected model and replace `YOUR_VOICE_ID` in the example.\n\nA successful response contains audio bytes, with `Content-Type` determined by the output format. Check the HTTP status before saving or playing the result; errors may return JSON.",
+        "responses": {
+          "200": {
+            "description": "Binary audio content. Content-Type depends on the output format.",
+            "content": {
+              "audio/mpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "audio/ogg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "audio/aac": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "audio/flac": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "audio/wav": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpeechRequest"
+              },
+              "examples": {
+                "basic": {
+                  "summary": "Generate MP3 audio",
+                  "value": {
+                    "model": "YOUR_MODEL_ID",
+                    "input": "Welcome to MaxAPI. Start building your AI application.",
+                    "voice": "YOUR_VOICE_ID",
+                    "response_format": "mp3"
+                  },
+                  "description": "Replace the model and voice placeholders. MP3 output requires model support."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/audio/transcriptions": {
+      "post": {
+        "operationId": "createTranscription",
+        "summary": "Transcribe audio",
+        "tags": [
+          "Audio"
+        ],
+        "description": "Upload audio to transcribe it in its original language. Optionally provide an input language hint with `language`; the output depends on `response_format` and model capabilities.\n\nUpload the file contents and let the client generate the multipart boundary. For JSON, read `text`; for text or subtitles, save the response body directly.",
+        "responses": {
+          "200": {
+            "description": "Returns text, JSON, or subtitles according to response_format.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AudioTextResponse"
+                },
+                "examples": {
+                  "text": {
+                    "summary": "Transcribed text",
+                    "value": {
+                      "text": "We will complete the API integration this week."
+                    }
+                  }
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "text": {
+                    "summary": "Plain text",
+                    "value": "We will complete the API integration this week."
+                  },
+                  "srt": {
+                    "summary": "SRT subtitles",
+                    "value": "1\n00:00:00,000 --> 00:00:03,000\nWe will complete the API integration this week.\n"
+                  }
+                }
+              },
+              "text/vtt": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "vtt": {
+                    "summary": "VTT subtitles",
+                    "value": "WEBVTT\n\n00:00:00.000 --> 00:00:03.000\nWe will complete the API integration this week.\n"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/TranscriptionRequest"
+              },
+              "encoding": {
+                "file": {
+                  "contentType": "application/octet-stream"
+                }
+              },
+              "examples": {
+                "basic": {
+                  "summary": "Upload audio",
+                  "description": "The model ID is a placeholder. Prepare the local file before running the code, or use the file picker when sending a request in the playground.",
+                  "value": {
+                    "model": "YOUR_MODEL_ID",
+                    "file": "@audio.wav",
+                    "response_format": "json"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/audio/translations": {
+      "post": {
+        "operationId": "createTranslation",
+        "summary": "Translate audio",
+        "tags": [
+          "Audio"
+        ],
+        "description": "Upload audio to translate it into English text. This endpoint does not accept an arbitrary target language through `language`.\n\nFor other target languages, transcribe the audio first, then translate the text with chat completions. File, model, and output format limits depend on your current channel.",
+        "responses": {
+          "200": {
+            "description": "English text returned as JSON, plain text, or subtitles according to response_format.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AudioTextResponse"
+                },
+                "examples": {
+                  "text": {
+                    "summary": "English translation",
+                    "value": {
+                      "text": "We will complete the API integration this week."
+                    }
+                  }
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "text": {
+                    "summary": "Plain text",
+                    "value": "We will complete the API integration this week."
+                  },
+                  "srt": {
+                    "summary": "SRT subtitles",
+                    "value": "1\n00:00:00,000 --> 00:00:03,000\nWe will complete the API integration this week.\n"
+                  }
+                }
+              },
+              "text/vtt": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "vtt": {
+                    "summary": "VTT subtitles",
+                    "value": "WEBVTT\n\n00:00:00.000 --> 00:00:03.000\nWe will complete the API integration this week.\n"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/TranslationRequest"
+              },
+              "encoding": {
+                "file": {
+                  "contentType": "application/octet-stream"
+                }
+              },
+              "examples": {
+                "basic": {
+                  "summary": "Upload audio",
+                  "description": "The model ID is a placeholder. Prepare the local file before running the code, or use the file picker when sending a request in the playground.",
+                  "value": {
+                    "model": "YOUR_MODEL_ID",
+                    "file": "@audio.wav",
+                    "response_format": "json"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/models": {
+      "get": {
+        "operationId": "listModels",
+        "summary": "List models",
+        "tags": [
+          "Models"
+        ],
+        "description": "List the models visible to your API key, then use `data[].id` as the `model` parameter in other endpoints. This endpoint has no request body.\n\nVisibility does not imply support for every endpoint, input type, or optional parameter. Account permissions and model status may change; use the current response as your reference.\n\n[Models and capabilities](/en/models)",
+        "responses": {
+          "200": {
+            "description": "Models visible to the current API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelList"
+                },
+                "examples": {
+                  "models": {
+                    "summary": "Model list",
+                    "value": {
+                      "object": "list",
+                      "data": [
+                        {
+                          "id": "YOUR_MODEL_ID",
+                          "object": "model"
+                        }
+                      ]
+                    },
+                    "description": "YOUR_MODEL_ID is a placeholder. Use the exact ID returned in a current response."
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Create an API key in the [MaxAPI console](https://platform.maxapi.ai). Enter only the key in the authentication field; the client generates the `Authorization: Bearer YOUR_MAXAPI_API_KEY` header."
+      }
+    },
+    "responses": {
+      "Error": {
+        "description": "The request failed. For 400, check parameters; for 401, check the key; for 403, check access permissions; for 429, check usage and rate limits; for 5xx, check service or upstream errors. Actual status codes and error bodies vary. See [Error handling](/en/help/errors).",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "examples": {
+              "error": {
+                "summary": "Illustrative response",
+                "value": {
+                  "error": {
+                    "message": "The request could not be validated. Check your API key and request parameters.",
+                    "type": "request_error",
+                    "code": null
+                  }
+                },
+                "description": "This illustrates a compatible error body, not a complete error code specification."
+              }
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "ModelID": {
+        "type": "string",
+        "description": "A model ID available to your account that supports this endpoint. Call GET /v1/models for exact IDs; visibility does not imply support for all endpoints or parameters. Replace the `YOUR_MODEL_ID` placeholder.",
+        "example": "YOUR_MODEL_ID"
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string",
+                "description": "An explanation of the error."
+              },
+              "type": {
+                "type": "string",
+                "description": "The error category."
+              },
+              "code": {
+                "description": "The error code; its type depends on the service response.",
+                "oneOf": [
+                  {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ]
+              },
+              "param": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The request parameter associated with the error; may be null."
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": true,
+        "description": "A common compatible error structure. Upstream channels may return different fields. Check the HTTP status before reading error details."
+      },
+      "Usage": {
+        "type": "object",
+        "properties": {
+          "prompt_tokens": {
+            "type": "integer",
+            "description": "Number of input tokens."
+          },
+          "completion_tokens": {
+            "type": "integer",
+            "description": "Number of output tokens, when applicable."
+          },
+          "total_tokens": {
+            "type": "integer",
+            "description": "Total number of tokens."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Token usage reported by the endpoint. Fields vary by model; consult the console for billing."
+      },
+      "ModelList": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "The list object type.",
+            "example": "list"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Model"
+            },
+            "description": "Models visible to the current API key."
+          }
+        },
+        "additionalProperties": true
+      },
+      "ChatMessage": {
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "description": "The message role, such as system, user, assistant, developer, or tool. Use roles supported by the model.",
+            "example": "user"
+          },
+          "content": {
+            "description": "Use a string for plain text or an array of text and image content parts for vision input. An assistant message with tool calls may have null content.",
+            "oneOf": [
+              {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "example": "Explain what an API is in three sentences."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/TextContentPart"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ImageContentPart"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "tool_calls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ToolCall"
+            },
+            "description": "Tool calls requested by the assistant. Preserve the complete structure when continuing the conversation."
+          },
+          "tool_call_id": {
+            "type": "string",
+            "description": "The corresponding tool call ID when role is tool."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A conversation message. Submit history in order for multi-turn conversations and associate tool results with the original call ID."
+      },
+      "ChatRequest": {
+        "type": "object",
+        "required": [
+          "model",
+          "messages"
+        ],
+        "properties": {
+          "model": {
+            "$ref": "#/components/schemas/ModelID"
+          },
+          "messages": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            },
+            "description": "Messages in chronological order. Include the required conversation history for each turn."
+          },
+          "stream": {
+            "type": "boolean",
+            "description": "Returns an SSE stream when true. Parse data as complete events.",
+            "default": false
+          },
+          "temperature": {
+            "type": "number",
+            "description": "Sampling randomness. Support and accepted ranges depend on the model."
+          },
+          "top_p": {
+            "type": "number",
+            "description": "Nucleus sampling parameter. Usually adjust either this or temperature, not both."
+          },
+          "max_tokens": {
+            "type": "integer",
+            "description": "The output token limit used by some models. Do not set together with max_completion_tokens."
+          },
+          "max_completion_tokens": {
+            "type": "integer",
+            "description": "The generated token limit used by some models; it may include reasoning tokens."
+          },
+          "stop": {
+            "description": "Stops generation when these sequences occur. Not supported by every model.",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
+          },
+          "n": {
+            "type": "integer",
+            "description": "Number of candidate responses. Support and limits depend on the model."
+          },
+          "presence_penalty": {
+            "type": "number",
+            "description": "A sampling penalty for tokens that have already appeared. Requires model support."
+          },
+          "frequency_penalty": {
+            "type": "number",
+            "description": "Adjusts sampling according to token frequency. Requires model support."
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FunctionTool"
+            },
+            "description": "Tools the model may use for this request. Requires model support."
+          },
+          "tool_choice": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "additionalProperties": true
+              }
+            ],
+            "description": "Controls tool selection. The common auto value lets the model choose; other string or object policies require model support."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Start with only model and messages. Add optional parameters after confirming model support. Do not set max_tokens and max_completion_tokens together."
+      },
+      "ChatResponse": {
+        "type": "object",
+        "required": [
+          "choices"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The response ID."
+          },
+          "object": {
+            "type": "string",
+            "description": "The response object type.",
+            "example": "chat.completion"
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatChoice"
+            },
+            "description": "Candidate responses."
+          },
+          "usage": {
+            "$ref": "#/components/schemas/Usage"
+          }
+        },
+        "additionalProperties": true,
+        "description": "A non-streaming chat result. Read text from choices[].message.content and tool calls from choices[].message.tool_calls."
+      },
+      "CompletionRequest": {
+        "type": "object",
+        "required": [
+          "model",
+          "prompt"
+        ],
+        "properties": {
+          "model": {
+            "$ref": "#/components/schemas/ModelID"
+          },
+          "prompt": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ],
+            "description": "Text to complete. Batch input requires model support.",
+            "example": "Continue this introduction: MaxAPI helps developers"
+          },
+          "stream": {
+            "type": "boolean",
+            "description": "Returns an SSE stream when true, with text deltas in choices[].text.",
+            "default": false
+          },
+          "temperature": {
+            "type": "number",
+            "description": "Sampling randomness. Requires model support."
+          },
+          "max_tokens": {
+            "type": "integer",
+            "description": "Output token limit. Requires model support."
+          },
+          "top_p": {
+            "type": "number",
+            "description": "Nucleus sampling parameter. Usually adjust either this or temperature."
+          },
+          "n": {
+            "type": "integer",
+            "description": "Number of candidate results per input. Requires model support."
+          },
+          "stop": {
+            "description": "Stops generation when these sequences occur. Not supported by every model.",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
+          },
+          "logprobs": {
+            "type": "integer",
+            "description": "Requests token log probabilities. Requires model support."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The legacy Completions endpoint uses prompt rather than chat messages. This definition covers text input; token ID input requires model support."
+      },
+      "CompletionResponse": {
+        "type": "object",
+        "required": [
+          "choices"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The response ID."
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "integer",
+                  "description": "The candidate result index."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "The generated completion, or the current text delta in a streaming event."
+                },
+                "finish_reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The reason generation ended, such as stop or length."
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "usage": {
+            "$ref": "#/components/schemas/Usage"
+          },
+          "object": {
+            "type": "string",
+            "description": "The completion response object type.",
+            "example": "text_completion"
+          }
+        },
+        "additionalProperties": true
+      },
+      "EmbeddingRequest": {
+        "type": "object",
+        "required": [
+          "model",
+          "input"
+        ],
+        "properties": {
+          "model": {
+            "$ref": "#/components/schemas/ModelID"
+          },
+          "input": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ],
+            "description": "A text string or a non-empty list of text strings. This definition covers text input; token ID input requires model support. Text length and batch limits depend on the model."
+          },
+          "encoding_format": {
+            "type": "string",
+            "enum": [
+              "float",
+              "base64"
+            ],
+            "description": "The embedding encoding format. Requires model support."
+          },
+          "dimensions": {
+            "type": "integer",
+            "description": "The output dimensions, for models that support configurable dimensions."
+          }
+        },
+        "additionalProperties": true
+      },
+      "EmbeddingResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "object": {
+                  "type": "string",
+                  "description": "The embedding object type.",
+                  "example": "embedding"
+                },
+                "index": {
+                  "type": "integer",
+                  "description": "The input index corresponding to this embedding."
+                },
+                "embedding": {
+                  "oneOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      }
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ],
+                  "description": "An array of floating-point values or Base64 data, depending on the requested format."
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "usage": {
+            "$ref": "#/components/schemas/Usage"
+          },
+          "object": {
+            "type": "string",
+            "description": "The list object type.",
+            "example": "list"
+          }
+        },
+        "additionalProperties": true,
+        "description": "An embedding response structure. Match input order with data[].index. Dimensions depend on the model and request parameters."
+      },
+      "ImageGenerationRequest": {
+        "type": "object",
+        "required": [
+          "model",
+          "prompt"
+        ],
+        "properties": {
+          "model": {
+            "$ref": "#/components/schemas/ModelID"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "The image subject, setting, composition, and style."
+          },
+          "n": {
+            "type": "integer",
+            "description": "Number of images to generate. Accepted values depend on the model."
+          },
+          "size": {
+            "type": "string",
+            "description": "The output dimensions. Requires model support."
+          },
+          "quality": {
+            "type": "string",
+            "description": "The quality level. Requires model support."
+          },
+          "response_format": {
+            "type": "string",
+            "description": "Some models allow url or b64_json; others use a fixed response format."
+          }
+        },
+        "additionalProperties": true
+      },
+      "ImageEditRequest": {
+        "type": "object",
+        "required": [
+          "model",
+          "image",
+          "prompt"
+        ],
+        "properties": {
+          "model": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ModelID"
+              }
+            ],
+            "example": "YOUR_MODEL_ID"
+          },
+          "image": {
+            "type": "string",
+            "format": "binary",
+            "description": "The image file contents. Format, dimensions, and file size limits depend on the model. The client generates the multipart boundary.",
+            "contentMediaType": "application/octet-stream"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "Editing instructions, including what to preserve.",
+            "example": "Keep the subject unchanged and replace the background with a light gray studio backdrop."
+          },
+          "mask": {
+            "type": "string",
+            "format": "binary",
+            "description": "An optional PNG mask with transparent areas marking where to edit. Requires a model that supports masks.",
+            "contentMediaType": "image/png"
+          },
+          "n": {
+            "type": "integer",
+            "description": "Number of images to generate. Requires model support."
+          },
+          "size": {
+            "type": "string",
+            "description": "The output dimensions. Requires model support."
+          },
+          "response_format": {
+            "type": "string",
+            "description": "The output format. Requires model support."
+          }
+        }
+      },
+      "ImageResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "created": {
+            "type": "integer",
+            "description": "The generation timestamp in seconds."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "format": "uri",
+                  "description": "A download URL for the generated image. It may expire; save the file when needed."
+                },
+                "b64_json": {
+                  "type": "string",
+                  "description": "Base64-encoded image data."
+                },
+                "revised_prompt": {
+                  "type": "string",
+                  "description": "A revised prompt, returned by some models."
+                }
+              },
+              "additionalProperties": true
+            },
+            "description": "Generated images. URL or Base64 output depends on the model and response_format."
+          }
+        },
+        "additionalProperties": true
+      },
+      "SpeechRequest": {
+        "type": "object",
+        "required": [
+          "model",
+          "input",
+          "voice"
+        ],
+        "properties": {
+          "model": {
+            "$ref": "#/components/schemas/ModelID"
+          },
+          "input": {
+            "type": "string",
+            "description": "Text to synthesize. Length limits depend on the model."
+          },
+          "voice": {
+            "type": "string",
+            "description": "A voice ID supported by the selected model. Replace YOUR_VOICE_ID with a confirmed supported voice.",
+            "example": "YOUR_VOICE_ID"
+          },
+          "response_format": {
+            "type": "string",
+            "description": "An audio format supported by the model, such as mp3, opus, aac, or flac."
+          },
+          "speed": {
+            "type": "number",
+            "description": "Speech speed. Accepted ranges depend on the model."
+          }
+        },
+        "additionalProperties": true
+      },
+      "TranscriptionRequest": {
+        "type": "object",
+        "required": [
+          "model",
+          "file"
+        ],
+        "properties": {
+          "model": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ModelID"
+              }
+            ],
+            "example": "YOUR_MODEL_ID"
+          },
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "description": "Upload the file contents. Format, file size, and duration limits depend on the selected model.",
+            "contentMediaType": "application/octet-stream"
+          },
+          "language": {
+            "type": "string",
+            "description": "An optional ISO 639-1 code for the input language, such as zh or en."
+          },
+          "prompt": {
+            "type": "string",
+            "description": "An optional terminology, style, or context hint in the original language."
+          },
+          "response_format": {
+            "type": "string",
+            "description": "An output format supported by the model, such as json, text, srt, verbose_json, or vtt.",
+            "example": "json"
+          },
+          "temperature": {
+            "type": "number",
+            "description": "Sampling configuration. Requires model support."
+          }
+        }
+      },
+      "TranslationRequest": {
+        "type": "object",
+        "required": [
+          "model",
+          "file"
+        ],
+        "properties": {
+          "model": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ModelID"
+              }
+            ],
+            "example": "YOUR_MODEL_ID"
+          },
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "description": "Upload the file contents. Format, file size, and duration limits depend on the selected model.",
+            "contentMediaType": "application/octet-stream"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "An optional context hint in English. This endpoint outputs English; language cannot select an arbitrary target language."
+          },
+          "response_format": {
+            "type": "string",
+            "description": "An output format supported by the model, such as json, text, srt, verbose_json, or vtt.",
+            "example": "json"
+          },
+          "temperature": {
+            "type": "number",
+            "description": "Sampling configuration. Requires model support."
+          }
+        }
+      },
+      "AudioTextResponse": {
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The transcribed or translated text. Formats such as verbose_json may return additional fields."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A JSON transcription or translation result. Formats such as verbose_json may include segments and timestamps; fields depend on the model."
+      },
+      "Model": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The exact model ID to use in requests.",
+            "example": "YOUR_MODEL_ID"
+          },
+          "object": {
+            "type": "string",
+            "description": "The model object type.",
+            "example": "model"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": true,
+        "description": "A model visible to the current API key. May include additional metadata."
+      },
+      "TextContentPart": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "A text content part.",
+            "enum": [
+              "text"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "description": "Text from the user, or a question about an image."
+          }
+        },
+        "required": [
+          "type",
+          "text"
+        ],
+        "additionalProperties": true,
+        "description": "The text part of a multimodal message."
+      },
+      "ImageContentPart": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "An image content part.",
+            "enum": [
+              "image_url"
+            ]
+          },
+          "image_url": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "description": "An image URL directly accessible to the API server, or a complete data:image/...;base64,... URL. Local paths and pages that require login are not supported."
+              },
+              "detail": {
+                "type": "string",
+                "description": "The image detail level. Requires model support.",
+                "enum": [
+                  "auto",
+                  "low",
+                  "high"
+                ]
+              }
+            },
+            "required": [
+              "url"
+            ],
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "type",
+          "image_url"
+        ],
+        "additionalProperties": true,
+        "description": "The image part of a multimodal message. Requires a model that supports vision input."
+      },
+      "ToolCall": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The tool call ID. Set tool_call_id to this value when submitting the tool result.",
+            "example": "call-example"
+          },
+          "type": {
+            "type": "string",
+            "description": "The tool type.",
+            "enum": [
+              "function"
+            ]
+          },
+          "function": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The function your application should execute.",
+                "example": "get_delivery_days"
+              },
+              "arguments": {
+                "type": "string",
+                "description": "Function arguments encoded as a JSON string. Your application parses and validates them before execution. For streaming, assemble all fragments first.",
+                "example": "{\"region\":\"east\"}"
+              }
+            },
+            "required": [
+              "name",
+              "arguments"
+            ],
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "function"
+        ],
+        "additionalProperties": true,
+        "description": "A function call requested by the model. Your application performs execution and permission checks."
+      },
+      "FunctionTool": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "This definition describes a function tool.",
+            "enum": [
+              "function"
+            ]
+          },
+          "function": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "A function name recognized by your application.",
+                "example": "get_delivery_days"
+              },
+              "description": {
+                "type": "string",
+                "description": "Describe the purpose and use cases to help the model select the tool."
+              },
+              "parameters": {
+                "type": "object",
+                "description": "The JSON Schema for function parameters. Validate the arguments returned by the model in your application.",
+                "additionalProperties": true,
+                "example": {
+                  "type": "object",
+                  "properties": {
+                    "region": {
+                      "type": "string",
+                      "enum": [
+                        "east",
+                        "west"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "region"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "name",
+              "parameters"
+            ],
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "type",
+          "function"
+        ],
+        "additionalProperties": true,
+        "description": "A function definition available to the model. See [Tool calling](/en/guides/tools)."
+      },
+      "AssistantMessage": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "description": "The response message role.",
+            "enum": [
+              "assistant"
+            ]
+          },
+          "content": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The generated text; may be null when the message contains tool calls."
+          },
+          "tool_calls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ToolCall"
+            },
+            "description": "Tool calls requested by the model. After execution, append result messages with role set to tool."
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "additionalProperties": true,
+        "description": "The complete assistant message from a non-streaming response."
+      },
+      "ChatChoice": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "description": "The candidate response index in choices.",
+            "example": 0
+          },
+          "message": {
+            "$ref": "#/components/schemas/AssistantMessage"
+          },
+          "finish_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why generation ended. Common values: stop for normal completion, length when a limit is reached, and tool_calls when tool results are needed.",
+            "example": "stop"
+          }
+        },
+        "additionalProperties": true,
+        "description": "One candidate response."
+      }
+    }
+  }
+}

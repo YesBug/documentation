@@ -1,0 +1,50 @@
+---
+title: "Frequently asked questions"
+description: "Find answers about MaxAPI domains, SDK configuration, model IDs, key storage, streaming, pricing information and asynchronous generation workflows."
+keywords: ["MaxAPI", "Frequently asked questions", "API documentation"]
+sidebarTitle: "FAQ"
+---
+
+These answers address common MaxAPI setup and integration questions. For a failed request with an HTTP status or task error, use the [troubleshooting guide](/en/help/errors).
+
+<AccordionGroup>
+  <Accordion title="How do the website, console and API addresses differ?">
+    Use [maxapi.ai](https://maxapi.ai) for product information and [platform.maxapi.ai](https://platform.maxapi.ai) to manage your account and keys. Applications call `https://api.maxapi.ai`. For a compatible SDK, set the base URL to `https://api.maxapi.ai/v1`.
+  </Accordion>
+  <Accordion title="Can I keep using the OpenAI SDK?">
+    You can use it for the Chat Completions-compatible flow documented here. Configure the MaxAPI key, base URL and an available model ID together. Compatibility with one endpoint does not imply support for every SDK method. See the [Python](/en/guides/python) and [Node.js](/en/guides/nodejs) guides.
+  </Accordion>
+  <Accordion title="Which model name should I send?">
+    Use the exact `id` returned by [List models](/en/api-reference/models), and confirm it suits your endpoint. Do not assume a display name or another platform's ID is valid on MaxAPI.
+  </Accordion>
+  <Accordion title="Why do examples use MAXAPI_MODEL?">
+    An environment variable keeps examples usable across accounts and makes model changes configurable. Set it to a real model ID available to your account before running an example.
+  </Accordion>
+  <Accordion title="Why is my key missing even though I created a .env file?">
+    A `.env` file does not change every process environment automatically. Load it with your framework, runtime or environment loader, or export the variable before starting your program. Do not print a real key while debugging.
+  </Accordion>
+  <Accordion title="Should my browser call the API directly?">
+    Prefer sending browser requests to your backend, where the key is managed. Keys in frontend code or public environment variables are visible to visitors. See [authentication](/en/authentication). The documentation's [interactive testing](/en/playground) is a separate testing workflow using Mintlify's playground.
+  </Accordion>
+  <Accordion title="How do I continue a conversation?">
+    Include the relevant history in the next request's `messages`. Do not expect the client object to remember it automatically. Trim or summarize long histories according to the model's context limits.
+  </Accordion>
+  <Accordion title="Why does streaming not display one character at a time?">
+    Enable `stream: true`, read increments as they arrive and check application buffering. A model can send multiple characters in one chunk; one character per event is not guaranteed. See [streaming](/en/guides/streaming).
+  </Accordion>
+  <Accordion title="Where can I find prices, balance and usage?">
+    Check the [console](https://platform.maxapi.ai) and current model information for your account. Examples in these docs do not establish prices, quotas, service commitments or current model availability.
+  </Accordion>
+  <Accordion title="What should I include in a support request?">
+    Provide the time and time zone, model ID, route, HTTP status and redacted error details through the console's support entry. Remove keys and sensitive data first. See [troubleshooting](/en/help/errors).
+  </Accordion>
+  <Accordion title="Which API format should I use for a model?">
+    Choose an enabled format suited to the task: compatible chat for conversations, or unified and provider-specific formats for video tasks. Keep the base URL, body and task query format aligned. See [API formats](/en/guides/protocols).
+  </Accordion>
+  <Accordion title="Why did a music or video request return no file?">
+    These are commonly asynchronous tasks. Save the returned identifier and query the task or receive a supported callback. Identifier and terminal-state fields differ between protocols. See [asynchronous tasks](/en/guides/async-tasks).
+  </Accordion>
+  <Accordion title="Can I call every endpoint in the extended catalog?">
+    Not necessarily. The [catalog](/en/api-reference/catalog) indexes the shared system's structure. Availability depends on your account's models and channels. Entries marked Needs review or Example path require additional validation. The catalog is not a record of live MaxAPI verification.
+  </Accordion>
+</AccordionGroup>

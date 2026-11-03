@@ -1,0 +1,96 @@
+---
+title: "Manage asynchronous tasks and callbacks"
+description: "Track generation tasks from submission to completion, map protocol-specific IDs and states, poll with a deadline, and safely process callbacks and results."
+keywords: ["MaxAPI", "Manage asynchronous tasks and callbacks", "API documentation"]
+sidebarTitle: "Async tasks"
+---
+
+Video, music and some image requests can take time to complete. A successful submission usually means a task was accepted. Your application must query its status until it succeeds or fails.
+
+## Follow a task through its lifecycle
+
+1. Submit using the selected protocol and record the protocol family, model and submission time.
+2. Save the returned task ID, song clip ID or operation name.
+3. Poll the matching query endpoint, or receive a supported callback.
+4. Confirm the terminal state. Read output on success or retain error details on failure.
+5. Retrieve and persist the generated asset according to your application's needs.
+
+Associate the task ID with a business record. Refreshing a page should not submit another generation request.
+
+## Keep protocol identifiers distinct
+
+| Protocol | Identifier from submission | Query |
+| --- | --- | --- |
+| Unified video | `task_id` | `GET /v2/videos/generations/{task_id}` |
+| Midjourney | `result` | `GET /mj/task/{id}/fetch` |
+| Suno NewAPI-compatible | `data.task_id` | `GET /suno/fetch/{task_id}` |
+| Suno v2 | `clips[].id`, possibly several | `GET /suno/v2/feed?ids=...` |
+| Native Hailuo-compatible | `task_id` | `GET /hailuo/v1/query/video_generation?task_id=...` |
+| Veo long-running operation | Operation `name` | POST `operationName` to the matching `fetchPredictOperation` route |
+
+Check the actual response for your channel. Do not pass one protocol's ID to another protocol's endpoint.
+
+## Map states per protocol
+
+Your application can normalize states, but the original values differ:
+
+| Application state | Values seen across reference examples | Action |
+| --- | --- | --- |
+| Waiting | `NOT_START`, `QUEUED`, `PENDING` | Retain the task and query later |
+| Processing | `IN_PROGRESS`, `RUNNING`, `processing` | Continue waiting |
+| Succeeded | `SUCCESS`, `SUCCEEDED`, `completed`, `complete` | Read the protocol's result fields |
+| Failed | `FAILURE`, `FAILED`, `failed`, `error` | Stop polling and record the error |
+
+These are cross-protocol examples, not an exhaustive enum for any endpoint. Preserve unknown values and investigate within a bounded waiting period. A state that is not explicitly failure is not necessarily success.
+
+## Poll with a deadline
+
+Adapt `fetch_status` and `classify` to your protocol. The timing values here are application policy, not platform limits:
+
+```python polling.py
+import random
+import time
+
+
+def wait_for_task(fetch_status, classify, timeout_seconds=600):
+    deadline = time.monotonic() + timeout_seconds
+    delay = 2.0
+    while time.monotonic() < deadline:
+        # Also set connection and read timeouts inside fetch_status.
+        payload = fetch_status()
+        state = classify(payload)
+        if state == "succeeded":
+            return payload
+        if state == "failed":
+            raise RuntimeError("Task failed; inspect the redacted error details")
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        time.sleep(min(remaining, delay + random.uniform(0, 0.5)))
+        delay = min(delay * 1.5, 15.0)
+    raise TimeoutError("Waiting timed out; retain the task ID to query again later")
+```
+
+A network error differs from a failed generation task. Brief query failures may justify [bounded retries](/en/help/errors); a task already marked failed should not be polled indefinitely.
+
+## Handle submission timeouts
+
+A timed-out request may still have created a task. Retrying blindly can create duplicate work and usage. Query using an ID you received or inspect console records first. Only send an idempotency field when the endpoint explicitly supports it; do not assume universal `Idempotency-Key` support.
+
+## Receive callbacks
+
+Some protocols provide `notifyHook`, `notify_hook` or `callback_url`. Their field names and event bodies are not interchangeable.
+
+- Use a reachable HTTPS receiver and acknowledge quickly, moving slow processing into the background.
+- Match the task ID to your record and make repeated notifications update the same task.
+- Verify the protocol's documented signature mechanism when one is provided; do not invent a signature header.
+- If no signature mechanism is specified, query the task endpoint to verify important completion claims.
+- Keep polling available to recover from missing, delayed or out-of-order callbacks.
+
+Callbacks originate from a server. `localhost` and private-network-only URLs generally cannot receive them.
+
+## Retrieve and retain results
+
+Output URLs may be temporary signed URLs. There is no universal retention duration documented here. Confirm success, media type and file size before downloading, then store required assets yourself. If a link expires, query the task again for its current result URL.
+
+Preserve the original ID so users can leave your page and return to check the same task later.
