@@ -1,0 +1,35 @@
+---
+title: "Suno 音乐接口总览"
+description: "选择 Suno v2 或 NewAPI 格式，区分生成 ID、任务 ID 与歌曲片段 ID，完成生成和续写。"
+keywords: ["MaxAPI", "Suno", "index"]
+---
+
+Suno 的两个兼容格式都有“提交 → 等待 → 读取音频”的过程，但它们使用的查询 ID 和响应包装不同。先选择当前渠道支持的格式，再完成整条流程。可运行的端到端示例见 [音乐生成与续写](/zh/media/music)。
+
+## 选择接口
+
+| 操作 | Suno v2 | NewAPI 兼容格式 |
+| --- | --- | --- |
+| 生成歌曲 | [POST /suno/v2/generate](/zh/api-reference/suno/v2-generate) | [POST /suno/submit/music](/zh/api-reference/suno/submit) |
+| 续写已有片段 | 同一个 generate 接口，提供 `continue_clip_id`、`continue_at` | 同一个 music 接口，按兼容模式提供续写参数 |
+| 查询结果 | [GET /suno/v2/feed](/zh/api-reference/suno/v2-feed)，使用歌曲 clip ID | [GET /suno/fetch/\{task_id\}](/zh/api-reference/suno/fetch)，使用任务 ID |
+
+这些路径使用 `https://api.maxapi.ai`，不额外添加 `/v1`。所有请求都使用 Bearer API Key。
+
+## 三类标识不要混用
+
+| 标识 | 来源 | 用途 |
+| --- | --- | --- |
+| v2 顶层生成 ID | generate 响应 `id` | 记录本次生成，不填入 feed 的 `ids` |
+| 歌曲片段 ID | v2 `clips[].id` 或 NewAPI 音乐结果中的 `data.data[].id` | v2 片段查询、后续续写的 `continue_clip_id` |
+| NewAPI 任务 ID | 提交响应 `data` 字符串，或兼容对象的 `data.task_id` | `/suno/fetch/{task_id}` 查询 |
+
+任务 ID 和 clip ID 都按字符串保存。一个任务可能产生多个片段，应按返回集合处理，不固定假设只有一首或两首。
+
+## 按格式判断完成
+
+- v2：逐项检查预期的 clip 是否都返回，并确认每个 `status` 为 `complete`；生成顶层状态不能代替片段状态。
+- NewAPI：先检查 `code`，再读取任务 `data.status` 和歌曲列表。`data` 的类型会因操作、任务类型和兼容版本不同而变化。
+- 音频地址可能在生成中提前出现。最终下载前确认完成状态，并检查下载结果的 HTTP 状态与内容类型。
+
+本组文档覆盖生成、查询和已有歌曲续写。上传、歌词与整曲拼接的其他协议保留在 [扩展目录](/zh/api-reference/catalog) 中，不应将它们的参数套进这四个接口。

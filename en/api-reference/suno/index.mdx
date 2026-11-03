@@ -1,0 +1,35 @@
+---
+title: "Suno music API overview"
+description: "Choose Suno v2 or NewAPI-compatible endpoints, distinguish generation, task, and clip identifiers, and retrieve generated or extended song results."
+keywords: ["MaxAPI", "Suno", "index"]
+---
+
+Both Suno formats follow submission, waiting, and audio retrieval, but use different query identifiers and response envelopes. Choose a format enabled for your channel and keep the workflow consistent. See [Generate and extend music](/en/media/music) for complete runnable examples.
+
+## Choose the endpoint
+
+| Operation | Suno v2 | NewAPI-compatible |
+| --- | --- | --- |
+| Generate songs | [POST /suno/v2/generate](/en/api-reference/suno/v2-generate) | [POST /suno/submit/music](/en/api-reference/suno/submit) |
+| Extend a clip | Same generate endpoint with `continue_clip_id` and `continue_at` | Same music endpoint with continuation fields for the compatible mode |
+| Retrieve results | [GET /suno/v2/feed](/en/api-reference/suno/v2-feed), using clip IDs | [GET /suno/fetch/\{task_id\}](/en/api-reference/suno/fetch), using a task ID |
+
+Use `https://api.maxapi.ai` without adding `/v1`. Authenticate all requests with a Bearer API key.
+
+## Keep three identifiers separate
+
+| Identifier | Source | Purpose |
+| --- | --- | --- |
+| v2 generation ID | Top-level `id` from generate | Record the generation; do not use it as feed `ids` |
+| Song clip ID | v2 `clips[].id` or NewAPI music result `data.data[].id` | v2 retrieval and later continuation as `continue_clip_id` |
+| NewAPI task ID | Submission `data` string or compatible object's `data.task_id` | Query `/suno/fetch/{task_id}` |
+
+Store task and clip IDs as strings. A task may produce several clips; handle the returned collection instead of assuming exactly one or two songs.
+
+## Determine completion by format
+
+- v2: ensure all expected clips are present and each has `status: "complete"`. The top-level generation state does not replace clip states.
+- NewAPI: check `code`, then the task's `data.status` and song list. The type of `data` differs by operation, task type, and compatible implementation.
+- An audio URL may appear before generation finishes. Check completion before final download, then verify the download's HTTP status and media type.
+
+This reference covers generation, retrieval, and extension of existing songs. Other upload, lyric, and concatenation protocols remain in the [catalog](/en/api-reference/catalog); do not copy their fields into these four endpoints.

@@ -1,0 +1,49 @@
+---
+title: "Suno NewAPI: retrieve a music task"
+description: "Retrieve a Suno task by its task ID, inspect business and task states, and distinguish song arrays from other possible result object shapes."
+keywords: ["MaxAPI", "Suno", "fetch"]
+openapi: "openapi/suno-en.json GET /suno/fetch/{task_id}"
+---
+
+This endpoint retrieves a task record by NewAPI task ID. For music, the outer `data` contains the task and the inner `data` contains songs. It does not use Suno v2's top-level `clips` field.
+
+## Check three layers
+
+| Layer | What to inspect |
+| --- | --- |
+| Request result | HTTP status and top-level `code: "success"` |
+| Task record | `data` is an object; inspect `data.status` and `data.fail_reason` on failure |
+| Song results | For music, `data.data` is an array; inspect each clip's status and `audio_url` |
+
+`SUBMITTED` and `IN_PROGRESS` require waiting; `SUCCESS` indicates task completion. Compatible failure states include `FAIL` and `FAILURE`. Preserve unknown states and enforce a total waiting deadline instead of treating unrecognized values as success.
+
+## Read songs from a completed task
+
+```python Read a saved task query
+import json
+from pathlib import Path
+
+response = json.loads(Path("suno-task-status.json").read_text(encoding="utf-8"))
+if not isinstance(response, dict) or response.get("code") != "success":
+    raise ValueError("Task query failed; inspect the original response")
+task = response.get("data")
+if not isinstance(task, dict):
+    raise ValueError("Expected a task object")
+if task.get("status") != "SUCCESS":
+    raise ValueError(f"Task is not complete: {task.get('status')!r}")
+songs = task.get("data")
+if not isinstance(songs, list) or not songs:
+    raise ValueError("Expected a nonempty music result array")
+for song in songs:
+    if not isinstance(song, dict):
+        raise ValueError("Invalid song entry")
+    print(song.get("id"), song.get("status"), song.get("audio_url"))
+```
+
+This script illustrates the result shape. Before delivering audio, also check that each clip is `complete`, has no error details, and downloads successfully. The [music guide](/en/media/music) provides a complete waiting and download workflow.
+
+## Other task result types
+
+The same query route may return other task types, such as a lyrics object. Inspect the type and fields of `data.data` instead of always iterating it as songs. Check the result against the intended task instead of inferring the payload solely from `action`.
+
+Retrieve a continuation with the task ID returned by its new submission. The original song clip ID belongs in `continue_clip_id`; these identifiers are not interchangeable.

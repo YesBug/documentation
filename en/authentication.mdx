@@ -41,6 +41,62 @@ Ignore files containing real keys in Git. You can commit an `.env.example` conta
 
 For deployed applications, use your hosting platform's environment variables or secret manager. Avoid prefixes such as `NEXT_PUBLIC_` and `VITE_` that expose values to browsers.
 
+## Load configuration from .env
+
+Create `.env` using the format above, replace the key and model placeholders, then choose the loader for your runtime. These checks print whether configuration exists without making API requests.
+
+<Tabs>
+<Tab title="Python">
+
+Install the loader in the same virtual environment that runs your application:
+
+```bash Install python-dotenv
+python -m pip install python-dotenv
+```
+
+Save this file beside `.env`. If your interpreter is named `python3`, use it for both installation and execution.
+
+```python check_env.py
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).with_name(".env"), override=False)
+
+print("API key configured:", bool(os.environ.get("MAXAPI_API_KEY")))
+print("Model configured:", bool(os.environ.get("MAXAPI_MODEL")))
+```
+
+```bash Check configuration
+python check_env.py
+```
+
+In your application, put `load_dotenv(...)` and its imports before reading `os.environ` or creating an SDK client. Running the check separately does not load configuration for another Python process. This example explicitly selects `.env` beside the script and uses `override=False` to preserve existing environment values. See the [python-dotenv documentation](https://bbc2.github.io/python-dotenv/).
+
+</Tab>
+<Tab title="Node.js">
+
+Save this file beside `.env` and run the commands from that directory:
+
+```javascript check_env.mjs
+console.log("API key configured:", Boolean(process.env.MAXAPI_API_KEY));
+console.log("Model configured:", Boolean(process.env.MAXAPI_MODEL));
+```
+
+```bash Check version and configuration
+node --version
+node --env-file=.env check_env.mjs
+```
+
+[`--env-file` is available from Node.js v20.6.0](https://nodejs.org/api/cli.html#--env-filefile). Your installed SDK may require a newer runtime. The path is relative to the command's working directory; place the flag before the script name. A missing file causes an error.
+
+For the [quickstart](/en/quickstart), run `node --env-file=.env hello.mjs`. Running only `node hello.mjs` does not inherit configuration loaded by a previous check process.
+
+</Tab>
+</Tabs>
+
+Both loaders preserve environment values already set for the process. If editing `.env` does not change the key your application uses, check for the same variable in your terminal, IDE or hosting configuration, then restart the application. Loading a file configures that program; it does not export variables to later cURL commands in your terminal. For cURL, use the terminal environment setup in the [quickstart](/en/quickstart).
+
 ## Configure a compatible client
 
 <CodeGroup>
@@ -95,7 +151,7 @@ The [documentation playground](/en/playground) is for manual development tests. 
 
 ## Check configuration without printing the key
 
-Environment variables affect the current process and child processes started afterward. Saving a `.env` file does not mean Python, Node.js, an IDE, a container or a hosting platform loads it automatically. Load configuration, restart the relevant service and check whether the value exists:
+Environment variables affect the current process and child processes started afterward. After [loading configuration](#load-configuration-from-env), run these checks inside the actual application process. Checking a separate terminal alone does not establish what the application receives:
 
 <CodeGroup>
 ```python Python

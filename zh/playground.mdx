@@ -10,13 +10,13 @@ MaxAPI 的常用接口页面提供 Mintlify 原生在线调试面板。你可以
 
 <Steps>
   <Step title="打开模型列表">
-    前往 [模型列表](/zh/api-reference/models)，选择接口页面中的 **Try it**（在线调试）入口。该接口无需请求体，适合先核对密钥与连接。
+    前往 [模型列表](/zh/api-reference/models)，选择接口页面中的 **试一试（Try it）** 入口。该接口无需请求体，适合先核对密钥与连接。
   </Step>
   <Step title="填写 API Key">
     从 [控制台](https://platform.maxapi.ai) 获取密钥，在调试面板的 Bearer 鉴权字段填写密钥值。生成的请求头应为 `Authorization: Bearer 你的密钥`，不要重复添加 `Bearer`。
   </Step>
   <Step title="检查请求并发送">
-    确认目标地址为 `https://api.maxapi.ai/v1/models`，然后发送请求。成功时，从响应的 `data[].id` 选取适合任务的模型 ID。
+    确认目标地址为 `https://api.maxapi.ai/v1/models`，点击面板中的 **发送（Send）**。成功时，从响应的 `data[].id` 选取适合任务的模型 ID。
   </Step>
   <Step title="尝试对话接口">
     打开 [创建对话](/zh/api-reference/chat-completions)，填写支持对话的模型 ID 和 `messages`。先验证最小请求，再逐项增加可选参数。
@@ -57,16 +57,62 @@ MaxAPI 的常用接口页面提供 Mintlify 原生在线调试面板。你可以
 
 依次确认三个结果：HTTP 请求成功、`choices` 中存在回复、`finish_reason` 符合预期。成功后再启用 `stream`、更换长输入或增加工具定义，每次只改变一个因素。
 
+## 按接口协议选择调试流程
+
+| 目标 | 提交入口 | 接下来读取什么 |
+| --- | --- | --- |
+| 对话、向量、通用图像或音频 | 对应的 `/v1` 接口 | 回复、向量、图片数据或音频字节 |
+| Midjourney 绘图 | [Imagine](/zh/api-reference/midjourney/imagine) | 保存 `result`，使用 [Fetch](/zh/api-reference/midjourney/fetch) 查询任务 |
+| 统一视频生成 | [创建视频任务](/zh/api-reference/videos/create) | 保存任务 ID，使用 [查询视频任务](/zh/api-reference/videos/retrieve) 获取进度与结果 |
+| Suno v2 音乐 | [Generate](/zh/api-reference/suno/v2-generate) | 保存每个 `clips[].id`，使用 [Feed](/zh/api-reference/suno/v2-feed) 查询歌曲 |
+| Suno NewAPI 兼容音乐 | [提交音乐任务](/zh/api-reference/suno/submit) | 按响应结构提取任务 ID，使用 [Fetch](/zh/api-reference/suno/fetch) 查询 |
+
+后四种流程是异步任务。提交响应没有最终文件时，应打开对应的查询页，**不要再次点击生成请求来刷新进度**。保持鉴权、协议与任务 ID 来源一致。
+
+### Midjourney：先选模式，再保存任务 ID
+
+1. 打开 Imagine，在地址区域选择当前账户可用的服务器。检查生成的完整请求地址是否符合下表。
+2. 在 JSON 或表单中填写 `prompt`；参考图使用 [Data URI 编码](/zh/media/midjourney/inputs)，不能填本地文件路径。
+3. 发送后检查 `code` 与 `description`。正常受理时保存 `result`，到 Fetch 页填入路径参数 `id`。
+4. 查询至 `SUCCESS` 后读取图片与 `buttons`。执行按钮时，进入 [Action](/zh/api-reference/midjourney/action)，使用当前任务 ID 和真实 `customId`。
+
+| 选择的模式 | Imagine 完整请求地址 |
+| --- | --- |
+| Fast | `https://api.maxapi.ai/mj/submit/imagine` |
+| Turbo | `https://api.maxapi.ai/mj-turbo/mj/submit/imagine` |
+| Relax | `https://api.maxapi.ai/mj-relax/mj/submit/imagine` |
+
+打开另一个查询或动作页面时，重新核对模式选择，避免切回默认地址。Action 提示等待输入或任务状态为 `MODAL` 时，继续 [Modal 交互](/zh/media/midjourney/actions)，不是无限等待。
+
+### 视频与音乐：不要混用任务和歌曲 ID
+
+视频查询使用对应视频提交结果的任务 ID。Suno v2 的 Feed 使用歌曲片段 `clips[].id`，多个值以英文逗号分隔；NewAPI Fetch 使用音乐任务 ID。具体响应位置见 [Suno 两种格式对照](/zh/api-reference/suno/index)。
+
+查询结果中的媒体 URL 是下载地址，不是下一次查询的任务 ID。`HTTP 200`、非空的进度字段或提前出现的预览 URL，都不能替代该协议的完成状态判断。
+
+## 图片输入不一定是文件上传
+
+| 接口 | 在面板中填写 |
+| --- | --- |
+| 图像编辑、音频转录等 multipart 接口 | 点击文件字段，选择本地文件 |
+| Midjourney Imagine / Blend | 在 `base64Array` 数组中填写图片 Data URI |
+| Midjourney Describe | 在单个 `base64` 字段中填写图片 Data URI |
+| 统一视频的参考图 | 在模型支持的 `images` 字段中填写所需格式；URL 必须能由生成服务访问 |
+
+只有接口定义为 multipart 时才使用文件上传控件。JSON 的图片字段仍通过 `application/json` 发送；把 `C:\images\photo.png` 粘贴进文本框不会上传文件。
+
 ## 从调试面板迁移到代码
 
 | 在线调试中确认的配置 | 应用代码中的对应项 |
 | --- | --- |
 | Bearer 鉴权字段 | 服务端环境变量和 Authorization 请求头，或 SDK 的 `api_key` |
-| 完整请求地址 | HTTP 完整端点；SDK 使用 `https://api.maxapi.ai/v1` |
+| `/v1` 兼容接口地址 | HTTP 完整端点；OpenAI SDK 使用 `https://api.maxapi.ai/v1` |
+| Midjourney、视频和音乐地址 | 普通 HTTP 客户端使用完整路径，保留模式与协议前缀 |
 | JSON 中的模型 ID | 配置项 `MAXAPI_MODEL` 或相应任务的模型变量 |
 | JSON 表单 | 应用构造的对象，不需要复制表单显示标签 |
 | 本地上传文件 | 应用运行环境中真实存在的文件字节 |
 | 流式响应区域 | SDK 流迭代或按事件解析 SSE 的代码 |
+| 异步提交返回的标识 | 持久化任务或 clip ID，调度对应查询请求 |
 
 复制代码后，检查其中是否仍有占位符、是否带入了真实密钥，以及示例使用的模型是否正确。调试成功后可继续阅读 [Python](/zh/guides/python)、[Node.js](/zh/guides/nodejs) 或相应接口页的保存结果示例。
 

@@ -1,0 +1,39 @@
+---
+title: "Suno v2：查询歌曲片段"
+description: "按一个或多个 clip ID 查询 Suno 音乐，逐首判断状态并读取音频、封面与错误信息。"
+keywords: ["MaxAPI", "Suno", "v2-feed"]
+openapi: "openapi/suno-zh.json GET /suno/v2/feed"
+---
+
+Feed 使用歌曲片段 ID 查询 Suno v2 的当前结果。响应是含 `clips` 的对象，不是裸数组，也不是 NewAPI 的 `data.data` 包装。
+
+## 传入正确的标识
+
+`ids` 使用生成响应中的 `clips[].id`。多个 clip ID 用英文逗号连接，作为一个查询参数发送。字段为可选项，但查询已知片段时应显式填写，不依赖省略后的行为。
+
+```bash 查询两个片段
+curl --fail-with-body --get https://api.maxapi.ai/suno/v2/feed \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  --data-urlencode "ids=YOUR_FIRST_CLIP_ID,YOUR_SECOND_CLIP_ID" \
+  --output suno-clips.json
+```
+
+替换示例 ID 后再发送。不要传顶层生成 `id`、NewAPI `task_id` 或图片等其他任务标识。
+
+## 逐首检查结果
+
+| 检查内容 | 处理方式 |
+| --- | --- |
+| `clips[].id` | 按 ID 与预期集合匹配，不依赖响应顺序 |
+| `status: "submitted"` 或 `"streaming"` | 继续等待；可播放地址不代表最终生成完毕 |
+| `status: "complete"` | 检查 `audio_url` 后读取音频 |
+| `metadata.error_type`、`metadata.error_message` | 出现有效错误信息时记录失败原因 |
+| 预期 ID 未返回 | 保留该 ID，有限重试；不要把整批当作完成 |
+
+只查询到了某个已完成片段，不代表其他片段也已完成。完整的集合检查脚本见 [等待全部片段](/zh/media/music)。
+
+## 音频与其他文件分开处理
+
+`audio_url`、`image_url`、`video_url` 是不同结果。只交付音频时，不需要等待未使用的视频字段。下载时使用媒体地址自身的访问方式，不向媒体域名附加 MaxAPI Bearer 密钥。
+
+再次续写时，选择具体歌曲的 `id` 填入 [生成接口](/zh/api-reference/suno/v2-generate) 的 `continue_clip_id`。

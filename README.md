@@ -38,11 +38,13 @@ mint dev --port 3001 --no-open
 | `openapi/zh.json` | 中文 OpenAPI 说明 |
 | `openapi/en.json` | 英文 OpenAPI 说明 |
 | `openapi/midjourney-{zh,en}.json` | 中英文 Midjourney 任务与交互规范 |
+| `openapi/video-{zh,en}.json` | 统一视频创建与查询规范 |
+| `openapi/suno-{zh,en}.json` | Suno v2 和 NewAPI 兼容格式的核心规范 |
 | `images/` | SVG Logo 与站点图标 |
 | `.mintlify/product-brief.md` | 编辑时核对的产品定位与内容边界 |
 | `AGENTS.md` | 自动化编辑与验证规则 |
 
-常用 API 参考覆盖 9 个核心操作与 13 个 Midjourney 操作。Midjourney 四篇工作流指南位于各语言的 `media/midjourney` 路径。扩展接口目录保留来源中的 173 条结构记录，用于核对协议；目录数量不代表全部路由已开通或经过实调。
+常用 API 参考覆盖 9 个核心操作、13 个 Midjourney 操作、2 个统一视频操作和 4 个 Suno 操作。Midjourney 四篇工作流指南位于各语言的 `media/midjourney` 路径。扩展接口目录保留来源中的 173 条结构记录，用于核对协议；目录数量不代表全部路由已开通或经过实调。
 
 ## 编辑与验证
 
@@ -55,6 +57,7 @@ mint dev --port 3001 --no-open
 ```bash
 node scripts/check-openapi.mjs
 node scripts/check-midjourney.mjs
+node scripts/check-media.mjs
 mint validate
 mint broken-links --check-anchors --check-redirects --check-snippets
 ```

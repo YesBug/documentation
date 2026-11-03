@@ -1,0 +1,48 @@
+---
+title: "查询统一视频任务"
+description: "按提交返回的 task_id 查询统一视频状态，区分等待、成功与失败，按已确认的结果字段读取单个或多个视频地址。"
+keywords: ["MaxAPI", "视频任务", "查询状态", "video_url", "data.output"]
+openapi: "openapi/video-zh.json GET /v2/videos/generations/{task_id}"
+---
+
+查询接口直接返回统一视频任务对象。用顶层 `status` 判断是否结束，再读取 `data` 中的结果。这里的 `task_id` 必须来自 [统一视频提交](/zh/api-reference/videos/create)，不能拿其他厂商原生接口的任意 ID 替代。
+
+## 根据状态决定下一步
+
+| 状态 | 处理方式 |
+| --- | --- |
+| `NOT_START`、`SUBMITTED`、`QUEUED` | 任务仍在等待，保留 ID 后继续查询 |
+| `IN_PROGRESS` | 展示可用进度，在客户端等待预算内继续查询 |
+| `SUCCESS` | 读取已返回的结果字段，开始文件下载 |
+| `FAILURE` | 停止轮询，读取 `fail_reason` |
+| 未识别状态或没有 `status` | 保存原始响应，检查接口格式；不自动判为成功 |
+
+进度是展示文本，生成中也可能出现结果预览。下载最终文件前仍需确认 `SUCCESS`。完整的有限轮询代码见 [统一视频指南](/zh/media/videos#自动等待任务完成)。
+
+## 明确选择结果字段
+
+| 响应结构 | 读取方式 |
+| --- | --- |
+| `data.output` | 单个文件地址，按字符串读取 |
+| `data.outputs` | 多个文件地址，按数组逐项处理 |
+| `data.video_url` | 部分兼容分支的视频地址 |
+| 顶层 `video_url` 或 `url` | 部分兼容分支提供的额外地址，不保证存在 |
+
+先确认你的分支实际使用哪一种结构，再固定解析路径。不要递归搜索响应里的任意 URL，也不要假定以上字段必须全部同时出现。等待期间 `data` 可以为 `null`。
+
+```json 单个结果结构示意
+{
+  "task_id": "YOUR_VIDEO_TASK_ID",
+  "status": "SUCCESS",
+  "progress": "100%",
+  "data": {"output": "https://example.com/generated-video.mp4"}
+}
+```
+
+下载时不要把 MaxAPI 的鉴权头转发给结果文件域名。文件下载失败可以重试下载或重新查询当前链接，无需重新创建视频。
+
+## 超时后继续同一个任务
+
+客户端等待预算用尽不等于生成失败或已取消。保存任务 ID，稍后重新调用本查询接口即可；查询失败时保留 HTTP 状态与原始响应，排除密钥、任务标识或协议不匹配的问题。
+
+统一视频资料没有定义通用取消接口。不要根据本地停止轮询推断服务端任务已停止，或将 `/v1/videos`、厂商原生协议的操作路径直接套到这里。

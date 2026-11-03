@@ -51,10 +51,10 @@ MaxAPI 的 API 服务地址为 `https://api.maxapi.ai`。使用 OpenAI 兼容 SD
 
 | 任务 | 入口 | 阅读顺序 |
 | --- | --- | --- |
-| 统一视频生成 | `/v2/videos/generations` | [提交与查询](/zh/media/videos) → [异步任务](/zh/guides/async-tasks) |
+| 统一视频生成 | `/v2/videos/generations` | [接入指南](/zh/media/videos) → [创建任务](/zh/api-reference/videos/create) → [查询任务](/zh/api-reference/videos/retrieve) |
 | 厂商原生视频格式 | Wan、Veo、Seedance、Vidu、Hailuo、Luma、Kling、Runway | [厂商接口差异](/zh/media/video-providers) |
 | Midjourney 图像与动作 | `/mj/submit/...`、`/mj/task/...` | [快速开始](/zh/media/midjourney) → [13 个接口](/zh/api-reference/midjourney/index) |
-| Suno 音乐 | `/suno/v2/...` 或 `/suno/submit/...` | [音乐生成](/zh/media/music) |
+| Suno 音乐 | `/suno/v2/...` 或 `/suno/submit/...` | [接入指南](/zh/media/music) → [Suno 接口](/zh/api-reference/suno/index) |
 
 先选择一种协议完成整条流程，再增加其他格式。任务标识、回调字段和状态枚举不能在不同协议间直接替换。
 

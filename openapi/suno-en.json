@@ -1,0 +1,644 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MaxAPI Suno core API",
+    "version": "1.0.0",
+    "description": "Suno v2 and NewAPI-compatible formats, based on the supplied export and matching public protocol references. Channel and model availability depend on the account."
+  },
+  "servers": [
+    {
+      "url": "https://api.maxapi.ai"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "paths": {
+    "/suno/v2/generate": {
+      "post": {
+        "summary": "Generate or extend music (v2)",
+        "description": "Custom generation and continuation use this endpoint. Save clips[].id and retrieve them with feed; the top-level id is not a feed identifier.",
+        "operationId": "generateSunoV2",
+        "responses": {
+          "200": {
+            "description": "Request result. Check HTTP status, business result, and generation state separately.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V2GenerateResponse"
+                },
+                "examples": {
+                  "submitted": {
+                    "summary": "Clips submitted",
+                    "value": {
+                      "id": "YOUR_GENERATION_ID",
+                      "status": "complete",
+                      "clips": [
+                        {
+                          "id": "YOUR_CLIP_ID",
+                          "status": "submitted",
+                          "audio_url": ""
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request result. Check HTTP status, business result, and generation state separately.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/V2GenerateRequest"
+              },
+              "example": {
+                "mv": "YOUR_ENABLED_SUNO_MODEL",
+                "prompt": "[Verse]\nMorning light across the floor\nA new road waits beyond the door",
+                "tags": "acoustic pop, warm vocals",
+                "title": "A new road"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/suno/v2/feed": {
+      "get": {
+        "summary": "Get song clips (v2)",
+        "description": "Query comma-separated clip IDs. Check each clip and match by id; missing clips are not completed clips.",
+        "operationId": "getSunoV2Clips",
+        "responses": {
+          "200": {
+            "description": "Request result. Check HTTP status, business result, and generation state separately.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V2FeedResponse"
+                },
+                "examples": {
+                  "complete": {
+                    "summary": "Clip completed",
+                    "value": {
+                      "clips": [
+                        {
+                          "id": "YOUR_CLIP_ID",
+                          "status": "complete",
+                          "title": "A new road",
+                          "audio_url": "https://example.com/music.mp3",
+                          "metadata": {
+                            "duration": 120,
+                            "error_type": null,
+                            "error_message": null
+                          }
+                        }
+                      ],
+                      "num_total_results": 1,
+                      "current_page": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request result. Check HTTP status, business result, and generation state separately.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "ids",
+            "in": "query",
+            "required": false,
+            "description": "Comma-separated song clip IDs. Specify them when retrieving known clips; do not use the generation-level id or a NewAPI task_id.",
+            "schema": {
+              "type": "string",
+              "example": "YOUR_FIRST_CLIP_ID,YOUR_SECOND_CLIP_ID"
+            }
+          }
+        ]
+      }
+    },
+    "/suno/submit/music": {
+      "post": {
+        "summary": "Submit a music task (NewAPI)",
+        "description": "Inspiration, custom, and continuation modes share this endpoint. Supply fields for one mode. The response data is a task ID or task object; inspect its type before retrieving the task.",
+        "operationId": "submitSunoMusic",
+        "responses": {
+          "200": {
+            "description": "Request result. Check HTTP status, business result, and generation state separately.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitEnvelope"
+                },
+                "examples": {
+                  "taskId": {
+                    "summary": "Standard task ID response",
+                    "value": {
+                      "code": "success",
+                      "message": "",
+                      "data": "YOUR_TASK_ID"
+                    }
+                  },
+                  "taskObject": {
+                    "summary": "Compatible task object response",
+                    "value": {
+                      "code": "success",
+                      "message": "",
+                      "data": {
+                        "task_id": "YOUR_TASK_ID",
+                        "status": "SUBMITTED",
+                        "data": [
+                          {
+                            "id": "YOUR_CLIP_ID",
+                            "status": "submitted",
+                            "audio_url": ""
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request result. Check HTTP status, business result, and generation state separately.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MusicSubmitRequest"
+              },
+              "example": {
+                "mv": "YOUR_ENABLED_SUNO_MODEL",
+                "prompt": "[Verse]\nMorning light across the floor\nA new road waits beyond the door",
+                "tags": "acoustic pop, warm vocals",
+                "title": "A new road"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/suno/fetch/{task_id}": {
+      "get": {
+        "summary": "Get a music task (NewAPI)",
+        "description": "Check code, then the task status inside data. Music results are in data.data[]. Song clip ids are for later continuation, not a replacement for this endpoint’s task_id.",
+        "operationId": "getSunoMusicTask",
+        "responses": {
+          "200": {
+            "description": "Request result. Check HTTP status, business result, and generation state separately.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FetchEnvelope"
+                },
+                "examples": {
+                  "complete": {
+                    "summary": "Music task completed",
+                    "value": {
+                      "code": "success",
+                      "message": "",
+                      "data": {
+                        "task_id": "YOUR_TASK_ID",
+                        "action": "MUSIC",
+                        "status": "SUCCESS",
+                        "progress": "100%",
+                        "data": [
+                          {
+                            "id": "YOUR_CLIP_ID",
+                            "status": "complete",
+                            "title": "A new road",
+                            "audio_url": "https://example.com/music.mp3",
+                            "metadata": {
+                              "duration": 120,
+                              "error_type": null,
+                              "error_message": null
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request result. Check HTTP status, business result, and generation state separately.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "description": "NewAPI task ID returned by submission, not a song clip ID.",
+            "schema": {
+              "type": "string",
+              "example": "YOUR_TASK_ID"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "V2GenerateRequest": {
+        "type": "object",
+        "properties": {
+          "mv": {
+            "type": "string",
+            "description": "Music model version. Use a value enabled for your account; the placeholder is not a list of available models.",
+            "example": "YOUR_ENABLED_SUNO_MODEL"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "Lyrics for a custom song. For continuation, provide lyrics for the new segment.",
+            "example": "[Verse]\nMorning light across the floor\nA new road waits beyond the door"
+          },
+          "tags": {
+            "type": "string",
+            "description": "Musical style description.",
+            "example": "acoustic pop, warm vocals"
+          },
+          "title": {
+            "type": "string",
+            "description": "Song title.",
+            "example": "A new road"
+          },
+          "continue_clip_id": {
+            "type": "string",
+            "description": "Existing song clip ID, not a generation-level id or a NewAPI task_id.",
+            "example": "YOUR_SOURCE_CLIP_ID"
+          },
+          "continue_at": {
+            "type": "number",
+            "description": "Continuation position in seconds. Choose a point within the actual source clip.",
+            "example": 30
+          }
+        },
+        "required": [
+          "prompt",
+          "mv"
+        ]
+      },
+      "ClipMetadata": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "Lyrics used for generation."
+          },
+          "tags": {
+            "type": "string",
+            "description": "Musical style."
+          },
+          "duration": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Audio duration in seconds; may be null before it is known."
+          },
+          "error_type": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Clip error type; a populated value indicates failure."
+          },
+          "error_message": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Clip error details."
+          }
+        },
+        "additionalProperties": true
+      },
+      "SongClip": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Song clip ID. Use it for a v2 feed lookup or as continue_clip_id for a later extension.",
+            "example": "YOUR_CLIP_ID"
+          },
+          "status": {
+            "type": "string",
+            "description": "Clip state. Examples include submitted, streaming, and complete; these are not an exhaustive enum."
+          },
+          "title": {
+            "type": "string",
+            "description": "Song title.",
+            "example": "A new road"
+          },
+          "audio_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Audio URL, which may appear during generation. Check clip status before final delivery."
+          },
+          "video_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Music video URL when available."
+          },
+          "image_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Cover image URL; may be empty during generation."
+          },
+          "image_large_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Large cover image URL when available."
+          },
+          "model_name": {
+            "type": "string",
+            "description": "Model name reported for the result."
+          },
+          "major_model_version": {
+            "type": "string",
+            "description": "Major model version reported for the result."
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/ClipMetadata"
+          }
+        },
+        "additionalProperties": true
+      },
+      "V2GenerateResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Generation-level identifier; do not pass it as feed ids.",
+            "example": "YOUR_GENERATION_ID"
+          },
+          "clips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SongClip"
+            },
+            "description": "Save each clip id and retrieve the clips individually."
+          },
+          "status": {
+            "type": "string",
+            "description": "Generation-level status; it does not replace each clip state."
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/ClipMetadata"
+          },
+          "batch_size": {
+            "type": "integer",
+            "description": "Number of clips reported for this generation."
+          }
+        },
+        "additionalProperties": true
+      },
+      "V2FeedResponse": {
+        "type": "object",
+        "properties": {
+          "clips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SongClip"
+            }
+          },
+          "num_total_results": {
+            "type": "integer",
+            "description": "Result count reported by the response."
+          },
+          "current_page": {
+            "type": "integer",
+            "description": "Current page reported by the response."
+          }
+        },
+        "additionalProperties": true
+      },
+      "MusicSubmitRequest": {
+        "type": "object",
+        "properties": {
+          "mv": {
+            "type": "string",
+            "description": "Music model version. Use a value enabled for your account; the placeholder is not a list of available models.",
+            "example": "YOUR_ENABLED_SUNO_MODEL"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "Lyrics for a custom song. For continuation, provide lyrics for the new segment.",
+            "example": "[Verse]\nMorning light across the floor\nA new road waits beyond the door"
+          },
+          "tags": {
+            "type": "string",
+            "description": "Musical style description.",
+            "example": "acoustic pop, warm vocals"
+          },
+          "title": {
+            "type": "string",
+            "description": "Song title.",
+            "example": "A new road"
+          },
+          "continue_clip_id": {
+            "type": "string",
+            "description": "Existing song clip ID, not a generation-level id or a NewAPI task_id.",
+            "example": "YOUR_SOURCE_CLIP_ID"
+          },
+          "continue_at": {
+            "type": "number",
+            "description": "Continuation position in seconds. Choose a point within the actual source clip.",
+            "example": 30
+          },
+          "gpt_description_prompt": {
+            "type": "string",
+            "description": "Song description for inspiration mode. Custom mode uses prompt, title, and tags; distinguish a theme description from lyrics.",
+            "example": "A warm acoustic song about starting a new journey"
+          },
+          "make_instrumental": {
+            "type": "boolean",
+            "description": "Whether to request instrumental music, subject to channel and mode support.",
+            "example": false
+          },
+          "task": {
+            "type": "string",
+            "description": "Compatible continuation requests can use extend. Omit it for initial generation; it is not required for every mode.",
+            "example": "extend"
+          },
+          "task_id": {
+            "type": "string",
+            "description": "Original task_id used by some compatible continuation flows. It does not replace continue_clip_id; supply it when required by the channel.",
+            "example": "YOUR_SOURCE_TASK_ID"
+          }
+        },
+        "additionalProperties": true
+      },
+      "TaskRecord": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "NewAPI task ID for /suno/fetch/{task_id}.",
+            "example": "YOUR_TASK_ID"
+          },
+          "action": {
+            "type": "string",
+            "description": "Task type, such as MUSIC or LYRICS. Also inspect the actual data shape."
+          },
+          "status": {
+            "type": "string",
+            "description": "Task-level state, such as SUBMITTED, IN_PROGRESS, or SUCCESS. Failure variants include FAIL and FAILURE. This differs from lowercase clip states."
+          },
+          "progress": {
+            "type": "string",
+            "description": "Progress display text; do not use it instead of a terminal-state check."
+          },
+          "fail_reason": {
+            "type": "string",
+            "description": "Task failure details."
+          },
+          "notify_hook": {
+            "type": "string",
+            "description": "Callback address included in the task record, if any."
+          },
+          "data": {
+            "description": "Music tasks return a song array. Other task types may return an object, such as lyrics; do not unconditionally iterate it as songs.",
+            "oneOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SongClip"
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "SubmitEnvelope": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Business result code. success means this request succeeded, not that the song is complete.",
+            "example": "success"
+          },
+          "message": {
+            "type": "string",
+            "description": "Business error or additional information."
+          },
+          "data": {
+            "description": "Standard NewAPI returns a task ID string. Some compatible channels return a task object containing task_id. Check the type before reading it.",
+            "oneOf": [
+              {
+                "type": "string",
+                "example": "YOUR_TASK_ID"
+              },
+              {
+                "$ref": "#/components/schemas/TaskRecord"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "FetchEnvelope": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Business result code. success means this request succeeded, not that the song is complete.",
+            "example": "success"
+          },
+          "message": {
+            "type": "string",
+            "description": "Business error or additional information."
+          },
+          "data": {
+            "description": "Task object on a successful lookup.",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TaskRecord"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "description": "Error bodies depend on the gateway or channel; preserve the original response.",
+        "additionalProperties": true
+      }
+    }
+  }
+}

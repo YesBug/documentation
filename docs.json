@@ -157,6 +157,34 @@
                 ]
               },
               {
+                "group": "视频",
+                "pages": [
+                  "zh/api-reference/videos/index",
+                  "zh/api-reference/videos/create",
+                  "zh/api-reference/videos/retrieve"
+                ]
+              },
+              {
+                "group": "音乐",
+                "pages": [
+                  "zh/api-reference/suno/index",
+                  {
+                    "group": "Suno v2",
+                    "pages": [
+                      "zh/api-reference/suno/v2-generate",
+                      "zh/api-reference/suno/v2-feed"
+                    ]
+                  },
+                  {
+                    "group": "Suno NewAPI",
+                    "pages": [
+                      "zh/api-reference/suno/submit",
+                      "zh/api-reference/suno/fetch"
+                    ]
+                  }
+                ]
+              },
+              {
                 "group": "音频",
                 "pages": [
                   "zh/api-reference/audio-speech",
@@ -309,6 +337,34 @@
                       "en/api-reference/midjourney/query",
                       "en/api-reference/midjourney/cancel",
                       "en/api-reference/midjourney/seed"
+                    ]
+                  }
+                ]
+              },
+              {
+                "group": "Video",
+                "pages": [
+                  "en/api-reference/videos/index",
+                  "en/api-reference/videos/create",
+                  "en/api-reference/videos/retrieve"
+                ]
+              },
+              {
+                "group": "Music",
+                "pages": [
+                  "en/api-reference/suno/index",
+                  {
+                    "group": "Suno v2",
+                    "pages": [
+                      "en/api-reference/suno/v2-generate",
+                      "en/api-reference/suno/v2-feed"
+                    ]
+                  },
+                  {
+                    "group": "Suno NewAPI",
+                    "pages": [
+                      "en/api-reference/suno/submit",
+                      "en/api-reference/suno/fetch"
                     ]
                   }
                 ]

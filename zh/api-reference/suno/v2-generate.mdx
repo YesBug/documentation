@@ -1,0 +1,42 @@
+---
+title: "Suno v2：生成与续写"
+description: "使用歌词和音乐风格创建 Suno 歌曲，或从已有 clip 指定秒数续写，并保存每个新片段的 ID。"
+keywords: ["MaxAPI", "Suno", "v2-generate"]
+openapi: "openapi/suno-zh.json POST /suno/v2/generate"
+---
+
+Suno v2 的首次生成和已有歌曲续写共用这个接口。它返回生成包装对象和 `clips` 数组；需要继续查询歌曲片段，不能把 HTTP 200 或顶层 `status` 当作音频已完成。
+
+## 首次生成
+
+填写已开通的 `mv` 和歌词 `prompt`。`tags` 描述音乐风格，`title` 用于歌曲标题。首次生成省略 `continue_clip_id` 和 `continue_at`。
+
+```json 自定义歌曲示意
+{
+  "mv": "YOUR_ENABLED_SUNO_MODEL",
+  "prompt": "[Verse]\n晨光落在窗台\n新的旅程展开",
+  "tags": "acoustic pop, warm vocals",
+  "title": "新的旅程"
+}
+```
+
+`mv` 占位符需要替换为账户支持的模型版本。本页介绍自定义歌曲与续写字段；NewAPI 的灵感模式字段不能直接套入 v2。
+
+## 从已有片段续写
+
+在相同请求中加入 `continue_clip_id` 与 `continue_at`。前者是原歌曲的 clip ID，后者是选择的秒数，不是毫秒或数组下标。把 `prompt` 换成要续写的新歌词。
+
+```json 续写所增加的字段
+{
+  "continue_clip_id": "YOUR_SOURCE_CLIP_ID",
+  "continue_at": 30
+}
+```
+
+这只是需要添加的字段，发送时仍需包含 `mv` 与 `prompt`。源片段必须能被当前渠道访问；不要将 NewAPI 的任务 ID 放入 `continue_clip_id`。
+
+## 保存查询所需的 ID
+
+读取响应的 `clips[].id`，通过 [查询片段](/zh/api-reference/suno/v2-feed) 等待新片段完成。顶层 `id` 记录的是生成过程，不能传给 feed。
+
+续写产生的是新片段，后续查询应使用新返回的 clip ID。它不保证已经将原曲和新片段拼接为完整歌曲。完整示例、有限轮询和音频下载见 [音乐生成与续写](/zh/media/music)。

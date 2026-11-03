@@ -1,0 +1,65 @@
+---
+title: "Suno NewAPI：提交音乐任务"
+description: "选择自定义、灵感或续写模式提交 Suno 音乐，并正确读取字符串或对象形式的任务响应。"
+keywords: ["MaxAPI", "Suno", "submit"]
+openapi: "openapi/suno-zh.json POST /suno/submit/music"
+---
+
+NewAPI 兼容接口将音乐生成包装为任务。先选择生成模式，提交后保存任务 ID，再通过 [查询任务](/zh/api-reference/suno/fetch) 读取状态和歌曲。
+
+
+<Note>
+在线调试已预填自定义歌曲示例。点击“试一试”后，展开可选字段修改 `mv`、歌词和标题，或切换到 JSON 编辑完整请求体。表单中的“可选”表示这些字段不适用于所有模式，不代表可以发送空请求。先替换模型占位符，并只保留所选模式需要的字段。
+</Note>
+
+## 选择一种请求模式
+
+| 模式 | 字段 |
+| --- | --- |
+| 自定义歌曲 | `prompt` 填歌词，配合 `title`、`tags`；显式选择已开通的 `mv` |
+| 灵感模式 | `gpt_description_prompt` 填主题描述；不要把它与自定义歌词混为一谈 |
+| 已有歌曲续写 | 提供源片段 `continue_clip_id` 与起点 `continue_at`；兼容续写示例使用 `task: "extend"` |
+
+`make_instrumental` 用于请求纯音乐，按当前渠道与模式支持情况使用。部分兼容续写流程还需要关联原 `task_id`；它与 `continue_clip_id` 是不同标识。不要把所有模式字段都填入第一次生成请求。
+
+## 先检查业务结果，再检查 data 类型
+
+以下两种成功提交结构都需要处理。它们是兼容版本差异，不是生成完成与否的区别。
+
+<CodeGroup>
+
+```json 标准任务 ID 响应
+{"code": "success", "message": "", "data": "YOUR_TASK_ID"}
+```
+
+```json 兼容任务对象响应
+{
+  "code": "success",
+  "message": "",
+  "data": {"task_id": "YOUR_TASK_ID", "status": "SUBMITTED"}
+}
+```
+
+</CodeGroup>
+
+```python 从已保存的提交结果提取 ID
+import json
+from pathlib import Path
+
+response = json.loads(Path("suno-task.json").read_text(encoding="utf-8"))
+if not isinstance(response, dict) or response.get("code") != "success":
+    raise ValueError("Submission failed; inspect suno-task.json")
+data = response.get("data")
+task_id = data if isinstance(data, str) else data.get("task_id") if isinstance(data, dict) else None
+if not isinstance(task_id, str) or not task_id.strip():
+    raise ValueError("No valid task ID in submission response")
+print(task_id)
+```
+
+不能固定读取 `data.task_id`，也不能直接把整个 `data` 对象转换成字符串作为 ID。
+
+## 后续查询与续写
+
+将提取的任务 ID 交给 `/suno/fetch/{task_id}`。歌曲可用后，从任务的歌曲数组中选择实际 clip ID，用于下一次续写。续写提交也会返回自己的任务，继续查询新任务，不等待原任务再次变化。
+
+完整的首次生成、续写、类型检查与轮询示例见 [音乐生成与续写](/zh/media/music)。

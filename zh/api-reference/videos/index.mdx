@@ -1,0 +1,40 @@
+---
+title: "统一视频 API 总览"
+description: "用统一视频接口提交生成任务、保存任务 ID、查询六种状态并读取视频结果，区分统一格式与厂商专用协议。"
+keywords: ["MaxAPI", "视频生成", "统一视频", "task_id", "Veo", "Wan", "Seedance"]
+---
+
+统一视频 API 使用一组提交与查询路由接入支持该格式的模型。先创建任务，再使用响应中的 `task_id` 查询结果；视频文件不会在提交请求中同步返回。完整接入步骤见 [统一视频指南](/zh/media/videos)。
+
+<Columns cols={2}>
+  <Card title="创建视频任务" icon="video" href="/zh/api-reference/videos/create">提交文字或模型支持的参考媒体，获得任务 ID。</Card>
+  <Card title="查询视频任务" icon="clock" href="/zh/api-reference/videos/retrieve">查看进度、失败原因与成功后的文件地址。</Card>
+</Columns>
+
+## 一次生成的完整流程
+
+| 步骤 | 请求或检查 | 保存内容 |
+| --- | --- | --- |
+| 提交 | `POST /v2/videos/generations` | 原始响应、顶层 `task_id`、模型 ID |
+| 等待 | `GET /v2/videos/generations/{task_id}` | 顶层 `status` 和进度 |
+| 完成 | 确认 `status` 为 `SUCCESS` | `data` 中已返回的结果地址 |
+| 下载 | 从结果地址下载文件 | 自己存储中的文件地址与下载状态 |
+
+`NOT_START`、`SUBMITTED`、`QUEUED`、`IN_PROGRESS` 都表示需要继续等待；`FAILURE` 时读取 `fail_reason`。图片或视频地址出现、进度达到 `100%`，都不能替代 `status` 的成功判断。
+
+## 模型相同，也要区分接口格式
+
+| 格式 | 任务标识示例 | 查询方式 |
+| --- | --- | --- |
+| 本参考的统一视频格式 | 提交响应顶层 `task_id` | `/v2/videos/generations/{task_id}` |
+| Wan 专用协议 | 响应 `output.task_id` | `/wan/api/v1/tasks/{task_id}` |
+| Veo 长任务协议 | 响应 `name` | 对应前缀的 `fetchPredictOperation` |
+| OpenAI 兼容视频格式 | 响应 `id` | 对应 `/v1/videos/...` 路由 |
+
+这里的路径和标识必须成对使用。不要通过 `task_id ?? id ?? output.task_id` 猜一个值，再统一发送到同一查询地址。已有厂商协议的应用请查看 [视频专用协议](/zh/media/video-providers)。
+
+## 在线调试
+
+使用控制台的 API Key 填入 Bearer 鉴权。创建任务需要真实可用的模型与媒体输入，点击发送会发起真实生成请求；查询现有任务时，填写自己的完整任务 ID。
+
+可选字段由模型决定。先用 `model` 和 `prompt` 完成文生视频，再按需求添加图片、时长或比例。图生视频模型可能要求 `images`，但不能把这个条件套到所有文生视频请求上。

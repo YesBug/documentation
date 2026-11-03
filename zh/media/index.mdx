@@ -20,6 +20,17 @@ keywords: ["MaxAPI", "多媒体 API 概览", "index"]
 | Suno 音乐及续写 | [Suno 音乐](/zh/media/music) | 生成后查询任务或歌曲片段 |
 | 语音合成、转录和翻译 | [语音合成](/zh/api-reference/audio-speech) / [转录与翻译](/zh/api-reference/audio-transcriptions) | 音频文件或文本结果 |
 
+## 直接打开任务调试页
+
+| 接口格式 | 创建内容 | 查询已有内容 |
+| --- | --- | --- |
+| 统一视频 | [创建视频任务](/zh/api-reference/videos/create) | [查询视频任务](/zh/api-reference/videos/retrieve) |
+| Midjourney | [Imagine](/zh/api-reference/midjourney/imagine) | [Fetch](/zh/api-reference/midjourney/fetch) |
+| Suno v2 | [Generate](/zh/api-reference/suno/v2-generate) | [Feed：按 clip ID 查询](/zh/api-reference/suno/v2-feed) |
+| Suno NewAPI | [提交音乐任务](/zh/api-reference/suno/submit) | [Fetch：按任务 ID 查询](/zh/api-reference/suno/fetch) |
+
+每个接口页都提供鉴权、参数与响应示例。已有任务时直接打开查询页；需要理解 ID 来源和结果字段时，先阅读对应指南。
+
 ## 从第一个结果到应用上线
 
 <Steps>

@@ -26,6 +26,7 @@
 
 - 常用接口契约维护在 `openapi/zh.json` 与 `openapi/en.json`，保持方法、路径、字段类型和必填项一致。
 - Midjourney 独立规范位于 `openapi/midjourney-{zh,en}.json`，维护 13 个操作、七种状态与三种模式。修改后运行 `node scripts/check-midjourney.mjs`。
+- 统一视频与 Suno 规范分别位于 `openapi/video-{zh,en}.json`、`openapi/suno-{zh,en}.json`；修改后运行 `node scripts/check-media.mjs`，不要将各协议的任务 ID 或返回包装层混用。
 - MDX frontmatter 使用完整引用，例如 `openapi: "openapi/zh.json POST /v1/chat/completions"`。项目有多个规范文件，不要只写方法和路径。
 - 参数和响应结构交给 OpenAPI 自动生成。MDX 补充任务流程、SDK 用法、输出处理与故障排查，避免重复维护同一参数表。
 - 保留 JSON、multipart、SSE 与音频响应的准确内容类型，不把所有响应都描述为 JSON。

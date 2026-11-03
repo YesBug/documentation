@@ -40,6 +40,62 @@ MAXAPI_MODEL=替换为模型_ID
 
 在部署环境中使用平台提供的环境变量或密钥管理服务。避免使用 `NEXT_PUBLIC_`、`VITE_` 等会将变量暴露给浏览器的前缀。
 
+## 从 .env 加载配置
+
+先用上面的格式创建 `.env`，替换密钥和模型占位符，再按运行环境选择加载方式。下面的检查只打印配置是否存在，不发送 API 请求。
+
+<Tabs>
+<Tab title="Python">
+
+在运行应用的同一虚拟环境中安装加载工具：
+
+```bash 安装 python-dotenv
+python -m pip install python-dotenv
+```
+
+把下面的文件与 `.env` 放在同一目录。使用 `python3` 时，安装和运行命令也都改用 `python3`。
+
+```python check_env.py
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).with_name(".env"), override=False)
+
+print("API key configured:", bool(os.environ.get("MAXAPI_API_KEY")))
+print("Model configured:", bool(os.environ.get("MAXAPI_MODEL")))
+```
+
+```bash 检查配置
+python check_env.py
+```
+
+在实际应用中，也要将 `load_dotenv(...)` 及相关导入放在读取 `os.environ`、创建 SDK 客户端之前。单独运行检查文件不会为另一个 Python 进程加载配置。此处显式使用脚本所在目录的 `.env`，`override=False` 保留进程已有的变量值，见 [python-dotenv 文档](https://bbc2.github.io/python-dotenv/)。
+
+</Tab>
+<Tab title="Node.js">
+
+将下面的文件与 `.env` 放在同一目录，并从该目录运行命令：
+
+```javascript check_env.mjs
+console.log("API key configured:", Boolean(process.env.MAXAPI_API_KEY));
+console.log("Model configured:", Boolean(process.env.MAXAPI_MODEL));
+```
+
+```bash 检查版本与配置
+node --version
+node --env-file=.env check_env.mjs
+```
+
+[`--env-file` 从 Node.js v20.6.0 开始提供](https://nodejs.org/api/cli.html#--env-filefile)。还需满足所安装 SDK 的运行时要求。文件路径相对于命令的当前工作目录，参数放在脚本名称之前；路径不存在会报错。
+
+运行 [快速开始](/zh/quickstart) 的 `hello.mjs` 时，同样使用 `node --env-file=.env hello.mjs`。只执行 `node hello.mjs` 不会应用前一个检查进程加载的配置。
+
+</Tab>
+</Tabs>
+
+两种方式都会优先保留进程已有的环境变量。如果换了 `.env` 里的密钥但应用仍使用旧值，检查终端、IDE 或部署平台是否已设置同名变量，再重新启动应用。加载器只配置当前程序，不会自动把值导出给之后在终端运行的 cURL；cURL 示例需使用 [快速开始](/zh/quickstart) 的终端环境变量设置方式。
+
 ## 配置 SDK
 
 ```python Python
@@ -90,7 +146,7 @@ const client = new OpenAI({
 
 ## 确认变量已加载，而不打印密钥
 
-环境变量只影响当前进程及之后启动的子进程。写入 `.env` 文件不代表 Python、Node.js、IDE、容器或托管平台会自动读取它。加载配置后重启对应服务，并用下面的方法检查是否存在：
+环境变量只影响当前进程及之后启动的子进程。完成 [加载配置](#从-env-加载配置) 后，在实际应用进程内执行下面的检查；不要只在另一个终端确认变量存在。
 
 <CodeGroup>
 ```python Python

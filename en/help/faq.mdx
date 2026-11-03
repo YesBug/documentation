@@ -21,7 +21,7 @@ These answers address common MaxAPI setup and integration questions. For a faile
     An environment variable keeps examples usable across accounts and makes model changes configurable. Set it to a real model ID available to your account before running an example.
   </Accordion>
   <Accordion title="Why is my key missing even though I created a .env file?">
-    A `.env` file does not change every process environment automatically. Load it with your framework, runtime or environment loader, or export the variable before starting your program. Do not print a real key while debugging.
+    In Python, call `load_dotenv()` before reading environment variables or creating the client. In Node.js, start with `node --env-file=.env hello.mjs`. See [loading .env configuration](/en/authentication#load-configuration-from-env) for installation, version requirements and checks that do not print keys. Both loaders preserve existing environment values. If editing the file leaves an old value active, check terminal or hosting variables with the same name and restart the application.
   </Accordion>
   <Accordion title="Should my browser call the API directly?">
     Prefer sending browser requests to your backend, where the key is managed. Keys in frontend code or public environment variables are visible to visitors. See [authentication](/en/authentication). The documentation's [interactive testing](/en/playground) is a separate testing workflow using Mintlify's playground.
@@ -53,6 +53,8 @@ These answers address common MaxAPI setup and integration questions. For a faile
 
 Listing only establishes that the key can perform that query. Chat, images, audio and embeddings need their respective model capabilities. Verify the endpoint, test minimal fields, then add options individually. A model ID's presence does not imply support for every interface.
 
+If it still fails, [capture the failed response](/en/help/errors#capture-a-failed-api-response) using your original `request.json` and compare the HTTP status with the error body. Repeating a model-list request alone cannot explain invalid chat parameters.
+
 ## Why does a playground request fail after I copy it into code?
 
 Compare the final URL, key source, model ID and body. Check for a duplicate `/v1`, unloaded environment variables and files missing from the server environment. The playground uses a documentation proxy, while your server has its own network path. See [online testing](/en/playground).
@@ -76,6 +78,10 @@ A timeout means the client did not receive a complete result within its deadline
 ## How do I save images when the API returns only Base64?
 
 Decode `data[].b64_json` into bytes and save them using the actual file format. Writing the Base64 string directly to a PNG file will not create an image. See [image generation](/en/api-reference/images) for complete batch URL and Base64 handling.
+
+## Should every image and audio request use multipart?
+
+It depends on the endpoint. Audio transcription uses a multipart file; Midjourney image inputs use Data URIs in JSON; vision can accept a direct image URL or supported Data URI in `image_url.url`. Do not interchange `@filename`, local paths, URLs and Base64 fields. Use the [input and download format comparison](/en/help/errors#upload-or-download-format-errors) and the specific fields in [Midjourney inputs](/en/media/midjourney/inputs).
 
 ## Why does an audio response fail JSON parsing?
 

@@ -1,6 +1,6 @@
 ---
 title: "统一视频接口"
-description: "使用统一路由提交视频生成任务、查询状态并读取结果。"
+description: "从文字或参考图提交统一视频任务，保存完整 task_id，轮询六种状态，并按明确的结果字段下载视频。"
 keywords: ["MaxAPI", "统一视频接口", "videos"]
 ---
 
@@ -10,6 +10,8 @@ keywords: ["MaxAPI", "统一视频接口", "videos"]
 POST https://api.maxapi.ai/v2/videos/generations
 GET  https://api.maxapi.ai/v2/videos/generations/{task_id}
 ```
+
+字段与在线调试见 [创建视频任务](/zh/api-reference/videos/create) 和 [查询视频任务](/zh/api-reference/videos/retrieve)。提交会创建真实生成任务，查询使用已保存的任务 ID。
 
 如果你的应用已经使用厂商原生请求体，先查看 [视频专用协议](/zh/media/video-providers)。`/v2/videos/generations` 与 `/v1/videos` 是不同接口格式，不能只替换路径后复用全部参数。
 
@@ -36,25 +38,34 @@ GET  https://api.maxapi.ai/v2/videos/generations/{task_id}
 | `prompt` | `string` | 必填 | 描述主体、动作、场景与镜头 |
 | `images` | `string[]` | 图生视频时按模型要求提供 | 参考图 URL 或 Base64；首帧、尾帧、参考主体的含义取决于模型 |
 | `aspect_ratio` | `string` | 部分模型支持 | 宽高比，如已支持的 `16:9` 或 `9:16` |
-| `duration` | `number` | 部分模型支持 | 秒数，允许值由模型决定 |
+| `duration` | `number` 或 `string` | 部分模型支持 | 按模型要求使用数字或数字字符串；允许值由模型决定 |
 | `enhance_prompt` | `boolean` | 部分 Veo 渠道支持 | 是否进行提示词增强 |
 
 不要把不同模型的可选字段一次性全部发送。例如，`images` 在图生视频分支可能必填，在文生视频分支则不需要；时长和分辨率也不存在适用于所有模型的统一组合。
 
 ### 文生视频
 
-下面示例适用于已确认支持文生视频的统一格式模型。将 `MAXAPI_VIDEO_MODEL` 设置为该模型的准确 ID。
+下面示例适用于已确认支持文生视频的统一格式模型。先按 [身份验证](/zh/authentication) 设置 `MAXAPI_API_KEY`，再将 `MAXAPI_VIDEO_MODEL` 设置为该模型的准确 ID。终端示例使用 Bash 与 `jq`。每次提交使用一个新建的 `video-submit.*` 目录保存请求和响应；只有本次 HTTP 请求与任务 ID 校验均成功，才设置 `TASK_ID`。失败会清空本次终端中的 `TASK_ID`，不会删除以前保存的文件。文生视频和图生视频示例选择一个执行即可。
 
 ```bash 提交并保存响应
+unset TASK_ID
 : "${MAXAPI_VIDEO_MODEL:?请设置支持统一文生视频格式的模型 ID}"
+VIDEO_ATTEMPT_DIR="$(mktemp -d ./video-submit.XXXXXX)" &&
 jq -n --arg model "$MAXAPI_VIDEO_MODEL" '{
   model: $model,
   prompt: "A paper boat floats slowly across a quiet pond, soft morning light, fixed camera."
-}' | curl --fail-with-body https://api.maxapi.ai/v2/videos/generations \
+}' > "$VIDEO_ATTEMPT_DIR/request.json" &&
+curl --fail-with-body https://api.maxapi.ai/v2/videos/generations \
   -H "Authorization: Bearer $MAXAPI_API_KEY" \
   -H "Content-Type: application/json" \
-  --data-binary @- \
-  --output video-submit.json
+  --data-binary "@$VIDEO_ATTEMPT_DIR/request.json" \
+  --output "$VIDEO_ATTEMPT_DIR/response.json" &&
+TASK_ID="$(jq -er '.task_id | select(type == "string" and length > 0)' "$VIDEO_ATTEMPT_DIR/response.json")" &&
+printf 'TASK_ID=%s\nResponse: %s\n' "$TASK_ID" "$VIDEO_ATTEMPT_DIR/response.json" || {
+  unset TASK_ID
+  printf '提交未确认成功。检查本次请求目录 %s；不要自动重试提交。\n' "${VIDEO_ATTEMPT_DIR:-unavailable}" >&2
+  false
+}
 ```
 
 ### 图生视频
@@ -62,21 +73,31 @@ jq -n --arg model "$MAXAPI_VIDEO_MODEL" '{
 把 `MAXAPI_IMAGE_URL` 设置为你有权使用、且生成服务能够访问的参考图 URL。参考图数量和用途以模型要求为准。
 
 ```bash 携带一张参考图
+unset TASK_ID
+: "${MAXAPI_VIDEO_MODEL:?请设置支持统一图生视频格式的模型 ID}"
 : "${MAXAPI_IMAGE_URL:?请设置可访问的参考图 URL}"
+VIDEO_ATTEMPT_DIR="$(mktemp -d ./video-submit.XXXXXX)" &&
 jq -n --arg model "$MAXAPI_VIDEO_MODEL" --arg image "$MAXAPI_IMAGE_URL" '{
   model: $model,
   prompt: "Keep the main subject consistent. A gentle breeze moves through the scene.",
   images: [$image]
-}' | curl --fail-with-body https://api.maxapi.ai/v2/videos/generations \
+}' > "$VIDEO_ATTEMPT_DIR/request.json" &&
+curl --fail-with-body https://api.maxapi.ai/v2/videos/generations \
   -H "Authorization: Bearer $MAXAPI_API_KEY" \
   -H "Content-Type: application/json" \
-  --data-binary @- \
-  --output video-submit.json
+  --data-binary "@$VIDEO_ATTEMPT_DIR/request.json" \
+  --output "$VIDEO_ATTEMPT_DIR/response.json" &&
+TASK_ID="$(jq -er '.task_id | select(type == "string" and length > 0)' "$VIDEO_ATTEMPT_DIR/response.json")" &&
+printf 'TASK_ID=%s\nResponse: %s\n' "$TASK_ID" "$VIDEO_ATTEMPT_DIR/response.json" || {
+  unset TASK_ID
+  printf '提交未确认成功。检查本次请求目录 %s；不要自动重试提交。\n' "${VIDEO_ATTEMPT_DIR:-unavailable}" >&2
+  false
+}
 ```
 
 ## 保存任务 ID
 
-本例处理提交响应以顶层 `task_id` 返回标识的统一视频分支。部分统一格式的 Wan 示例使用 `id` 与 `output.task_id`；接入这类分支时应先确认它们与查询接口的对应关系，再明确修改解析代码。不要将其他协议的任意 `id` 自动送到此查询路由。
+统一视频提交的任务 ID 位于响应顶层 `task_id`。Wan 专用协议的 `output.task_id`、Veo 长任务协议的 `name`、其他视频格式的 `id` 属于各自的协议。不要通过遍历这些字段猜测一个可用标识；提交路由、ID 位置和查询路由必须匹配。
 
 ```json 任务标识示意
 {
@@ -84,9 +105,11 @@ jq -n --arg model "$MAXAPI_VIDEO_MODEL" --arg image "$MAXAPI_IMAGE_URL" '{
 }
 ```
 
-```bash 提取并检查任务 ID
-TASK_ID="$(jq -er '.task_id // empty' video-submit.json)"
-: "${TASK_ID:?响应中没有任务 ID，请检查错误详情}"
+提交示例已在同一条成功链中提取并检查任务 ID。请保留其输出的本次响应路径 `$VIDEO_ATTEMPT_DIR/response.json`；不要在提交失败后从旧响应文件重新提取 ID。
+
+```bash 确认本次提交已获得任务 ID
+: "${TASK_ID:?本次提交尚未确认任务 ID，请检查本次响应，不要自动重新提交}"
+printf '%s\n' "$TASK_ID"
 ```
 
 业务数据库应同时记录模型、接口格式、原始响应和任务 ID。HTTP 200 可能只表示已受理；还需要检查返回中的业务错误。
@@ -96,6 +119,7 @@ TASK_ID="$(jq -er '.task_id // empty' video-submit.json)"
 任务 ID 可能包含冒号等字符。将它编码为路径片段后再查询，避免直接拼接特殊字符。
 
 ```bash 查询一次任务状态
+: "${TASK_ID:?请先确认已保存的任务 ID}"
 TASK_ID_ESCAPED="$(printf '%s' "$TASK_ID" | jq -sRr @uri)"
 curl --fail-with-body \
   "https://api.maxapi.ai/v2/videos/generations/$TASK_ID_ESCAPED" \
@@ -103,19 +127,80 @@ curl --fail-with-body \
   --output video-status.json
 ```
 
-| 资料中出现的状态 | 常见含义 | 建议处理 |
+| 统一格式的状态 | 含义 | 建议处理 |
 | --- | --- | --- |
 | `NOT_START`、`QUEUED`、`SUBMITTED` | 尚未完成、等待执行 | 保留任务并等待下次查询 |
 | `IN_PROGRESS` | 正在生成 | 继续查询，展示可用的进度信息 |
 | `SUCCESS` | 成功 | 检查结果字段，取得视频地址 |
 | `FAILURE` | 失败 | 读取 `fail_reason` 等错误详情 |
-| 其他值 | 当前渠道的其他状态或格式差异 | 记录原始值，并在有限期限内查询；不要自动视为成功 |
+| 其他值或缺失 | 状态未识别或协议格式不同 | 保存原始响应并检查协议，不自动视为成功或无限等待 |
 
-这里汇总的是不同示例中出现的状态，**不是每个模型都返回的固定枚举**。状态可能位于顶层，也可能在协议包装对象中。按你所用渠道的真实响应建立解析规则。
+统一格式定义了六种状态，但一次任务不一定经历全部等待状态。本页的查询状态位于**顶层 `status`**；如果得到 `data.task_status`、`output.task_status` 或其他包装结构，应先核对是否调用了厂商专用协议，不要直接套用这里的解析器。
+
+## 自动等待任务完成
+
+下面的脚本只查询已经创建的任务。收到 HTTP 响应后，它先保存原始正文，再检查 HTTP 状态并解析 JSON，因此错误响应或非 JSON 正文也会保留。遇到失败、未知状态或不匹配的任务对象时停止。仅在脚本成功退出后，执行下一节的下载步骤。
+
+```bash 安装依赖
+python3 -m pip install requests
+```
+
+```python wait_for_video.py
+import os
+import sys
+import time
+from pathlib import Path
+from urllib.parse import quote
+
+import requests
+
+
+def wait_for_video(task_id, budget=600, interval=5):
+    if not isinstance(task_id, str) or not task_id:
+        raise ValueError("task_id must be a non-empty string from unified submission")
+    if budget <= 0 or interval <= 0:
+        raise ValueError("budget and interval must be positive")
+    url = "https://api.maxapi.ai/v2/videos/generations/" + quote(task_id, safe="")
+    headers = {"Authorization": f"Bearer {os.environ['MAXAPI_API_KEY']}"}
+    deadline = time.monotonic() + budget
+    pending = {"NOT_START", "SUBMITTED", "QUEUED", "IN_PROGRESS"}
+    while time.monotonic() < deadline:
+        response = requests.get(url, headers=headers, timeout=(10, 30))
+        Path("video-status.json").write_bytes(response.content)
+        response.raise_for_status()
+        task = response.json()
+        if not isinstance(task, dict) or task.get("task_id") != task_id:
+            raise RuntimeError("Unexpected task wrapper or task_id; inspect video-status.json")
+        status = task.get("status")
+        print(status, task.get("progress", ""))
+        if status == "SUCCESS":
+            return task
+        if status == "FAILURE":
+            raise RuntimeError(task.get("fail_reason") or "Video generation failed")
+        if status not in pending:
+            raise RuntimeError(f"Unknown status {status!r}; inspect video-status.json")
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            time.sleep(min(interval, remaining))
+    raise TimeoutError("Waiting budget expired; retain task_id and query again later")
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        raise SystemExit("Usage: python3 wait_for_video.py TASK_ID")
+    result = wait_for_video(sys.argv[1])
+    print("Task succeeded; inspect result fields in video-status.json")
+```
+
+```bash 等待已保存的任务
+python3 wait_for_video.py "$TASK_ID"
+```
+
+5 秒间隔与 600 秒等待预算是示例客户端策略，不是平台的生成时间承诺。单次 HTTP 请求另有连接和读取超时，因此预算并非严格的总时长上限。网络失败或预算用尽后，可用同一 `TASK_ID` 重新运行脚本；不要重新创建任务。未收到 HTTP 响应的网络失败不会删除已有的结果文件，因此文件存在本身不代表本次查询成功。下载前还必须核对文件中的任务 ID 与当前 `TASK_ID` 一致。
 
 ## 读取视频结果
 
-成功响应的常见结果字段包括 `data.video_url`、`data.output` 或顶层 `video_url`、`url`。下面只示意一种结构：
+统一格式的单个结果通常放在 `data.output`，多个结果放在 `data.outputs`。部分兼容分支使用 `data.video_url` 或顶层 `video_url`、`url`。先确认所用分支的响应结构，再固定读取对应字段；这些字段不保证同时返回。下面采用 `data.output`：
 
 ```json 成功响应关键字段示意
 {
@@ -123,7 +208,7 @@ curl --fail-with-body \
   "status": "SUCCESS",
   "progress": "100%",
   "data": {
-    "video_url": "https://your-storage.example/generated-video.mp4"
+    "output": "https://example.com/generated-video.mp4"
   }
 }
 ```
@@ -132,12 +217,14 @@ curl --fail-with-body \
 
 ### 保存视频文件
 
-以下命令对应上面展示的 `status` 与 `data.video_url` 结构。若你的渠道返回另一种包装层，先按实际响应修改提取路径。命令会拒绝未完成的任务与空地址，不会在任意字段中猜测一个 URL。
+以下命令对应上面展示的顶层 `status` 与 `data.output` 结构。若已确认你的分支使用 `data.video_url`，明确将提取路径改为该字段；`data.outputs` 则需要逐项下载。仅在上面的等待脚本成功退出后运行。命令会拒绝任务 ID 不匹配、未完成的任务与空地址，不会在任意字段中猜测一个 URL。
 
 ```bash 仅从成功任务提取视频地址
-VIDEO_URL="$(jq -er '
-  if .status != "SUCCESS" then error("任务尚未成功")
-  else (.data.video_url | select(type == "string" and startswith("https://")))
+: "${TASK_ID:?请先设置本次任务的 TASK_ID}"
+VIDEO_URL="$(jq -er --arg task_id "$TASK_ID" '
+  if .task_id != $task_id then error("响应任务 ID 与当前任务不匹配")
+  elif .status != "SUCCESS" then error("任务尚未成功")
+  else (.data.output | select(type == "string" and startswith("https://")))
   end
 ' video-status.json)"
 : "${VIDEO_URL:?成功响应中没有可用的视频地址}"
@@ -151,7 +238,7 @@ curl --fail --location --proto '=https' --proto-redir '=https' \
 
 ### 中断后恢复
 
-保存 `video-submit.json` 或业务记录中的原任务 ID，然后重新执行“查询状态”。已经有任务 ID 时，无需重新执行“提交任务”。轮询也只重复 GET 查询：为你的渠道明确映射等待、成功、失败状态，并使用 [异步任务指南](/zh/guides/async-tasks) 的有限等待与后台调度方式。
+保存本次请求目录中的 `response.json` 或业务记录中的原任务 ID，然后重新执行“查询状态”。已经有任务 ID 时，无需重新执行“提交任务”。轮询也只重复 GET 查询：为你的渠道明确映射等待、成功、失败状态，并使用 [异步任务指南](/zh/guides/async-tasks) 的有限等待与后台调度方式。
 
 ## 常见问题
 
@@ -160,7 +247,7 @@ curl --fail --location --proto '=https' --proto-redir '=https' \
 | `images` 报错，或模型要求图片 | 当前模型是否为图生视频分支、图片数量与含义是否正确 |
 | 已拿到任务 ID，但没有视频 | 提交只代表受理，继续调用同一协议的查询接口 |
 | 轮询程序一直等待 | 原始状态字段的位置和大小写；不要直接套用另一个厂商的状态表 |
-| 返回成功，却找不到 `data.video_url` | 检查实际响应包装层，再明确调整解析器 |
+| 返回成功，却找不到 `data.output` | 确认是否使用 `data.outputs` 或已知兼容分支，再明确选择解析字段 |
 | 视频生成成功，但文件下载失败 | 查询最新结果链接，检查链接有效性与文件下载响应 |
 | 修改了模型后相同参数不再可用 | 回到最小请求，逐一验证时长、比例和参考图字段 |
 
@@ -170,6 +257,6 @@ curl --fail --location --proto '=https' --proto-redir '=https' \
 - 提交超时且无法确定是否受理时，先排查已有任务，避免重复提交产生多份生成任务。
 - 查询请求遇到暂时性网络错误时，可延迟重试；设置查询间隔和总等待期限。
 - 明确生成失败时记录任务 ID、模型和失败原因，再决定是否修改输入后重新提交。
-- 到达本地等待期限只代表应用停止等待，不等于服务端任务被取消。
+- 到达本地等待期限只代表应用停止等待，不等于服务端任务被取消。统一视频资料没有定义通用取消路由，不能从其他视频协议推断一个取消接口。
 
 轮询、回调去重和业务状态保存的完整建议见 [异步任务与回调](/zh/guides/async-tasks)。

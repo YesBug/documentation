@@ -37,7 +37,7 @@ keywords: ["MaxAPI", "异步任务与回调", "async-tasks"]
 | --- | --- | --- |
 | 统一视频 | `task_id` | `GET /v2/videos/generations/{task_id}` |
 | Midjourney | 提交结果的 `result` | `GET /mj/task/{id}/fetch` |
-| Suno NewAPI 兼容格式 | `data.task_id` | `GET /suno/fetch/{task_id}` |
+| Suno NewAPI 兼容格式 | `data.task_id` 或字符串 `data`，按响应类型区分 | `GET /suno/fetch/{task_id}` |
 | Suno v2 | `clips[].id`，可能一次返回多个 | `GET /suno/v2/feed?ids=...` |
 | Hailuo 原生兼容 | `task_id` | `GET /hailuo/v1/query/video_generation?task_id=...` |
 | Veo 长时操作 | 操作对象中的 `name` | 向匹配的 `fetchPredictOperation` 路径提交操作名称 |

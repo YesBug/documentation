@@ -1,0 +1,39 @@
+---
+title: "Suno v2: retrieve song clips"
+description: "Retrieve one or more Suno clip IDs, check each song independently, and read audio, artwork, and error details without confusing task identifiers."
+keywords: ["MaxAPI", "Suno", "v2-feed"]
+openapi: "openapi/suno-en.json GET /suno/v2/feed"
+---
+
+Feed retrieves current Suno v2 results by song clip ID. The response is an object containing `clips`, not a bare array or NewAPI's `data.data` envelope.
+
+## Supply clip identifiers
+
+Use `clips[].id` from the generation response. Join multiple IDs with commas in one query parameter. Although the field is optional, explicitly supply it when retrieving known clips.
+
+```bash Retrieve two clips
+curl --fail-with-body --get https://api.maxapi.ai/suno/v2/feed \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  --data-urlencode "ids=YOUR_FIRST_CLIP_ID,YOUR_SECOND_CLIP_ID" \
+  --output suno-clips.json
+```
+
+Replace the example IDs before sending. Do not pass the top-level generation `id`, a NewAPI `task_id`, or identifiers from unrelated tasks.
+
+## Inspect every result
+
+| Check | Behavior |
+| --- | --- |
+| `clips[].id` | Match the expected set by ID, not response order |
+| `status: "submitted"` or `"streaming"` | Continue waiting; a playable URL does not establish final completion |
+| `status: "complete"` | Check `audio_url` before reading audio |
+| `metadata.error_type`, `metadata.error_message` | Record populated error details as a failure |
+| An expected ID is absent | Keep its ID and retry within a bounded period; the batch is not complete |
+
+One completed clip does not establish that every requested clip has completed. See the [complete polling example](/en/media/music) for set-based checking.
+
+## Handle assets separately
+
+`audio_url`, `image_url`, and `video_url` identify different assets. Audio-only delivery does not need to wait for an unused video field. Download using the media URL's own access method; do not forward your MaxAPI Bearer key to the media host.
+
+For another continuation, select a song's `id` as `continue_clip_id` in [Generate or extend](/en/api-reference/suno/v2-generate).

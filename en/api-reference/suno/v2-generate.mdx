@@ -1,0 +1,42 @@
+---
+title: "Suno v2: generate or extend music"
+description: "Create a custom song from lyrics and style, or extend an existing Suno clip from a chosen time, then save each newly returned clip identifier."
+keywords: ["MaxAPI", "Suno", "v2-generate"]
+openapi: "openapi/suno-en.json POST /suno/v2/generate"
+---
+
+Suno v2 uses the same endpoint for initial generation and continuation. It returns a generation envelope and a `clips` array. Retrieve those clips next; HTTP 200 or the top-level `status` does not establish audio completion.
+
+## Generate the first song
+
+Provide an enabled `mv` and lyrics in `prompt`. Use `tags` for musical style and `title` for the song title. Omit `continue_clip_id` and `continue_at` for initial generation.
+
+```json Custom song example
+{
+  "mv": "YOUR_ENABLED_SUNO_MODEL",
+  "prompt": "[Verse]\nMorning light across the floor\nA new road waits beyond the door",
+  "tags": "acoustic pop, warm vocals",
+  "title": "A new road"
+}
+```
+
+Replace the model placeholder with an enabled version. This reference covers custom-song and continuation fields. Do not copy NewAPI inspiration-mode fields into v2.
+
+## Extend an existing clip
+
+Add `continue_clip_id` and `continue_at` to the same request. The former identifies the original song clip; the latter is a position in seconds, not milliseconds or an array index. Use new lyrics in `prompt`.
+
+```json Additional continuation fields
+{
+  "continue_clip_id": "YOUR_SOURCE_CLIP_ID",
+  "continue_at": 30
+}
+```
+
+These are only the additional fields; still include `mv` and `prompt`. The source clip must be accessible through the current channel. Do not put a NewAPI task ID in `continue_clip_id`.
+
+## Save IDs for retrieval
+
+Read `clips[].id` and [retrieve the clips](/en/api-reference/suno/v2-feed) until they complete. The top-level `id` identifies the generation and cannot be used for feed queries.
+
+Continuation creates new clips, so retrieve the newly returned clip IDs. It does not guarantee that the original song and new segment have already been combined. See [Generate and extend music](/en/media/music) for complete examples, bounded polling, and downloads.
