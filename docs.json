@@ -51,12 +51,20 @@
               {
                 "group": "开发接入",
                 "pages": [
+                  "zh/guides/text-generation",
                   "zh/guides/python",
                   "zh/guides/nodejs",
                   "zh/guides/streaming",
                   "zh/guides/vision",
-                  "zh/guides/tools",
+                  "zh/guides/tools"
+                ]
+              },
+              {
+                "group": "集成与上线",
+                "pages": [
                   "zh/guides/protocols",
+                  "zh/guides/migration",
+                  "zh/guides/production",
                   "zh/guides/async-tasks"
                 ]
               },
@@ -158,12 +166,20 @@
               {
                 "group": "Build with MaxAPI",
                 "pages": [
+                  "en/guides/text-generation",
                   "en/guides/python",
                   "en/guides/nodejs",
                   "en/guides/streaming",
                   "en/guides/vision",
-                  "en/guides/tools",
+                  "en/guides/tools"
+                ]
+              },
+              {
+                "group": "Integration and production",
+                "pages": [
                   "en/guides/protocols",
+                  "en/guides/migration",
+                  "en/guides/production",
                   "en/guides/async-tasks"
                 ]
               },

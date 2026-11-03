@@ -59,3 +59,59 @@ A successful body contains audio bytes, not a JSON object with an audio URL. Its
 The cURL command may write an error body into `speech.mp3` when it fails. Check the exit status and HTTP response before playing the file. If text exceeds the model's limit, synthesize sentence or paragraph segments and maintain their order in your application.
 
 For speech recognition, use [transcription](/en/api-reference/audio-transcriptions). For authentication and quota failures, see [troubleshooting](/en/help/errors).
+
+## Choose an output format
+
+Choose a supported format for the playback or processing environment. Renaming a file does not convert its encoding.
+
+| Use case | What to verify |
+| --- | --- |
+| Download and play | Match `response_format`, returned `Content-Type` and file extension |
+| Save while receiving | Use the SDK byte stream, then verify completion before treating the file as final |
+| Play in a web application | Pass the actual media type from your backend; do not turn binary output into a JSON string |
+| Join narrated segments | Retain segment order and use format-aware audio tools rather than concatenating arbitrary file bytes |
+
+MP3 commonly uses `audio/mpeg`; other formats can return different media types. `application/octet-stream` only identifies generic bytes, so check the requested encoding and the actual file.
+
+## Keep error bodies out of audio files
+
+This Python standard-library example checks HTTP success and the media type before saving bytes. It serves the same purpose as the SDK example and helps diagnose direct HTTP behavior. The 60-second client timeout is an example choice, not a platform processing limit.
+
+```python Check the response before saving
+import json
+import os
+import shutil
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+payload = {
+    "model": os.environ["MAXAPI_AUDIO_MODEL"],
+    "voice": os.environ["MAXAPI_VOICE"],
+    "input": "Your order is confirmed. We will keep you updated on delivery.",
+    "response_format": "mp3",
+}
+request = urllib.request.Request(
+    "https://api.maxapi.ai/v1/audio/speech",
+    data=json.dumps(payload).encode("utf-8"),
+    headers={
+        "Authorization": f"Bearer {os.environ['MAXAPI_API_KEY']}",
+        "Content-Type": "application/json",
+    },
+    method="POST",
+)
+try:
+    with urllib.request.urlopen(request, timeout=60) as response:
+        content_type = response.headers.get_content_type()
+        if not content_type.startswith("audio/") and content_type != "application/octet-stream":
+            raise ValueError(f"Expected audio, received {content_type}")
+        temporary = Path("speech.part")
+        with temporary.open("wb") as file:
+            shutil.copyfileobj(response, file)
+        temporary.replace("speech.mp3")
+    print("Saved speech.mp3")
+except urllib.error.HTTPError as error:
+    raise RuntimeError(f"Speech request failed with HTTP {error.code}; inspect the error before retrying") from error
+```
+
+A dropped connection can leave an incomplete `.part` file. Do not mark it as a successful result. Stopping frontend playback does not establish that upstream generation was cancelled. Decide whether to retry from the actual response and console records.

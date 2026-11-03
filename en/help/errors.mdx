@@ -7,6 +7,39 @@ sidebarTitle: "Troubleshooting"
 
 When a MaxAPI request fails, inspect the HTTP status first, then the response's error details. Models and upstream services can return different error structures, so avoid relying on one exact error string.
 
+## Locate the failing layer
+
+| Observation | Start with | Next action |
+| --- | --- | --- |
+| Missing environment variable or module | Application startup and dependencies | Check that the process loads the key and uses the environment where the package is installed |
+| Connection fails without an HTTP status | Network, DNS, proxy or TLS | Request the model list from the same environment as the application |
+| Non-2xx HTTP response | Authentication, request, access or server processing | Retain status and error body, then use the table below |
+| HTTP success but JSON parsing fails | Response reader | Check for SSE, plain text, audio or an HTML page |
+| HTTP success but a task is queued | Task lifecycle | Save the task ID and query it; submission is not completion |
+| Valid text with an unsuitable answer | Model input and application validation | Check history, instructions, finish reason and result validation |
+
+If cURL works and the SDK does not, compare the final URL, model ID, actual fields and runtime environment. An SDK exception describes what the client observed; its class name is not necessarily a platform business error code.
+
+## Preserve one diagnostic response
+
+This model-list request saves response headers and body separately and prints the HTTP status. The 10-second connection and 30-second total timeouts are diagnostic choices, not MaxAPI service limits.
+
+```bash Save diagnostic files
+curl --silent --show-error \
+  --connect-timeout 10 \
+  --max-time 30 \
+  --dump-header diagnostic-headers.txt \
+  --output diagnostic-body.txt \
+  --write-out 'HTTP %{http_code}\n' \
+  https://api.maxapi.ai/v1/models \
+  -H "Authorization: Bearer $MAXAPI_API_KEY"
+```
+
+- When a real HTTP status is available, inspect `diagnostic-body.txt`; it need not be JSON.
+- `HTTP 000` with a cURL connection error means there was no usable HTTP response. Diagnose networking first.
+- This command omits `--fail`, so an HTTP `401` can still have a successful process exit code. Use the printed HTTP status.
+- Inspect files for account information, personal data and sensitive inputs before sharing. Avoid collecting public diagnostic material with logging that exposes authentication headers.
+
 ## Interpret HTTP status codes
 
 This table gives general HTTP troubleshooting directions, not a complete MaxAPI error specification. Use the actual response to identify the cause.
@@ -81,3 +114,49 @@ Match the query protocol to the source of the ID. Do not mix `clips[].id`, `oper
 Upload files as multipart data and let the client generate a boundary. Remote image URLs must be accessible to the processing service; local paths only identify files to upload from your client.
 
 Speech and file downloads can return bytes. If JSON parsing fails, check status and `Content-Type`. Do not treat an error JSON body as valid audio or image data.
+
+## Narrow the failure by request type
+
+<Tabs>
+<Tab title="Chat and streaming">
+
+Begin with one short user message, no streaming and only `model` and `messages`. Enable `stream` after that works. If raw events arrive but the page does not update, inspect application buffering. If the connection closes early, compare timeouts in the client, gateway and application.
+
+Check tool calls when `content` is empty and `finish_reason` when output is truncated. An empty SDK property does not by itself establish that the whole request failed.
+
+</Tab>
+<Tab title="File uploads">
+
+Start with a small image or short recording you can open locally. Confirm the file exists in the application's runtime environment and open it as bytes; use `@` with cURL. Let the client create the multipart boundary and remove a manually set JSON Content-Type.
+
+If the small file works, compare the original file's actual encoding, dimensions or duration with the model requirements. Renaming an extension does not convert encoding.
+
+</Tab>
+<Tab title="Video and music tasks">
+
+Separate submission, status queries and result downloads. Save the ID after submission instead of submitting again to check progress. If querying fails, verify the ID's source and protocol. If downloading fails, retry the existing result URL before generating again.
+
+Reaching your application deadline leaves the result unresolved; it does not prove generation failed. Query again later where supported. See [asynchronous tasks](/en/guides/async-tasks) for protocol fields.
+
+</Tab>
+</Tabs>
+
+## Prepare a support request
+
+Use the smallest reproducible input without a real key. Fill in this template. Include a request identifier only when the API actually returns one; do not invent its header name.
+
+```text Support request template
+Time and time zone: YYYY-MM-DD HH:mm:ss with time zone
+Environment: local / cloud; language and SDK version
+Method and path: POST /v1/chat/completions
+Model ID: actual model ID
+HTTP status: actual status, or no response
+Request or task identifier: if returned
+Frequency: every request / intermittent; last successful time
+Minimal reproduction: required fields and shareable input only
+Expected result:
+Actual result: redacted error or status
+Checks performed: whether model listing and minimal requests succeed
+```
+
+After redacting the details, submit them through the support entry in your [console](https://platform.maxapi.ai). If a key entered public code, screenshots or logs, handle that key in the console before sharing a sanitized reproduction.

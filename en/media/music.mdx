@@ -73,6 +73,117 @@ curl --fail-with-body --get https://api.maxapi.ai/suno/v2/feed \
 
 Preserve unknown states and query within a deadline. Stop on explicit failure or error information. A nonempty `audio_url` alone does not establish that the full song is complete.
 
+### Wait for every requested clip
+
+This script reads `suno-generate.json` from the preceding example and queries every returned clip ID. It verifies that the response contains all expected IDs so one completed song cannot accidentally be treated as a complete batch.
+
+```bash Install the dependency
+python -m pip install requests
+```
+
+```python wait_for_suno.py
+import json
+import os
+import time
+from pathlib import Path
+
+import requests
+
+
+def wait_for_clips(clip_ids, timeout_seconds=600):
+    expected = set(clip_ids)
+    if not expected:
+        raise ValueError("No clip IDs supplied")
+    headers = {"Authorization": f"Bearer {os.environ['MAXAPI_API_KEY']}"}
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        response = requests.get(
+            "https://api.maxapi.ai/suno/v2/feed",
+            params={"ids": ",".join(sorted(expected))},
+            headers=headers,
+            timeout=(10, 30),
+        )
+        response.raise_for_status()
+        payload = response.json()
+        Path("suno-clips.json").write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        by_id = {clip["id"]: clip for clip in payload.get("clips", []) if clip.get("id")}
+        for clip_id in expected:
+            clip = by_id.get(clip_id, {})
+            metadata = clip.get("metadata") or {}
+            if metadata.get("error_type") or metadata.get("error_message"):
+                raise RuntimeError(f"Clip {clip_id} failed: {metadata.get('error_message')}")
+            print(f"{clip_id}: {clip.get('status', 'not returned yet')}")
+        if expected.issubset(by_id) and all(
+            by_id[clip_id].get("status") == "complete" for clip_id in expected
+        ):
+            if not all(by_id[clip_id].get("audio_url") for clip_id in expected):
+                raise RuntimeError("A completed clip has no audio_url; inspect suno-clips.json")
+            return [by_id[clip_id] for clip_id in sorted(expected)]
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            time.sleep(min(5, remaining))
+    raise TimeoutError("Clips are not all complete; retain their IDs and query again later")
+
+
+if __name__ == "__main__":
+    submission = json.loads(Path("suno-generate.json").read_text(encoding="utf-8"))
+    ids = [clip["id"] for clip in submission.get("clips", []) if clip.get("id")]
+    clips = wait_for_clips(ids)
+    print(f"Completed {len(clips)} clips. Response saved to suno-clips.json.")
+```
+
+```bash Wait for every clip
+python wait_for_suno.py
+```
+
+The 5-second interval and 600-second budget are example client policies. An HTTP error stops the script; rerunning after resolving the error queries the original clips. Unrecognized states are not treated as success. The script keeps the latest response and eventually times out.
+
+### Save completed audio
+
+Audio, cover images and video are separate outputs. If you need audio only, download `audio_url` without waiting for an unused video URL. This script sends no MaxAPI key to media hosts:
+
+```python save_suno_audio.py
+import json
+import mimetypes
+from pathlib import Path
+from urllib.parse import urlparse
+
+import requests
+
+
+payload = json.loads(Path("suno-clips.json").read_text(encoding="utf-8"))
+for index, clip in enumerate(payload.get("clips", []), start=1):
+    if clip.get("status") != "complete" or not clip.get("audio_url"):
+        continue
+    url = clip["audio_url"]
+    if urlparse(url).scheme != "https":
+        raise RuntimeError("Expected an HTTPS audio URL")
+    with requests.get(url, stream=True, timeout=(10, 60)) as response:
+        response.raise_for_status()
+        media_type = response.headers.get("Content-Type", "").split(";", 1)[0]
+        if not media_type.startswith("audio/") and media_type != "application/octet-stream":
+            raise RuntimeError(f"Expected audio bytes, received {media_type!r}")
+        extension = mimetypes.guess_extension(media_type) or ".audio"
+        output = Path(f"suno-{index}{extension}")
+        partial = output.with_suffix(output.suffix + ".part")
+        with partial.open("wb") as file:
+            for chunk in response.iter_content(chunk_size=64 * 1024):
+                if chunk:
+                    file.write(chunk)
+        if partial.stat().st_size == 0:
+            raise RuntimeError("Downloaded audio is empty")
+        partial.replace(output)
+    print(f"Saved clip {clip['id']} to {output}")
+```
+
+```bash Download completed songs
+python save_suno_audio.py
+```
+
+A download served as `application/octet-stream` can be saved with a `.bin` extension. Verify the actual format before choosing its extension instead of naming every response `.mp3`. Confirm playback, then return your stored asset URL to the frontend.
+
 ## Submit and query a NewAPI task
 
 This format wraps generation in a task. The example below extends an existing song. Set `MAXAPI_SUNO_CLIP_ID` to an extendable clip in your channel and `MAXAPI_CONTINUE_AT` to the desired start time in seconds. It is not a first-song minimal request.
@@ -123,6 +234,19 @@ curl --fail-with-body \
 | `data.data[].audio_url` | Audio URL when available |
 
 Do not apply v2 lowercase clip rules directly to NewAPI task states. Lyrics, generation and continuation tasks can return different output types.
+
+## Troubleshoot music tasks
+
+| Symptom | What to check |
+| --- | --- |
+| Submission succeeds but `feed` returns no song | Use `clips[].id` and separate multiple IDs with commas |
+| Outer status is complete but audio URLs are empty | Inspect every clip; the wrapper status does not replace clip status |
+| One song is complete and another is pending | Store states separately and decide whether your app delivers each song or the whole batch |
+| `audio_url` exists but audio is incomplete | Wait for that clip's `status` to become `complete` |
+| Continuation cannot find the original song | Use a song clip ID accessible through the current channel |
+| NewAPI parser cannot find songs | Read `data.data[]`, not the v2 top-level `clips[]` |
+| Downloaded content is not audio | Inspect HTTP status and media type, then query the current link; do not save a JSON error as MP3 |
+
 
 ## Track continuation identifiers
 

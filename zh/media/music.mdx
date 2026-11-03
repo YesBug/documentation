@@ -22,7 +22,7 @@ Suno 接口提供多种兼容格式。选择一个已开通的格式完成整条
 
 ### 请求参数
 
-```http "Endpoints"
+```http Endpoints
 POST https://api.maxapi.ai/suno/v2/generate
 GET  https://api.maxapi.ai/suno/v2/feed
 ```
@@ -38,7 +38,7 @@ GET  https://api.maxapi.ai/suno/v2/feed
 
 上传音频续写、纯音乐和其他高级模式可能有额外参数或版本要求。本例先演示自定义歌曲；不要将不同场景的全部参数一起发送。
 
-```bash "生成自定义歌曲"
+```bash 生成自定义歌曲
 : "${MAXAPI_SUNO_MODEL:?请设置已开通的 Suno mv 值}"
 jq -n --arg mv "$MAXAPI_SUNO_MODEL" '{
   mv: $mv,
@@ -56,7 +56,7 @@ jq -n --arg mv "$MAXAPI_SUNO_MODEL" '{
 
 生成响应中可能同时有顶层 `id` 和 `clips[].id`。以下是结构示意：
 
-```json "提交响应关键字段示意"
+```json 提交响应关键字段示意
 {
   "id": "generation-id",
   "clips": [
@@ -71,7 +71,7 @@ jq -n --arg mv "$MAXAPI_SUNO_MODEL" '{
 
 顶层任务已受理或完成包装处理，不代表每个音频已完成。查询时使用歌曲片段 ID：
 
-```bash "按 clip ID 查询"
+```bash 按 clip ID 查询
 CLIP_IDS="$(jq -er '[.clips[]?.id] | if length > 0 then join(",") else error("响应中没有 clip ID") end' suno-generate.json)"
 curl --fail-with-body --get https://api.maxapi.ai/suno/v2/feed \
   -H "Authorization: Bearer $MAXAPI_API_KEY" \
@@ -83,11 +83,122 @@ curl --fail-with-body --get https://api.maxapi.ai/suno/v2/feed \
 
 对于未识别的状态，保留原始响应并在有限期限内继续查询。出现错误字段或明确失败时应停止等待并记录原因，不能仅凭 `audio_url` 非空认定整首歌曲已生成完成。
 
+### 等待整批片段完成
+
+下面的脚本直接读取上一节的 `suno-generate.json`，查询其中所有 clip ID。它会检查返回集合是否包含全部预期 ID，避免“这次只返回一首已完成的歌”被误判为整批完成。
+
+```bash 安装依赖
+python -m pip install requests
+```
+
+```python wait_for_suno.py
+import json
+import os
+import time
+from pathlib import Path
+
+import requests
+
+
+def wait_for_clips(clip_ids, timeout_seconds=600):
+    expected = set(clip_ids)
+    if not expected:
+        raise ValueError("No clip IDs supplied")
+    headers = {"Authorization": f"Bearer {os.environ['MAXAPI_API_KEY']}"}
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        response = requests.get(
+            "https://api.maxapi.ai/suno/v2/feed",
+            params={"ids": ",".join(sorted(expected))},
+            headers=headers,
+            timeout=(10, 30),
+        )
+        response.raise_for_status()
+        payload = response.json()
+        Path("suno-clips.json").write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        by_id = {clip["id"]: clip for clip in payload.get("clips", []) if clip.get("id")}
+        for clip_id in expected:
+            clip = by_id.get(clip_id, {})
+            metadata = clip.get("metadata") or {}
+            if metadata.get("error_type") or metadata.get("error_message"):
+                raise RuntimeError(f"Clip {clip_id} failed: {metadata.get('error_message')}")
+            print(f"{clip_id}: {clip.get('status', 'not returned yet')}")
+        if expected.issubset(by_id) and all(
+            by_id[clip_id].get("status") == "complete" for clip_id in expected
+        ):
+            if not all(by_id[clip_id].get("audio_url") for clip_id in expected):
+                raise RuntimeError("A completed clip has no audio_url; inspect suno-clips.json")
+            return [by_id[clip_id] for clip_id in sorted(expected)]
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            time.sleep(min(5, remaining))
+    raise TimeoutError("Clips are not all complete; retain their IDs and query again later")
+
+
+if __name__ == "__main__":
+    submission = json.loads(Path("suno-generate.json").read_text(encoding="utf-8"))
+    ids = [clip["id"] for clip in submission.get("clips", []) if clip.get("id")]
+    clips = wait_for_clips(ids)
+    print(f"Completed {len(clips)} clips. Response saved to suno-clips.json.")
+```
+
+```bash 查询到全部片段完成
+python wait_for_suno.py
+```
+
+5 秒查询间隔和 600 秒等待期限是示例的客户端策略。遇到 HTTP 错误时脚本退出，处理错误后可重跑，仍然查询原有片段。其他未识别状态不会被当成成功，脚本保留最近响应并最终超时。
+
+### 保存完成的音频
+
+音频、封面和视频是独立结果。只需要音频时，根据 `audio_url` 下载，不必等待一个未使用的视频地址出现。下面的脚本不向媒体域名发送 MaxAPI 密钥：
+
+```python save_suno_audio.py
+import json
+import mimetypes
+from pathlib import Path
+from urllib.parse import urlparse
+
+import requests
+
+
+payload = json.loads(Path("suno-clips.json").read_text(encoding="utf-8"))
+for index, clip in enumerate(payload.get("clips", []), start=1):
+    if clip.get("status") != "complete" or not clip.get("audio_url"):
+        continue
+    url = clip["audio_url"]
+    if urlparse(url).scheme != "https":
+        raise RuntimeError("Expected an HTTPS audio URL")
+    with requests.get(url, stream=True, timeout=(10, 60)) as response:
+        response.raise_for_status()
+        media_type = response.headers.get("Content-Type", "").split(";", 1)[0]
+        if not media_type.startswith("audio/") and media_type != "application/octet-stream":
+            raise RuntimeError(f"Expected audio bytes, received {media_type!r}")
+        extension = mimetypes.guess_extension(media_type) or ".audio"
+        output = Path(f"suno-{index}{extension}")
+        partial = output.with_suffix(output.suffix + ".part")
+        with partial.open("wb") as file:
+            for chunk in response.iter_content(chunk_size=64 * 1024):
+                if chunk:
+                    file.write(chunk)
+        if partial.stat().st_size == 0:
+            raise RuntimeError("Downloaded audio is empty")
+        partial.replace(output)
+    print(f"Saved clip {clip['id']} to {output}")
+```
+
+```bash 下载完成的歌曲
+python save_suno_audio.py
+```
+
+若下载服务返回 `application/octet-stream`，文件扩展名可能为 `.bin`。按实际文件格式确认扩展名，不要把所有返回内容一律命名成 `.mp3`。播放器能够读取音频后，再将自有存储地址交给前端。
+
 ## NewAPI：提交并查询任务
 
 该格式使用任务包装层。以下演示已存在歌曲的续写：先设置 `MAXAPI_SUNO_CLIP_ID` 为当前渠道中可续写的 clip ID，并设置 `MAXAPI_CONTINUE_AT` 为你选择的秒数。它不是首次生成歌曲的最小请求。
 
-```bash "续写已有歌曲"
+```bash 续写已有歌曲
 : "${MAXAPI_SUNO_CLIP_ID:?请设置可续写的歌曲 clip ID}"
 : "${MAXAPI_CONTINUE_AT:?请设置续写起点秒数}"
 jq -n \
@@ -110,7 +221,7 @@ jq -n \
 
 该格式的示例响应使用 `code: "success"`，任务 ID 位于 `data.task_id`。检查业务结果后再取 ID：
 
-```bash "查询 NewAPI 任务"
+```bash 查询 NewAPI 任务
 TASK_ID="$(jq -er '
   if .code == "success" then (.data.task_id // empty)
   else error(.message // "Suno 任务提交失败") end
@@ -133,6 +244,19 @@ curl --fail-with-body \
 | `data.data[].audio_url` | 可用时返回的音频地址 |
 
 不要把 v2 的小写 clip 状态判断直接套到 NewAPI 的任务状态上。生成音乐、歌词和续写等任务也可能返回不同的结果内容。
+
+## 音乐任务排错
+
+| 现象 | 检查方式 |
+| --- | --- |
+| 生成成功，但 `feed` 没有歌曲 | 检查 `ids` 是否来自 `clips[].id`，以及多个 ID 是否用英文逗号分隔 |
+| 顶层 `status` 已完成，歌曲地址仍为空 | 检查每个 clip 的状态；顶层包装状态不能替代片段状态 |
+| 第一首完成，第二首还没完成 | 分别记录片段状态，按产品需求选择逐首展示或等待整批完成 |
+| 有 `audio_url`，但音频还未完整 | 等待该 clip 的 `status` 为 `complete`，不要只检查 URL 是否非空 |
+| 续写提示找不到原歌曲 | 检查 `continue_clip_id` 是歌曲片段 ID，并确认该片段属于当前可访问渠道 |
+| NewAPI 查询解析不到歌曲 | 歌曲数组在 `data.data[]`，不能直接套用 v2 的顶层 `clips[]` |
+| 下载内容不是音频 | 检查下载 HTTP 状态和内容类型，再查询最新链接；不要保存 JSON 错误为 MP3 |
+
 
 ## 续写流程中的标识关系
 

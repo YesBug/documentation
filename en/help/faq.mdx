@@ -33,7 +33,7 @@ These answers address common MaxAPI setup and integration questions. For a faile
     Enable `stream: true`, read increments as they arrive and check application buffering. A model can send multiple characters in one chunk; one character per event is not guaranteed. See [streaming](/en/guides/streaming).
   </Accordion>
   <Accordion title="Where can I find prices, balance and usage?">
-    Check the [console](https://platform.maxapi.ai) and current model information for your account. Examples in these docs do not establish prices, quotas, service commitments or current model availability.
+    Use the [model overview](https://platform.maxapi.ai/modelmak) for model information and sign in to the [pricing page](https://platform.maxapi.ai/account/pricing) for current prices. Check your balance and usage records in the console. Examples in these docs do not establish prices, quotas, service commitments or current model availability.
   </Accordion>
   <Accordion title="What should I include in a support request?">
     Provide the time and time zone, model ID, route, HTTP status and redacted error details through the console's support entry. Remove keys and sensitive data first. See [troubleshooting](/en/help/errors).
@@ -48,3 +48,43 @@ These answers address common MaxAPI setup and integration questions. For a faile
     Not necessarily. The [catalog](/en/api-reference/catalog) indexes the shared system's structure. Availability depends on your account's models and channels. Entries marked Needs review or Example path require additional validation. The catalog is not a record of live MaxAPI verification.
   </Accordion>
 </AccordionGroup>
+
+## Why does generation fail after model listing succeeds?
+
+Listing only establishes that the key can perform that query. Chat, images, audio and embeddings need their respective model capabilities. Verify the endpoint, test minimal fields, then add options individually. A model ID's presence does not imply support for every interface.
+
+## Why does a playground request fail after I copy it into code?
+
+Compare the final URL, key source, model ID and body. Check for a duplicate `/v1`, unloaded environment variables and files missing from the server environment. The playground uses a documentation proxy, while your server has its own network path. See [online testing](/en/playground).
+
+## Does HTTP 200 mean generation is complete?
+
+Inspect the result too. Chat needs `choices` and a suitable finish reason; tools require application execution. Video or music submission can return only an ID and still require terminal-state queries. Audio and subtitles need the correct response reader. See the [API overview](/en/api-reference/index).
+
+## Should I use max_tokens or max_completion_tokens?
+
+Use the parameter explicitly supported by the model, never both together. They are not interchangeable on every model, and some generation budgets can include reasoning tokens. Test without a length option first, then add the model's supported control.
+
+## Can I convert usage directly into a charged amount?
+
+`usage` is reported consumption, not a universal billing formula. Fields vary by model, and image, audio or asynchronous work cannot all be priced using chat token counts. Consult current console prices, charges and account records.
+
+## Should I immediately resend a timed-out request?
+
+A timeout means the client did not receive a complete result within its deadline; it does not prove the server did no work. Check an existing task ID, queryable status or console record first. Retry a bounded number of times only when appropriate to avoid duplicate generation.
+
+## How do I save images when the API returns only Base64?
+
+Decode `data[].b64_json` into bytes and save them using the actual file format. Writing the Base64 string directly to a PNG file will not create an image. See [image generation](/en/api-reference/images) for complete batch URL and Base64 handling.
+
+## Why does an audio response fail JSON parsing?
+
+Speech generation returns audio bytes. Transcription and translation can return subtitle text. Only JSON output belongs in a JSON parser. Check HTTP status and Content-Type, then select a reader. See [speech](/en/api-reference/audio-speech) and [transcription](/en/api-reference/audio-transcriptions).
+
+## Can audio translation directly output Japanese or Chinese?
+
+The documented `/v1/audio/translations` endpoint outputs English. For another target language, transcribe the original recording and translate the text with a chat model. To speak the result, pass the translation to speech generation. See [audio translation](/en/api-reference/audio-translations) for runnable examples.
+
+## Are example timeouts, batch sizes and dimensions platform limits?
+
+No. Values marked as examples illustrate client integration choices. Actual capabilities, input sizes, rates and other limits depend on the model and account configuration. Do not infer universal platform limits from sample code.

@@ -1,37 +1,49 @@
 ---
-title: "Integrate MaxAPI with Node.js"
-description: "Use the OpenAI JavaScript or TypeScript SDK with MaxAPI, configure server-side environment variables, and handle API errors in your application."
-keywords: ["MaxAPI", "Integrate MaxAPI with Node.js", "API documentation"]
-sidebarTitle: "Node.js SDK"
+title: "Node.js SDK"
+description: "Connect server-side JavaScript or TypeScript to MaxAPI with a runnable example, response handling, timeout and cancellation settings, and troubleshooting."
+keywords: ["MaxAPI", "Node.js", "JavaScript", "TypeScript", "OpenAI SDK"]
 ---
 
-The OpenAI JavaScript and TypeScript SDK supports a custom `baseURL`. Configure it with MaxAPI's address and your key to send requests from your Node.js server.
+Connect the OpenAI JavaScript / TypeScript SDK to MaxAPI by setting `baseURL`. This guide provides a runnable Node.js file and explains client configuration, request cancellation, and web application integration.
 
-## Install the SDK
+## 1. Install the dependency
 
-```bash Terminal
+Install the SDK in your application directory. For a new project, run `npm init -y` first to create `package.json`.
+
+```bash
 npm install openai
+npm ls openai
 ```
 
-## Set environment variables
+Use a Node.js version supported by the SDK. The examples use `.mjs` files, which run ES Module syntax without adding `type: module` to your project.
 
-```bash Configure your process
-export MAXAPI_API_KEY="YOUR_MAXAPI_API_KEY"
+## 2. Set environment variables
+
+Get a key from the [console](https://platform.maxapi.ai) and choose an accessible model ID from the [model list](/en/api-reference/models).
+
+<CodeGroup>
+```bash macOS / Linux
+export MAXAPI_API_KEY="YOUR_API_KEY"
 export MAXAPI_MODEL="YOUR_MODEL_ID"
 ```
 
-Create a key in the [console](https://platform.maxapi.ai) and query [List models](/en/api-reference/models) for model IDs. If you use `.env`, ensure your runtime loads it before running these examples.
+```powershell Windows PowerShell
+$env:MAXAPI_API_KEY = "YOUR_API_KEY"
+$env:MAXAPI_MODEL = "YOUR_MODEL_ID"
+```
+</CodeGroup>
 
-## Make your first request
+The examples read process environment variables and do not automatically load `.env`. Do not expose your key through public browser variables or commit it to version control.
 
-Save this example as `main.mjs`. The `.mjs` extension lets Node.js run the ES module directly:
+## 3. Send a request and read the result
+
+Save this as `main.mjs`. The 60-second timeout and disabled retries are application choices for this example, not platform limits.
 
 ```javascript main.mjs
 import OpenAI from "openai";
 
 const apiKey = process.env.MAXAPI_API_KEY;
 const model = process.env.MAXAPI_MODEL;
-
 if (!apiKey || !model) {
   throw new Error("Set MAXAPI_API_KEY and MAXAPI_MODEL.");
 }
@@ -39,51 +51,108 @@ if (!apiKey || !model) {
 const client = new OpenAI({
   apiKey,
   baseURL: "https://api.maxapi.ai/v1",
+  timeout: 60_000,
+  maxRetries: 0,
 });
 
-const completion = await client.chat.completions.create({
-  model,
-  messages: [
-    { role: "user", content: "Explain APIs in three bullet points." },
-  ],
-});
-
-console.log(completion.choices[0]?.message.content ?? "");
-```
-
-```bash Run the example
-node main.mjs
-```
-
-TypeScript projects use the same client and calls with the request and response types supplied by the SDK.
-
-## Handle API errors
-
-After configuring the client, catch errors and log the necessary status without exposing keys or sensitive inputs:
-
-```javascript Handle errors
 try {
-  const completion = await client.chat.completions.create({
+  const response = await client.chat.completions.create({
     model,
-    messages: [{ role: "user", content: "Hello!" }],
+    messages: [{
+      role: "user",
+      content: "Write a product description for a team notes app in under 50 words.",
+    }],
   });
-
-  console.log(completion.choices[0]?.message.content ?? "");
+  const choice = response.choices[0];
+  if (!choice) throw new Error("The response contains no choices.");
+  if (choice.message.tool_calls?.length) {
+    throw new Error("Received tool calls; use the tool-calling flow.");
+  }
+  console.log(choice.message.content ?? "");
+  console.error("response_id:", response.id);
+  console.error("finish_reason:", choice.finish_reason);
+  if (response.usage) console.error("usage:", response.usage);
 } catch (error) {
   if (error instanceof OpenAI.APIError) {
-    console.error("Request failed with HTTP status:", error.status ?? "unavailable");
+    console.error("Request failed:", error.name, "HTTP", error.status ?? "no response");
   } else {
-    console.error("Request failed. Check runtime configuration and connectivity.");
+    console.error(error instanceof Error ? error.message : "Unknown error");
   }
+  process.exitCode = 1;
 }
 ```
 
-Before adding retries, check whether the SDK already retries the request. See [troubleshooting](/en/help/errors) to avoid stacking retry loops.
+```bash Run
+node main.mjs
+```
 
-## Use MaxAPI in a web application
+Standard output shows the generated product description. The response ID, finish reason, and available usage details go to standard error. Read the answer from `choices[0].message.content`, rather than displaying the entire response object.
 
-Send browser requests to your own backend, and let that backend attach the MaxAPI key. Authenticate your application's users and control request frequency and input length according to your product's needs.
+## 4. Configuration and TypeScript
 
-Do not put your key in browser code or enable client-side key access to bypass this separation. See [authentication](/en/authentication).
+| Setting | Purpose |
+| --- | --- |
+| `apiKey` | Your MaxAPI key without a `Bearer` prefix |
+| `baseURL` | `https://api.maxapi.ai/v1`; the SDK appends resource paths |
+| `timeout` | Client timeout in milliseconds; `60_000` is 60 seconds |
+| `maxRetries` | SDK retry count; `0` makes failures explicit in this example |
 
-Continue with [streaming](/en/guides/streaming). The [official JavaScript SDK repository](https://github.com/openai/openai-node) documents other client options.
+Python uses `base_url` and `max_retries`; JavaScript uses `baseURL` and `maxRetries`. Do not mix these names or set `baseURL` to the full `.../v1/chat/completions` endpoint.
+
+TypeScript uses the same client and methods. For reusable message arrays, import the SDK type to prevent `role` from being inferred as an arbitrary string:
+
+```typescript Message types
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+
+const messages: ChatCompletionMessageParam[] = [
+  { role: "user", content: "Explain what an API is." },
+];
+```
+
+## 5. Timeouts, retries, and cancellation
+
+The SDK can retry selected errors according to its configuration. Choose either SDK or application retry management and budget the entire user operation. Respect a valid `Retry-After` response. Do not repeatedly retry invalid keys, exhausted balance, missing permissions, or invalid parameters.
+
+In a Node.js environment with `AbortController`, pass a `signal` to an individual request. The following replaces the request section after the client configuration above and uses a 30-second application deadline for this example.
+
+```javascript Cancel a request
+const controller = new AbortController();
+const timer = setTimeout(() => controller.abort(), 30_000);
+
+try {
+  const response = await client.chat.completions.create(
+    { model, messages: [{ role: "user", content: "Describe three API design principles." }] },
+    { signal: controller.signal },
+  );
+  console.log(response.choices[0]?.message.content ?? "");
+} catch (error) {
+  if (controller.signal.aborted) {
+    console.error("The application stopped waiting for the response.");
+  } else {
+    throw error;
+  }
+} finally {
+  clearTimeout(timer);
+}
+```
+
+Cancellation stops the client from waiting. It does not prove that the server has not processed the request, or guarantee cancellation of generation or charges. After a partial stream, do not automatically resend and concatenate two generations. See [streaming](/en/guides/streaming).
+
+## 6. Use it in a web application
+
+Send browser input to your backend. After authenticating the user, the backend calls MaxAPI with its key and returns text or a stream to the browser. Control allowed models, input size, and concurrency on the backend instead of forwarding arbitrary client-supplied models and parameters.
+
+Keep the API key in server configuration. Do not expose it through public frontend environment variables or bypass isolation with browser key-access options. See [authentication](/en/authentication).
+
+## Troubleshooting
+
+| Symptom | Action |
+| --- | --- |
+| `Cannot use import statement outside a module` | Save the file as `.mjs` or configure the project's module system |
+| `Cannot find package 'openai'` | Install dependencies in the current project and run the file there |
+| 401 / 403 | Check the key, account status, and model permissions |
+| 404 | Check `baseURL`, duplicated `/v1` segments, and model ID |
+| `APIConnectionError` / timeout | Check network and proxy settings; distinguish failed connections from slow responses |
+| No normal text | Inspect `choices`, `tool_calls`, and `finish_reason` |
+
+Continue with [conversation history](/en/guides/text-generation), [error troubleshooting](/en/help/errors), and [streaming](/en/guides/streaming). See the [OpenAI SDK documentation](https://developers.openai.com/api/docs/libraries) and [official retry guidance](https://developers.openai.com/api/docs/guides/rate-limits#retrying-with-exponential-backoff) for SDK installation and retry behavior.

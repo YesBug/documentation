@@ -21,6 +21,34 @@ All requests use `https://api.maxapi.ai`. Confirm model, group and channel acces
 | Suno music and continuation | [Music](/en/media/music) | Query a task or song clip after submission |
 | Speech, transcription and translation | [Speech](/en/api-reference/audio-speech), [transcription](/en/api-reference/audio-transcriptions), [translation](/en/api-reference/audio-translations) | Audio bytes or text output |
 
+## Move from a first result to an application
+
+<Steps>
+  <Step title="Start with one generation goal">
+    Choose an enabled model and route, then generate one image, video or song with the minimum request. Inspect the output before adding optional ratios, durations or reference assets one at a time.
+  </Step>
+  <Step title="Save a real output file">
+    Download URL results, decode Base64 results, and save binary responses according to their media type. Confirm the file opens in the appropriate image viewer, audio player or video player.
+  </Step>
+  <Step title="Add task status and resume behavior">
+    Persist asynchronous identifiers and show waiting, processing, failure or completion. Refreshing the page should query the same task. See [asynchronous tasks and callbacks](/en/guides/async-tasks).
+  </Step>
+  <Step title="Add real inputs and failure handling">
+    Verify reference assets are accessible. Distinguish submission, generation and download failures, and test empty outputs, query timeouts and expired links before increasing concurrency.
+  </Step>
+</Steps>
+
+## Prepare reference assets
+
+| Input | Correct approach | Common mistake |
+| --- | --- | --- |
+| Image or audio URL | Provide a directly accessible HTTPS media URL with any required valid signature | Passing a preview webpage, local path or browser-login-only link |
+| File upload | Use the required multipart field and let the client set the boundary | Sending a local path as text or setting an incomplete `Content-Type` |
+| Base64 | Follow the field's encoding rules and distinguish raw Base64 from a data URL | Pasting a full data URL into a raw Base64 field |
+| Multiple images | Confirm first-frame, last-frame or subject semantics and preserve ordering | Assuming every model accepts the same image count and roles |
+
+A link working in your browser does not prove the generation service can access it. Check whether it needs a Cookie, is about to expire, or returns a webpage instead of media bytes.
+
 ## Distinguish synchronous and asynchronous results
 
 A synchronous endpoint returns its result in one request. Read the response according to its `Content-Type` and fields: an image may be a URL or Base64, while speech may be binary audio.

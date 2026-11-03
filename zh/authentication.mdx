@@ -14,7 +14,7 @@ Authorization: Bearer YOUR_MAXAPI_API_KEY
 
 `Bearer` 与密钥之间保留一个空格。不要将 API Key 放进 URL 查询参数，也不要把完整密钥输出到日志。
 
-```bash "验证连接"
+```bash 验证连接
 curl --fail-with-body https://api.maxapi.ai/v1/models \
   -H "Authorization: Bearer $MAXAPI_API_KEY"
 ```
@@ -25,14 +25,14 @@ curl --fail-with-body https://api.maxapi.ai/v1/models \
 
 本地开发时可以将密钥写入 `.env` 文件；应用需要通过运行时或环境变量加载工具读取该文件。
 
-```dotenv ".env"
+```dotenv .env
 MAXAPI_API_KEY=替换为你的_API_Key
 MAXAPI_MODEL=替换为模型_ID
 ```
 
 将包含真实密钥的文件加入 Git 忽略规则。可以提交只包含占位符的 `.env.example`，帮助团队了解必要配置。
 
-```text ".gitignore"
+```text .gitignore
 .env
 .env.*
 !.env.example
@@ -42,7 +42,7 @@ MAXAPI_MODEL=替换为模型_ID
 
 ## 配置 SDK
 
-```python "Python"
+```python Python
 import os
 from openai import OpenAI
 
@@ -52,7 +52,7 @@ client = OpenAI(
 )
 ```
 
-```javascript "Node.js"
+```javascript Node.js
 import OpenAI from "openai";
 
 const client = new OpenAI({
@@ -79,3 +79,39 @@ const client = new OpenAI({
 - 密钥是否仍然有效，且来自当前使用的 MaxAPI 账户。
 
 如果认证通过但模型请求仍失败，继续检查 [模型与能力](/zh/models) 和 [错误排查](/zh/help/errors)。
+
+## 浏览器应用如何接入
+
+推荐的调用链是：`浏览器 → 你的服务端 → MaxAPI`。浏览器通过你自己的登录会话调用业务接口；服务端从环境变量读取 MaxAPI 密钥，并组装请求。这样也便于按用户限制调用次数、约束可选模型和记录业务用量。
+
+不要让前端传入任意目标 URL、任意 Authorization 或不受限制的模型参数，再由服务端直接转发。服务端应只开放业务需要的接口，并验证用户身份、输入长度和允许的参数。
+
+[文档在线调试](/zh/playground) 是开发阶段的手动测试入口，实际产品仍应使用自己的服务端密钥管理方式。
+
+## 确认变量已加载，而不打印密钥
+
+环境变量只影响当前进程及之后启动的子进程。写入 `.env` 文件不代表 Python、Node.js、IDE、容器或托管平台会自动读取它。加载配置后重启对应服务，并用下面的方法检查是否存在：
+
+<CodeGroup>
+```python Python
+import os
+
+print("API key configured:", bool(os.environ.get("MAXAPI_API_KEY")))
+```
+```javascript Node.js
+console.log("API key configured:", Boolean(process.env.MAXAPI_API_KEY));
+```
+</CodeGroup>
+
+结果为 `true` 只证明进程中存在非空值。接着通过 `GET /v1/models` 验证鉴权，不要通过输出密钥前后若干位来替代请求验证。
+
+## 团队与环境管理
+
+| 环境 | 建议做法 |
+| --- | --- |
+| 本地开发 | 使用开发用途密钥；不要复用个人生产密钥写进示例 |
+| CI / 自动部署 | 使用 CI 的 secret 配置，避免命令回显与构建产物携带密钥 |
+| 生产服务 | 从部署平台的密钥配置读取；变更后确认所有实例已更新 |
+| 排查支持问题 | 提供脱敏请求、时间和响应标识，不提供完整密钥 |
+
+密钥发生泄露时，优先撤销泄露密钥并更新应用，再排查调用记录。仅删除代码里的明文不能撤销已暴露的密钥，Git 历史和构建日志也可能保留旧值。

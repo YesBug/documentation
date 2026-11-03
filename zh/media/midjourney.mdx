@@ -21,7 +21,7 @@ Midjourney 使用任务接口。先提交绘图，取得任务 ID，再查询图
 
 ## 1. 提交绘图
 
-```http "Endpoint"
+```http Endpoint
 POST https://api.maxapi.ai/mj/submit/imagine
 ```
 
@@ -32,7 +32,7 @@ POST https://api.maxapi.ai/mj/submit/imagine
 | `notifyHook` | `string` | 否 | 该任务的回调地址 |
 | `state` | `string` | 否 | 关联业务记录的自定义值，避免存放密钥等敏感信息 |
 
-```bash "创建 Imagine 任务"
+```bash 创建 Imagine 任务
 jq -n '{
   prompt: "A tiny observatory on a green hill, watercolor illustration",
   state: "illustration-job-001"
@@ -45,7 +45,7 @@ jq -n '{
 
 ### 先检查业务状态
 
-```json "提交响应示意"
+```json 提交响应示意
 {
   "code": 1,
   "description": "提交成功",
@@ -62,7 +62,7 @@ jq -n '{
 
 这些是提交结果的业务码，和 HTTP 状态码、后续任务状态不同。`result` 才是此接口返回任务 ID 的位置。
 
-```bash "取得可继续查询的任务 ID"
+```bash 取得可继续查询的任务 ID
 TASK_ID="$(jq -er '
   if (.code == 1 or .code == 21 or .code == 22)
   then (.result // empty | tostring)
@@ -74,7 +74,7 @@ TASK_ID="$(jq -er '
 
 ## 2. 查询任务
 
-```bash "查询一次"
+```bash 查询一次
 TASK_ID_ESCAPED="$(printf '%s' "$TASK_ID" | jq -sRr @uri)"
 curl --fail-with-body \
   "https://api.maxapi.ai/mj/task/$TASK_ID_ESCAPED/fetch" \
@@ -94,6 +94,58 @@ curl --fail-with-body \
 
 等待成功或失败后停止轮询。遇到其他状态时记录原始响应，并设置总等待期限；不要无限请求。通用实现建议见 [异步任务与回调](/zh/guides/async-tasks)。
 
+### 等待完成并保存图片
+
+[异步任务指南](/zh/guides/async-tasks) 提供完整的 `wait_for_midjourney.py`。保存脚本后，可直接使用刚才取得的任务 ID：
+
+```bash 等待同一任务完成
+python -m pip install requests
+python wait_for_midjourney.py "$TASK_ID"
+```
+
+成功时 `mj-task.json` 中应包含 `status: "SUCCESS"` 与非空的 `imageUrl`。下面的脚本检查状态、下载图片并根据实际 MIME 类型选择扩展名；下载中断时保留 `.part` 文件，不会把半张图片当作成功结果。
+
+```python save_mj_image.py
+import json
+import mimetypes
+from pathlib import Path
+from urllib.parse import urlparse
+
+import requests
+
+
+task = json.loads(Path("mj-task.json").read_text(encoding="utf-8"))
+if task.get("status") != "SUCCESS":
+    raise RuntimeError("The Midjourney task has not succeeded")
+url = task.get("imageUrl", "")
+if urlparse(url).scheme != "https":
+    raise RuntimeError("Expected an HTTPS imageUrl in the completed task")
+
+# This download deliberately has no Authorization header.
+with requests.get(url, stream=True, timeout=(10, 60)) as response:
+    response.raise_for_status()
+    media_type = response.headers.get("Content-Type", "").split(";", 1)[0]
+    if not media_type.startswith("image/"):
+        raise RuntimeError(f"Expected image bytes, received {media_type!r}")
+    extension = mimetypes.guess_extension(media_type) or ".img"
+    output = Path("mj-image" + extension)
+    partial = output.with_suffix(output.suffix + ".part")
+    with partial.open("wb") as file:
+        for chunk in response.iter_content(chunk_size=64 * 1024):
+            if chunk:
+                file.write(chunk)
+    if partial.stat().st_size == 0:
+        raise RuntimeError("Downloaded image is empty")
+    partial.replace(output)
+print(f"Saved {output}")
+```
+
+```bash 下载已完成的图片
+python save_mj_image.py
+```
+
+下载使用图片地址自身的访问方式，不把 MaxAPI 的 Bearer 密钥转发给图片域名。如果图片链接失效，先重新查询这个任务，再尝试其当前结果地址。
+
 ## 3. 执行后续动作
 
 放大、变化等操作通过 `taskId` 关联原任务，通过 `customId` 指定具体动作。`customId` 通常由返回的按钮信息提供，例如可用时读取 `buttons[].customId`；它不是让开发者自行拼接的固定编号。
@@ -107,7 +159,7 @@ curl --fail-with-body \
 
 将 `MAXAPI_MJ_ACTION_ID` 设置为用户选中的可用动作标识后提交：
 
-```bash "执行选中的动作"
+```bash 执行选中的动作
 : "${MAXAPI_MJ_ACTION_ID:?请设置查询结果中可用的 customId}"
 jq -n --arg task "$TASK_ID" --arg action "$MAXAPI_MJ_ACTION_ID" '{
   taskId: $task,
@@ -120,6 +172,28 @@ jq -n --arg task "$TASK_ID" --arg action "$MAXAPI_MJ_ACTION_ID" '{
 ```
 
 动作提交会返回自己的提交结果。检查业务码、保存新的 `result`，然后查询新任务；不要继续用原任务 ID 等待新图片。如果动作要求额外输入，按该动作对应的交互接口提交，不能假定一次 `action` 请求就完成所有步骤。
+
+### 让用户选择真实可用的动作
+
+只展示当前成功任务返回的按钮。可先查看可用标识，再把用户选中的一个值赋给 `MAXAPI_MJ_ACTION_ID`：
+
+```bash 列出当前任务的动作标识
+jq -r '.buttons[]?.customId // empty' mj-task.json
+```
+
+若列表为空，不能据此构造 `U1`、`V1` 或其他假定动作 ID。保留已生成的图片，并确认该渠道是否返回交互按钮。跟踪后续任务时，建议把“原任务 ID → 动作标识 → 新任务 ID”一起保存，便于用户回到原图或查看某次变化的结果。
+
+## 按症状排查
+
+| 现象 | 检查顺序 |
+| --- | --- |
+| HTTP 200，但没有任务 ID | 检查提交响应 `code` 和 `description`，不要只看 HTTP 状态 |
+| 一直显示原图 | 检查动作返回的新 `result`，查询新任务而不是原任务 |
+| 图片存在，但放大或变化失败 | 重新获取原任务的当前按钮；确认 `taskId` 和 `customId` 来自同一任务 |
+| `SUCCESS`，下载却失败 | 检查 `imageUrl`、下载 HTTP 状态和 `Content-Type`；重新查询结果地址 |
+| 刷新页面后出现重复任务 | 让页面读取已保存的任务记录，避免在页面加载时自动调用 `imagine` |
+| 查询任务找不到 | 检查任务 ID、密钥所属渠道，以及提交与查询是否使用同一运行模式前缀 |
+
 
 ## 回调和运行模式
 

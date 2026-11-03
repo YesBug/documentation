@@ -17,6 +17,21 @@ Video, music and some image requests can take time to complete. A successful sub
 
 Associate the task ID with a business record. Refreshing a page should not submit another generation request.
 
+## Persist enough information to resume
+
+Keep the following application records so a refresh, restart or missed callback does not lose the task. These are your application's fields, not extra parameters to send to MaxAPI.
+
+| Application record | Purpose |
+| --- | --- |
+| Business record ID and owner | Locate the request and authorize access to its result |
+| Protocol, submission path and model | Select the matching query route and parser |
+| Task IDs, clip IDs or operation name | Resume queries; one generation can produce several result IDs |
+| Submission time, last query time and raw state | Show progress and identify tasks that stopped updating |
+| Latest response and failure reason | Diagnose format differences; redact keys and unnecessary sensitive input before storing |
+| Result URL in your own storage | Preserve an asset independently of temporary generation URLs |
+
+Return your business record ID to the frontend. Repeatedly opening the result view should read that record. Only an explicit new generation action should submit another API task.
+
 ## Keep protocol identifiers distinct
 
 | Protocol | Identifier from submission | Query |
@@ -43,35 +58,81 @@ Your application can normalize states, but the original values differ:
 
 These are cross-protocol examples, not an exhaustive enum for any endpoint. Preserve unknown values and investigate within a bounded waiting period. A state that is not explicitly failure is not necessarily success.
 
-## Poll with a deadline
+## Run a complete Midjourney poller
 
-Adapt `fetch_status` and `classify` to your protocol. The timing values here are application policy, not platform limits:
+This script accepts an existing Midjourney task ID, exits on success or failure, and saves the latest response to `mj-task.json`. It creates no new generation task, so you can resume after restarting your application. First submit a task using the [Midjourney guide](/en/media/midjourney) and retain `TASK_ID`.
 
-```python polling.py
-import random
-import time
-
-
-def wait_for_task(fetch_status, classify, timeout_seconds=600):
-    deadline = time.monotonic() + timeout_seconds
-    delay = 2.0
-    while time.monotonic() < deadline:
-        # Also set connection and read timeouts inside fetch_status.
-        payload = fetch_status()
-        state = classify(payload)
-        if state == "succeeded":
-            return payload
-        if state == "failed":
-            raise RuntimeError("Task failed; inspect the redacted error details")
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            break
-        time.sleep(min(remaining, delay + random.uniform(0, 0.5)))
-        delay = min(delay * 1.5, 15.0)
-    raise TimeoutError("Waiting timed out; retain the task ID to query again later")
+```bash Install the dependency
+python -m pip install requests
 ```
 
-A network error differs from a failed generation task. Brief query failures may justify [bounded retries](/en/help/errors); a task already marked failed should not be polled indefinitely.
+```python wait_for_midjourney.py
+import json
+import os
+import sys
+import time
+from pathlib import Path
+from urllib.parse import quote
+
+import requests
+
+
+def wait_for_midjourney(task_id, timeout_seconds=600, interval_seconds=5):
+    url = f"https://api.maxapi.ai/mj/task/{quote(task_id, safe='')}/fetch"
+    headers = {"Authorization": f"Bearer {os.environ['MAXAPI_API_KEY']}"}
+    deadline = time.monotonic() + timeout_seconds
+    pending = {"NOT_START", "SUBMITTED", "IN_PROGRESS"}
+
+    while time.monotonic() < deadline:
+        response = requests.get(url, headers=headers, timeout=(10, 30))
+        response.raise_for_status()
+        task = response.json()
+        Path("mj-task.json").write_text(
+            json.dumps(task, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        status = task.get("status")
+        print(f"{task_id}: {status}, {task.get('progress', '')}", file=sys.stderr)
+        if status == "SUCCESS":
+            if not task.get("imageUrl"):
+                raise RuntimeError("Task succeeded but imageUrl is missing; inspect mj-task.json")
+            return task
+        if status == "FAILURE":
+            raise RuntimeError(task.get("failReason") or "Midjourney generation failed")
+        if status not in pending:
+            raise RuntimeError(f"Unrecognized task state: {status!r}; inspect mj-task.json")
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            time.sleep(min(interval_seconds, remaining))
+    raise TimeoutError(f"Still waiting for {task_id}; query the same ID again later")
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        raise SystemExit("Usage: python wait_for_midjourney.py TASK_ID")
+    wait_for_midjourney(sys.argv[1])
+    print("Task complete. Response saved to mj-task.json.")
+```
+
+```bash Wait for the submitted task
+python wait_for_midjourney.py "$TASK_ID"
+```
+
+The 5-second interval and 600-second waiting period are application example values, not MaxAPI rate limits or completion guarantees. Individual HTTP requests have separate connection and read timeouts; an in-flight request can finish after the polling deadline.
+
+| Outcome | Next step |
+| --- | --- |
+| Success saved to `mj-task.json` | Read `imageUrl` and use the [download example](/en/media/midjourney) |
+| Task state `FAILURE` | Inspect `failReason` before deciding whether to change the input and submit again |
+| Local waiting timeout | Retain the task ID and rerun later with the same ID |
+| HTTP or network error | The script exits; resolve [authentication, rate limit or network errors](/en/help/errors), then query the original ID |
+| Unexpected state | Inspect the saved response and route instead of applying a different protocol's parser |
+
+### Move polling to a background worker
+
+Closing a page should not end the business task. Schedule queries on your application backend: query once per worker execution, save the next query time, and release the worker. Stagger queries when managing many tasks.
+
+Record query failures separately from generation failures. Retry temporary query errors after a delay; stop polling once generation explicitly fails. For HTTP `429`, honor a supplied `Retry-After` within your own waiting budget. Retrying a query must not automatically submit another generation.
+
 
 ## Handle submission timeouts
 
@@ -88,6 +149,12 @@ Some protocols provide `notifyHook`, `notify_hook` or `callback_url`. Their fiel
 - Keep polling available to recover from missing, delayed or out-of-order callbacks.
 
 Callbacks originate from a server. `localhost` and private-network-only URLs generally cannot receive them.
+
+### Handle callbacks racing with queries
+
+Locate the record by task ID and apply an atomic state update. After success has been verified and its asset stored, an older processing notification should not move the task backward. Reuse the stored asset when the same completion notification arrives again.
+
+If a notification claims completion but a query does not confirm it, retain the notification for diagnosis and continue scheduling from the query result. A callback processing failure is not a generation failure and should not automatically trigger a new submission.
 
 ## Retrieve and retain results
 

@@ -71,3 +71,21 @@ Responses are not always JSON. [Speech](/en/api-reference/audio-speech) can retu
 5. Check paths and schemas before using [catalog](/en/api-reference/catalog) entries marked **Needs review**.
 
 The presence of an optional field does not mean every model supports it. Resolution, duration, output format, context limits and billing follow the selected model and account configuration.
+
+## Match the parser to the transport
+
+| Request / response | Typical task | Client handling |
+| --- | --- | --- |
+| JSON → JSON | Non-streaming chat, embeddings, image generation | Encode JSON, check success and parse the response |
+| JSON → SSE | Streaming chat | Parse `data:` events, assemble deltas and verify completion |
+| Multipart → JSON / text | Image editing, transcription, audio translation | Upload actual file bytes and read the selected response format |
+| JSON → binary | Speech synthesis | Check status and content type, then save bytes without JSON parsing |
+| JSON → task object → polling | Video, music and specialized generation | Retain the protocol's original identifier and query the matching endpoint |
+
+SDKs handle many transport details, but they cannot select the correct model or native protocol for you. If HTTP succeeds but JSON parsing fails, check whether the body is SSE, a file, text or an error page.
+
+## Do not copy messages between protocols unchanged
+
+OpenAI-compatible chat uses `messages`. Native protocols may use different roles, content arrays and tool declarations. Assemble requests and parse responses according to the target contract, even when the user text is identical. Native SDKs may also assemble base URLs differently from the OpenAI SDK.
+
+For an existing client, identify its actual method and path first, then follow [Migration](/en/guides/migration). Do not treat another platform's protocol prefixes or model aliases as MaxAPI settings.

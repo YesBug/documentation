@@ -44,3 +44,28 @@ curl --fail-with-body https://api.maxapi.ai/v1/images/edits \
 ## Read output and resolve errors
 
 Use the same URL or Base64 handling described in [image generation](/en/api-reference/images). If an upload appears empty, verify the file exists and cURL uses `@`. If a mask has no effect, verify transparency, dimensions and model support. Remove unsupported optional size or output settings and retry a minimal request. See [troubleshooting](/en/help/errors).
+
+## Write actionable editing instructions
+
+Focus a first edit on one goal. For product photography, try “Keep the bottle, label text and proportions unchanged. Replace the background with white and retain a natural shadow.” This specifies the target, constraints and intended result. Image models can still alter details, so inspect labels, text and the subject after generation.
+
+| Goal | Prepare the input |
+| --- | --- |
+| Replace the background | Upload the source and describe the retained subject and new background |
+| Change a local region | For mask-capable models, supply the source and a matching transparent mask |
+| Combine reference images | Confirm multi-image support and explain each image's role and order |
+| Read text from an image | Use [vision](/en/guides/vision) rather than this editing endpoint |
+
+## Verify uploads and results
+
+A successful request still needs result handling. Read `data[].url` or `data[].b64_json`, use the [image-saving example](/en/api-reference/images#save-a-batch-of-images), and compare the areas that should change with those that should stay intact.
+
+| Symptom | Check first |
+| --- | --- |
+| Missing `image` | Actual file-content upload and the `@` prefix in cURL |
+| Existing file will not upload | Working directory, file permissions and actual encoding |
+| Mask has no visible effect | Model capability, transparency and matching dimensions |
+| Multiple images are rejected | Channel support for `image[]`; return to a minimal single-image request |
+| Subject changes unexpectedly | Reduce simultaneous edits, state preservation constraints, and inspect the image rather than only HTTP success |
+
+Do not mix file uploads with a JSON body or manually set a multipart header without its boundary. See [troubleshooting](/en/help/errors) for authentication and other HTTP failures.

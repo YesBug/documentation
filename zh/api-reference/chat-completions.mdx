@@ -5,31 +5,105 @@ keywords: ["MaxAPI", "创建对话", "chat-completions"]
 openapi: "openapi/zh.json POST /v1/chat/completions"
 ---
 
-Chat Completions 根据消息列表生成下一条回复，适合聊天、摘要、翻译和代码生成。图片输入与工具调用需要所选模型和账户通道支持。
+Chat Completions 根据消息列表生成下一条回复，适合聊天、摘要、翻译和代码生成。本页说明如何发起请求、判断回复是否完整，以及把返回消息接入下一轮对话。图片输入与工具调用需要所选模型支持。
 
-## 从最小请求开始
+## 发送最小请求
 
-先在 [控制台](https://platform.maxapi.ai) 创建密钥，并选择可用模型。首次请求只传 `model` 和 `messages`；环境变量配置见 [快速开始](/zh/quickstart)。
+先按 [快速开始](/zh/quickstart) 配置 `MAXAPI_API_KEY` 和支持对话的 `MAXAPI_MODEL`。以下命令依赖 `jq`，将成功响应保存为 `chat-response.json`，便于继续读取。
 
-确认模型要求后，再添加采样、长度和工具参数；不要同时传两种输出长度参数。可见模型列表不等于所有模型都支持每个可选字段。
+```bash 创建回复
+jq -n --arg model "$MAXAPI_MODEL" '{
+  model: $model,
+  messages: [{role: "user", content: "用三句话解释什么是 API，并举一个电商场景的例子。"}]
+}' | curl --fail-with-body https://api.maxapi.ai/v1/chat/completions \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @- \
+  --output chat-response.json
+```
 
-## 保留对话上下文
+只有命令成功后才执行下面的结果处理。命令失败时，该文件可能包含错误响应，应先查看 [错误排查](/zh/help/errors)。Python 和 Node.js 的完整接入分别见 [Python SDK](/zh/guides/python) 与 [Node.js SDK](/zh/guides/nodejs)。
 
-多轮对话需要把之前的用户消息和 assistant 回复一并发送。服务端不会仅凭上一次响应的 `id` 自动恢复对话。图片消息的 `content` 数组格式见 [视觉理解](/zh/guides/vision)。
+## 读取回复与结束原因
 
-工具调用时，保留原 assistant 消息中的 `tool_calls`，由应用执行工具，再用 `tool_call_id` 关联结果。完整示例见 [工具调用](/zh/guides/tools)。
+以下是结构示意，文字和用量值仅用于说明，不代表某次真实调用或计费结果。
 
-## 流式输出
+```json 非流式响应示意
+{
+  "id": "chatcmpl-example",
+  "object": "chat.completion",
+  "choices": [{
+    "index": 0,
+    "message": {"role": "assistant", "content": "API 是不同软件之间交换数据和功能的接口。"},
+    "finish_reason": "stop"
+  }],
+  "usage": {"prompt_tokens": 30, "completion_tokens": 20, "total_tokens": 50}
+}
+```
 
-设置 `stream: true` 后，响应为 SSE 事件流，文本位于 `choices[].delta.content`，不再是完整的 `message.content`。工具参数也可能分片到达；收集完整后再解析 JSON。实现细节见 [流式响应](/zh/guides/streaming)。
-
-## 常见问题
-
-| 现象 | 处理方式 |
+| 需要判断的内容 | 应用处理方式 |
 | --- | --- |
-| 提示参数不支持 | 回到仅含 `model`、`messages` 的最小请求，再逐项添加参数 |
-| 回复没有记住上一轮 | 在本次 `messages` 中包含需要保留的历史记录 |
-| `content` 为空 | 检查 `tool_calls`、结束原因和模型返回的其他字段 |
-| 回复被截断 | 检查 `finish_reason`，按模型支持的参数提高输出上限或缩短上下文 |
+| 回复文字 | 从 `choices[].message.content` 读取；有工具调用时可能为 `null` |
+| `finish_reason: "stop"` | 生成正常结束，显示返回的文字 |
+| `finish_reason: "length"` | 输出达到限制，不能假定结果完整；检查模型支持的长度参数和上下文 |
+| `finish_reason: "tool_calls"` | 模型正在请求工具，由应用校验并执行后续流程 |
+| `usage` | 保存接口实际返回的用量字段；金额以控制台记录为准 |
+| 未识别的结束原因 | 保留原值并记录该响应，避免强行当作正常完成 |
 
-认证失败、限流和上游错误的处理见 [错误排查](/zh/help/errors)。
+```python 读取 chat-response.json
+import json
+from pathlib import Path
+
+result = json.loads(Path("chat-response.json").read_text(encoding="utf-8"))
+choices = result.get("choices", [])
+if not choices:
+    raise ValueError("响应中没有候选回复，请检查原始响应")
+
+choice = choices[0]
+message = choice.get("message", {})
+if message.get("content"):
+    print(message["content"])
+if message.get("tool_calls"):
+    print("需要处理工具调用：", [call["function"]["name"] for call in message["tool_calls"]])
+print("结束原因：", choice.get("finish_reason"))
+print("用量：", result.get("usage", {}))
+```
+
+不要仅凭 HTTP 200 或非空文本判断业务成功。例如需要生成完整 JSON 或代码时，`length` 结束的文本仍可能不完整。
+
+## 保留多轮对话
+
+每次请求都要携带需要保留的消息。下面是下一轮请求的 `messages` 部分；将其中的 assistant 内容替换为上一轮实际返回的消息。
+
+```json 第二轮消息示意
+[
+  {"role": "user", "content": "用三句话解释什么是 API，并举一个电商场景的例子。"},
+  {"role": "assistant", "content": "API 是不同软件之间交换数据和功能的接口。"},
+  {"role": "user", "content": "把刚才的解释改成面向小学生的说法。"}
+]
+```
+
+消息顺序影响上下文。上次响应的 `id` 是响应标识，不能代替消息历史。长会话应在应用中裁剪或摘要，同时保留当前问题依赖的事实。
+
+如果 assistant 消息包含 `tool_calls`，应保留完整调用结构，并用 `tool_call_id` 关联每个工具结果。不要把工具调用简单转换成普通文字，完整流程见 [工具调用](/zh/guides/tools)。
+
+## 逐步增加参数
+
+先验证 `model` 与 `messages`，再一次增加一个选项，便于定位不兼容参数。
+
+- 控制输出长度时，按模型要求选择 `max_tokens` 或 `max_completion_tokens`，不要同时传入。
+- 调整采样时，通常选择 `temperature` 或 `top_p` 之一；支持范围由模型决定。
+- 需要图片理解时，使用文本和 `image_url` 组成的内容数组，见 [视觉理解](/zh/guides/vision)。
+- 设置 `stream: true` 后，解析 SSE 的 `choices[].delta.content`，不要继续读取完整 `message.content`。工具参数也可能分片到达，见 [流式响应](/zh/guides/streaming)。
+
+## 按现象排查
+
+| 现象 | 检查顺序 |
+| --- | --- |
+| 模型列表成功，对话仍失败 | 模型是否支持聊天端点 → 当前通道权限 → 最小请求是否成功 |
+| `content` 为空 | 是否有 `tool_calls` → `finish_reason` → 原始响应中的其他信息 |
+| 回复没有记住上一轮 | 本次 `messages` 是否包含实际历史 → 顺序是否正确 |
+| 回复被截断 | `finish_reason` → 输出上限 → 输入上下文长度 |
+| 流式 JSON 解析报错 | 是否把整个 SSE 当成 JSON → 是否按完整事件解析 → 是否正确处理结束事件 |
+
+鉴权、限流、超时和上游错误见 [错误排查](/zh/help/errors)。

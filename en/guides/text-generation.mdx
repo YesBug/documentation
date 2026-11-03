@@ -1,0 +1,150 @@
+---
+title: "Text generation and conversations"
+sidebarTitle: "Text and conversations"
+description: "Build multi-turn conversations with MaxAPI Chat Completions, preserve message history, interpret finish reasons and usage, and manage context and truncation."
+keywords: ["MaxAPI", "text generation", "conversation history", "messages", "finish_reason", "context"]
+---
+
+MaxAPI Chat Completions takes input as a `messages` array. A single generation needs one question; a chat application includes relevant history with each request. This page extends a successful request into a two-turn conversation and explains when to save an answer as complete.
+
+## Choose a request pattern
+
+| Task | Pattern | Guide |
+| --- | --- | --- |
+| Summarization, rewriting, questions, chat | `POST /v1/chat/completions` with text messages | This page |
+| Display text as it is generated | The same endpoint with `stream` enabled | [Streaming](/en/guides/streaming) |
+| Analyze images, screenshots, or text in images | The same endpoint with text and image content parts | [Vision](/en/guides/vision) |
+| Answer using business data | The same endpoint with `tools` and tool results | [Tool calling](/en/guides/tools) |
+| Integrate an existing legacy prompt application | `POST /v1/completions`, with model support | [Legacy completions](/en/api-reference/completions) |
+
+Complete the [quickstart](/en/quickstart) and set `MAXAPI_API_KEY` and `MAXAPI_MODEL`. The model list helps discover accessible IDs; capabilities still depend on the selected model and channel.
+
+## Message roles and ordering
+
+| Role | Supplied by | Purpose |
+| --- | --- | --- |
+| `system` | Application | High-level instructions such as style and task boundaries, when supported |
+| `user` | User or application | Questions, source material, and follow-up instructions |
+| `assistant` | Model | The actual previous answer or tool calls |
+| `tool` | Application | A tool result matched to a call through `tool_call_id` |
+
+Some models use roles such as `developer`. Use roles supported by the model instead of stacking multiple instruction roles for compatibility. Treat user-uploaded material as content to process; do not let users assign arbitrary message roles.
+
+A typical two-turn sequence is `user` → `assistant` → `user`. Include all three messages in the second request. The response ID identifies that result; this guide does not use it to restore conversation context automatically.
+
+## Run a two-turn conversation
+
+The program first generates a launch announcement, then asks the model to rewrite it. It saves the real first response in history and stops on an incomplete result rather than accepting truncated content as a finished answer.
+
+<CodeGroup>
+```python conversation.py
+import os
+from openai import OpenAI
+
+messages = []
+questions = [
+    "Write a launch announcement for a team notes app. Emphasize collaboration in under 100 words.",
+    "Keep the key information from that announcement and turn it into an email for existing customers, with a subject.",
+]
+
+with OpenAI(
+    api_key=os.environ["MAXAPI_API_KEY"],
+    base_url="https://api.maxapi.ai/v1",
+    timeout=60.0,
+    max_retries=0,
+) as client:
+    for question in questions:
+        pending = messages + [{"role": "user", "content": question}]
+        response = client.chat.completions.create(
+            model=os.environ["MAXAPI_MODEL"],
+            messages=pending,
+        )
+        if not response.choices:
+            raise RuntimeError("The response contains no choices.")
+        choice = response.choices[0]
+        if choice.finish_reason != "stop" or not choice.message.content:
+            raise RuntimeError(f"No complete text response: {choice.finish_reason}")
+        messages = pending + [{
+            "role": "assistant",
+            "content": choice.message.content,
+        }]
+        print(f"User: {question}\nAssistant: {choice.message.content}\n")
+```
+
+```javascript conversation.mjs
+import OpenAI from "openai";
+
+const apiKey = process.env.MAXAPI_API_KEY;
+const model = process.env.MAXAPI_MODEL;
+if (!apiKey || !model) throw new Error("Set MAXAPI_API_KEY and MAXAPI_MODEL.");
+const client = new OpenAI({
+  apiKey, baseURL: "https://api.maxapi.ai/v1", timeout: 60_000, maxRetries: 0,
+});
+let messages = [];
+const questions = [
+  "Write a launch announcement for a team notes app. Emphasize collaboration in under 100 words.",
+  "Keep the key information from that announcement and turn it into an email for existing customers, with a subject.",
+];
+
+for (const question of questions) {
+  const pending = [...messages, { role: "user", content: question }];
+  const response = await client.chat.completions.create({ model, messages: pending });
+  const choice = response.choices[0];
+  if (choice?.finish_reason !== "stop" || !choice.message.content) {
+    throw new Error(`No complete text response: ${choice?.finish_reason ?? "no choices"}`);
+  }
+  messages = [...pending, { role: "assistant", content: choice.message.content }];
+  console.log(`User: ${question}\nAssistant: ${choice.message.content}\n`);
+}
+```
+</CodeGroup>
+
+Install the [Python SDK](/en/guides/python) or [Node.js SDK](/en/guides/nodejs), then run `python conversation.py` or `node conversation.mjs`. Expect two exchanges. The second answer should use the first announcement as its source; exact wording is generated by the model.
+
+This example keeps history in memory only. For a real chat application, persist ordered messages separately for each user and conversation. Do not share one global `messages` array across users.
+
+## Decide whether generation completed
+
+| Response field | How to use it |
+| --- | --- |
+| `choices[0].message.content` | Read the candidate's generated text |
+| `choices[0].finish_reason` | Distinguish normal completion, a length limit, and pending tool results |
+| `choices[0].message.tool_calls` | Start tool execution when present; text can be empty |
+| `usage` | Record the reported token usage; available fields vary by model |
+| `id` | Save the response identifier for application logs and troubleshooting |
+
+Handle common finish reasons as follows:
+
+- `stop`: Generation stopped normally. Still validate that the text meets application requirements.
+- `length`: An output or related model limit was reached. Treat the text as potentially incomplete. Narrow the task or adjust a supported output limit before explicitly making another request.
+- `tool_calls`: The model needs application tool results. Do not present this as a final answer.
+- Another value or no finish reason: Preserve the actual state and handle it according to model documentation rather than assuming success.
+
+Reported usage is not a price calculation. Check current console pricing, multipliers, and account billing information.
+
+## Change one output control at a time
+
+Start by specifying the audience, task, language, length, and format in your prompt. For example, replace “write a description” with “write three product benefits for a development team, each under 20 words.”
+
+Parameter support varies by model. To control output length, choose the supported `max_tokens` or `max_completion_tokens` field; do not set both. To adjust sampling, generally change either `temperature` or `top_p`. On supported models, `stop` defines stopping sequences; it does not validate your application's output format.
+
+If your application needs JSON, request the fields and format in the prompt, then parse JSON and validate fields in application code. A prompt alone does not guarantee valid JSON. Do not write unvalidated output directly into a database or execute it. See the [Chat Completions reference](/en/api-reference/chat-completions) for parameters.
+
+## Manage long conversations
+
+Each request sends the required history again, and those messages consume input context. Preserve the current task, key facts, and recent relevant turns. Summarize older content when appropriate. Summaries may lose detail, so store exact values in your application and supply them again when needed.
+
+Trim complete interactions together. In particular, do not retain a `tool` result after removing its assistant tool call, or leave a tool call without its result. Leave context space for both input and the expected output; the available window depends on the model.
+
+## Troubleshooting
+
+| Symptom | What to inspect |
+| --- | --- |
+| The second answer forgets the first turn | Check that this request includes the actual history in order |
+| An answer ends unexpectedly | Inspect `finish_reason`, output budget, and context length |
+| A parameter is rejected | Begin with the minimal request and add supported parameters individually |
+| Answers differ between requests | Generation varies; sampling support differs by model, so do not depend on exact wording |
+| Empty text with a successful HTTP response | Inspect tool calls, choices, and finish reasons |
+| Long conversations get slower or more expensive | Inspect input usage and remove irrelevant history or repeated material |
+
+Add [streaming](/en/guides/streaming) to show content earlier. For HTTP errors and network failures, see [troubleshooting](/en/help/errors).

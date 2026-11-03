@@ -49,3 +49,41 @@ For a direct terminal request, copy a generated cURL example and supply your own
 ## Troubleshoot a test
 
 Check for placeholder values, missing required fields, unsupported model options and invalid uploaded files. A successful model list does not prove a specific model supports every endpoint. Use [troubleshooting](/en/help/errors) for status codes and [API formats](/en/guides/protocols) for JSON versus multipart behavior.
+
+## Verify chat with minimal JSON
+
+Use this body in the JSON view of [Chat Completions](/en/api-reference/chat-completions). Replace `YOUR_MODEL_ID` with an actual chat-capable model available to your account. Keep the key in the authentication field, not the JSON body.
+
+```json Minimal chat request
+{
+  "model": "YOUR_MODEL_ID",
+  "messages": [{"role": "user", "content": "Explain the purpose of an API in one sentence."}]
+}
+```
+
+Check three things: the HTTP request succeeds, `choices` contains a reply, and its `finish_reason` is appropriate. Then add streaming, longer input or tool definitions, changing one factor at a time.
+
+## Move a working test into code
+
+| Playground configuration | Application equivalent |
+| --- | --- |
+| Bearer authentication | A server-side environment variable and Authorization header, or SDK `api_key` |
+| Full request URL | Full HTTP endpoint; SDK base URL `https://api.maxapi.ai/v1` |
+| Model ID in JSON | `MAXAPI_MODEL` or a task-specific model setting |
+| JSON form | An application object without the form's display labels |
+| Uploaded local file | File bytes available in the application's runtime environment |
+| Streamed response view | SDK stream iteration or SSE event parsing |
+
+After copying code, check for remaining placeholders, accidentally embedded keys and the intended model. Continue with [Python](/en/guides/python), [Node.js](/en/guides/nodejs) or the endpoint's result-saving examples.
+
+## Compare browser and application behavior
+
+| Observation | Check next |
+| --- | --- |
+| Playground succeeds, application fails | Final URL, environment variables, model, fields and uploaded file match |
+| Application succeeds, playground fails | Authentication input, required fields and the documentation proxy path; retain the actual error |
+| Streamed text appears in the panel but not the application | Incremental reading and intermediate buffering |
+| Usage continues after stopping | Stopping the reader does not prove upstream cancellation; check console records |
+| Audio or images do not display correctly | HTTP status and Content-Type; verify raw output with the endpoint's save-to-file example |
+
+The panel verifies request structure and output. Your application still implements concurrency, timeouts, retries, task recovery and business validation. Do not repeatedly generate new tasks to check asynchronous progress.

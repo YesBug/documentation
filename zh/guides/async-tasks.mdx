@@ -16,6 +16,21 @@ keywords: ["MaxAPI", "异步任务与回调", "async-tasks"]
 
 不要在每次刷新页面时重新提交生成请求。任务 ID 应与应用里的业务记录关联。
 
+## 应用需要保存什么
+
+至少保存以下信息，才能在刷新页面、服务重启或回调丢失后继续任务。这些是应用自己的记录字段，不是要提交给 MaxAPI 的 API 参数。
+
+| 应用记录 | 为什么要保存 |
+| --- | --- |
+| 业务记录 ID 与所属用户 | 找到任务来源，检查当前用户是否能查看结果 |
+| 协议、提交路径、模型 | 选择正确的查询路由与状态解析器 |
+| 任务 ID、clip ID 或 operation 名称 | 恢复查询；一次生成可能对应多个结果标识 |
+| 提交时间、最后查询时间、原始状态 | 展示真实进度，识别长时间未更新的任务 |
+| 最后一次响应与失败原因 | 排查格式差异；保存前移除密钥和不需要保留的敏感输入 |
+| 自有存储中的结果地址 | 避免把临时生成地址作为唯一产物记录 |
+
+向前端返回你自己的业务记录 ID。前端重复点击“查看结果”时读取同一个记录；只有明确的新生成操作才调用提交接口。
+
 ## 不同格式的任务标识
 
 | 接口族 | 提交结果中的标识 | 查询方式 |
@@ -42,35 +57,81 @@ keywords: ["MaxAPI", "异步任务与回调", "async-tasks"]
 
 这些是跨协议的示例，不是任何单一接口的完整枚举。对未知状态保留原始响应，在有限超时内继续观察或转为人工排查；不要将“不是失败”直接视为成功。
 
-## 使用有限轮询
+## 可运行示例：等待 Midjourney 任务
 
-下面是应用侧的通用轮询工具。将 `fetch_status` 和 `classify` 换成所用接口的查询与状态适配函数；时间间隔是客户端策略，不是平台限额。
+下面的脚本接收一个已提交的 Midjourney 任务 ID，查询到成功或失败后退出，并把最近一次响应保存在 `mj-task.json`。它不会创建新的绘图任务，可以在应用重启后使用原 ID 恢复查询。先按 [Midjourney 指南](/zh/media/midjourney) 提交任务并保存 `TASK_ID`。
 
-```python "polling.py"
-import random
-import time
-
-
-def wait_for_task(fetch_status, classify, timeout_seconds=600):
-    deadline = time.monotonic() + timeout_seconds
-    delay = 2.0
-    while time.monotonic() < deadline:
-        # fetch_status 内还应设置一次 HTTP 请求的连接/读取超时。
-        payload = fetch_status()
-        state = classify(payload)
-        if state == "succeeded":
-            return payload
-        if state == "failed":
-            raise RuntimeError("任务失败，请查看已脱敏的错误详情")
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            break
-        time.sleep(min(remaining, delay + random.uniform(0, 0.5)))
-        delay = min(delay * 1.5, 15.0)
-    raise TimeoutError("等待超时；保留任务 ID，稍后可继续查询")
+```bash 安装依赖
+python -m pip install requests
 ```
 
-网络失败和任务失败是两回事。查询请求短暂失败时，可按 [错误排查](/zh/help/errors) 进行有限重试；生成任务已经失败时，不应继续无期限轮询。
+```python wait_for_midjourney.py
+import json
+import os
+import sys
+import time
+from pathlib import Path
+from urllib.parse import quote
+
+import requests
+
+
+def wait_for_midjourney(task_id, timeout_seconds=600, interval_seconds=5):
+    url = f"https://api.maxapi.ai/mj/task/{quote(task_id, safe='')}/fetch"
+    headers = {"Authorization": f"Bearer {os.environ['MAXAPI_API_KEY']}"}
+    deadline = time.monotonic() + timeout_seconds
+    pending = {"NOT_START", "SUBMITTED", "IN_PROGRESS"}
+
+    while time.monotonic() < deadline:
+        response = requests.get(url, headers=headers, timeout=(10, 30))
+        response.raise_for_status()
+        task = response.json()
+        Path("mj-task.json").write_text(
+            json.dumps(task, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        status = task.get("status")
+        print(f"{task_id}: {status}, {task.get('progress', '')}", file=sys.stderr)
+        if status == "SUCCESS":
+            if not task.get("imageUrl"):
+                raise RuntimeError("Task succeeded but imageUrl is missing; inspect mj-task.json")
+            return task
+        if status == "FAILURE":
+            raise RuntimeError(task.get("failReason") or "Midjourney generation failed")
+        if status not in pending:
+            raise RuntimeError(f"Unrecognized task state: {status!r}; inspect mj-task.json")
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            time.sleep(min(interval_seconds, remaining))
+    raise TimeoutError(f"Still waiting for {task_id}; query the same ID again later")
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        raise SystemExit("Usage: python wait_for_midjourney.py TASK_ID")
+    wait_for_midjourney(sys.argv[1])
+    print("Task complete. Response saved to mj-task.json.")
+```
+
+```bash 等待已经提交的任务
+python wait_for_midjourney.py "$TASK_ID"
+```
+
+脚本中的 5 秒间隔和 600 秒等待期限是应用示例值，不是 MaxAPI 的频率限制或生成时长承诺。每次 HTTP 请求还有独立的连接和读取超时；正在进行的单次请求可能晚于轮询截止时间结束。
+
+| 运行结果 | 接下来怎么做 |
+| --- | --- |
+| 成功并写入 `mj-task.json` | 读取 `imageUrl`，按 [结果保存示例](/zh/media/midjourney) 下载图片 |
+| 任务 `FAILURE` | 查看 `failReason`；确认输入与错误原因后，再决定是否新建任务 |
+| 本地等待超时 | 保留任务 ID，稍后重新运行脚本查询同一任务 |
+| HTTP 错误或网络异常 | 本次脚本退出；先处理 [鉴权、限流或网络错误](/zh/help/errors)，然后继续查询原 ID |
+| 状态不在本协议的枚举中 | 检查保存的响应和所选查询路由，避免用其他协议的状态解析器 |
+
+### 接入后台任务队列
+
+页面关闭不应结束业务任务。将查询调度放到应用后端：每次执行只查询一次，把下一次查询时间写入任务记录，然后释放工作线程。对于大量任务，错开查询时间，避免所有任务在同一秒请求。
+
+查询失败和生成失败需要分别记录。短暂网络错误可以延迟重试查询；收到明确的生成失败后停止轮询。HTTP `429` 时优先遵循响应中提供的 `Retry-After`，并结合你自己的最大等待期限。任何查询重试都不应自动变成重新提交生成。
+
 
 ## 提交超时不代表没有创建任务
 
@@ -89,6 +150,12 @@ def wait_for_task(fetch_status, classify, timeout_seconds=600):
 - 保留查询方式作为补偿机制，处理回调丢失、乱序或服务短暂不可用。
 
 回调请求由服务端发起，`localhost` 或仅内网可访问的 URL 通常无法接收。
+
+### 回调与查询同时到达时
+
+以任务 ID 定位记录，并使用一次原子状态更新处理通知。任务已经确认成功并保存产物后，较早的“处理中”通知不应把它退回处理中。同一个完成通知重复到达时，复用已保存的产物，不重复下载或发放业务权益。
+
+如果通知称已完成而主动查询仍未完成，保留通知供排查，并继续按查询结果调度。不要把回调处理失败等同于生成失败，也不要因此自动再次提交生成。
 
 ## 结果地址与保留期限
 

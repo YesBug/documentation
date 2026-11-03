@@ -57,6 +57,55 @@ For editing, add a reference image part to the same message, using its real MIME
 
 The response can include text and images, or no image because of input or model restrictions. Inspect candidate content parts according to their actual types. Do not use the OpenAI Images `data[0].url` parser. This MaxAPI route uses Bearer authentication; keep provider-direct hosts and keys out of this request.
 
+### Build an edit request from a local image
+
+For a channel that enables image editing, encode the actual image into `inline_data.data`. This example reads a JPEG or PNG file whose extension matches its format. Building the request body alone makes no generation request.
+
+```python build_gemini_edit.py
+import base64
+import json
+import mimetypes
+import sys
+from pathlib import Path
+
+
+if len(sys.argv) != 2:
+    raise SystemExit("Usage: python build_gemini_edit.py IMAGE_FILE")
+image = Path(sys.argv[1])
+mime_type = mimetypes.guess_type(image.name)[0]
+if mime_type not in {"image/jpeg", "image/png"}:
+    raise ValueError("This example accepts a JPEG or PNG file with a matching extension")
+payload = {
+    "contents": [{
+        "role": "user",
+        "parts": [
+            {"text": "Keep the main subject unchanged and replace the background with a quiet garden."},
+            {"inline_data": {
+                "mime_type": mime_type,
+                "data": base64.b64encode(image.read_bytes()).decode("ascii"),
+            }},
+        ],
+    }],
+    "generationConfig": {"responseModalities": ["TEXT", "IMAGE"]},
+}
+Path("gemini-edit-request.json").write_text(json.dumps(payload), encoding="utf-8")
+print("Request body saved to gemini-edit-request.json")
+```
+
+```bash Build and send the editing request
+python build_gemini_edit.py ./reference.png
+: "${MAXAPI_GEMINI_IMAGE_MODEL:?Set an enabled image-editing model ID}"
+MODEL_ESCAPED="$(printf '%s' "$MAXAPI_GEMINI_IMAGE_MODEL" | jq -sRr @uri)"
+curl --fail-with-body \
+  "https://api.maxapi.ai/v1beta/models/$MODEL_ESCAPED:generateContent" \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @gemini-edit-request.json \
+  --output gemini-edit-response.json
+```
+
+Keep `gemini-edit-response.json` to inspect the actual output. The supplied material does not fully define this route's response schema. Do not display HTTP 200 as proof that an image exists: verify that a candidate contains image data, then decode using its returned MIME type. If no image is present, inspect text or error information and confirm model output support and input validity.
+
 ## Stable Diffusion 3 multipart and Accept
 
 SD3 uses `mode` to distinguish text-to-image and image-to-image. Supported models, dimensions and parameter combinations depend on the SD channel.
@@ -94,6 +143,28 @@ Check status and `Content-Type` before displaying the file; an error may still b
 
 SDXL's `/sd/v1/generation/{engine_id}/text-to-image` uses a different schema. Do not reuse SD3 multipart fields unchanged. See the [catalog](/en/api-reference/catalog) for branches.
 
+### Run SD3 image-to-image
+
+For a model supporting `image-to-image`, provide a file and a confirmed valid `strength`. Set `MAXAPI_SD_STRENGTH` to a value accepted by the channel; another model's strength range does not establish this route's constraints.
+
+```bash Upload a reference and save the result
+: "${MAXAPI_SD_MODEL:?Set an enabled SD3 model ID}"
+: "${MAXAPI_SD_STRENGTH:?Set a strength value accepted by this model}"
+curl --fail-with-body https://api.maxapi.ai/sd/v2beta/stable-image/generate/sd3 \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Accept: image/*" \
+  --form-string "model=$MAXAPI_SD_MODEL" \
+  --form-string "mode=image-to-image" \
+  --form-string "prompt=Keep the building layout and redraw the scene as a watercolor illustration" \
+  --form "image=@./reference.png" \
+  --form-string "strength=$MAXAPI_SD_STRENGTH" \
+  --form-string "output_format=png" \
+  --dump-header sd-edit.headers \
+  --output sd-edit.download
+```
+
+For parameter errors, verify that `image` contains uploaded bytes, `strength` is valid, and the model supports this mode. The `.download` filename lets you inspect the content before treating a possible JSON error as a PNG.
+
 ## Ideogram image_request wrapper
 
 Generation uses JSON `image_request`. Remix, upscale and describe operations can use multipart, so check encoding separately:
@@ -130,6 +201,27 @@ jq -n --arg model "$MAXAPI_IDEOGRAM_MODEL" '{
 
 Successful `data[]` items can include `url`, `prompt`, `resolution` and `is_image_safe`. Check for an actual URL per item; it may be absent. Persist required results rather than hard-coding a generated link's retention period.
 
+### Read and save an Ideogram image
+
+Keep the whole `data[]` result rather than just its first URL. Prompt, resolution and safety information help display and diagnose results. This example selects the first HTTPS image that is not explicitly marked unsafe:
+
+```bash Select and download an available image
+IMAGE_URL="$(jq -er '
+  [.data[]? |
+    select(.is_image_safe != false) |
+    select(.url | type == "string") |
+    select(.url | startswith("https://"))
+  ][0].url // empty
+' ideogram-images.json)"
+: "${IMAGE_URL:?No usable image; inspect data and error information}"
+curl --fail --location --proto '=https' --proto-redir '=https' \
+  --connect-timeout 10 --max-time 120 \
+  --dump-header ideogram-image.headers \
+  --output ideogram-image.download "$IMAGE_URL"
+```
+
+Inspect download `Content-Type` and choose the extension after confirming image content. Generation and downloading are separate requests. Only the generation request sends a Bearer key to MaxAPI; the image URL uses its own access mechanism.
+
 ## Asynchronous images through video task resources
 
 Some image channels reuse the compatible `/v1/videos` resource. The returned object can be an `image` even though the route is named videos.
@@ -143,3 +235,15 @@ Some image channels reuse the compatible `/v1/videos` resource. The returned obj
 The route also appears in video and character workflows. A shared export may retain only one branch's schema; do not treat character fields as image-generation inputs. Confirm the specific image branch rather than combining fields from different tasks.
 
 Save `id`, use that branch's state rules and retrieve content only after completion. The image example uses `in_progress`; do not apply unified video's uppercase `SUCCESS` to all tasks. Inspect `Content-Type` before reading image bytes. See [async tasks](/en/guides/async-tasks) for polling and storage.
+
+
+## Troubleshoot image output
+
+| Symptom | Action |
+| --- | --- |
+| SDK rejects fields or cannot parse output | Confirm whether a provider-specific format is being called through the OpenAI SDK; use HTTP where needed |
+| Gemini returns text but no image | Check image output support, `responseModalities` and the actual content parts |
+| SD3 result will not open | Inspect HTTP status and `Content-Type` before treating an error body as an image |
+| Ideogram has `data[]` but empty URLs | Inspect each item and its safety flag instead of blindly reading the first |
+| Reference image is rejected | Check MIME type, encoding, uploaded content and model input constraints |
+| A `/v1/videos` image task never finishes | Use that image branch's states and check task ID and content retrieval steps |

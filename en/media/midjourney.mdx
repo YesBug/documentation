@@ -91,6 +91,58 @@ curl --fail-with-body \
 
 Stop polling at success or failure. Preserve unknown states and set an overall deadline. See [asynchronous tasks](/en/guides/async-tasks).
 
+### Wait for completion and save the image
+
+The [asynchronous task guide](/en/guides/async-tasks) provides the complete `wait_for_midjourney.py` script. Save it and use the task ID you just received:
+
+```bash Wait for the same task
+python -m pip install requests
+python wait_for_midjourney.py "$TASK_ID"
+```
+
+On success, `mj-task.json` should contain `status: "SUCCESS"` and a nonempty `imageUrl`. This script verifies completion, downloads the image and chooses an extension from the actual MIME type. An interrupted download remains a `.part` file instead of appearing as a completed image.
+
+```python save_mj_image.py
+import json
+import mimetypes
+from pathlib import Path
+from urllib.parse import urlparse
+
+import requests
+
+
+task = json.loads(Path("mj-task.json").read_text(encoding="utf-8"))
+if task.get("status") != "SUCCESS":
+    raise RuntimeError("The Midjourney task has not succeeded")
+url = task.get("imageUrl", "")
+if urlparse(url).scheme != "https":
+    raise RuntimeError("Expected an HTTPS imageUrl in the completed task")
+
+# This download deliberately has no Authorization header.
+with requests.get(url, stream=True, timeout=(10, 60)) as response:
+    response.raise_for_status()
+    media_type = response.headers.get("Content-Type", "").split(";", 1)[0]
+    if not media_type.startswith("image/"):
+        raise RuntimeError(f"Expected image bytes, received {media_type!r}")
+    extension = mimetypes.guess_extension(media_type) or ".img"
+    output = Path("mj-image" + extension)
+    partial = output.with_suffix(output.suffix + ".part")
+    with partial.open("wb") as file:
+        for chunk in response.iter_content(chunk_size=64 * 1024):
+            if chunk:
+                file.write(chunk)
+    if partial.stat().st_size == 0:
+        raise RuntimeError("Downloaded image is empty")
+    partial.replace(output)
+print(f"Saved {output}")
+```
+
+```bash Download the completed image
+python save_mj_image.py
+```
+
+Use the image URL's own access mechanism. Do not forward the MaxAPI Bearer key to its host. If the URL expires, query the same task again and try its current result URL.
+
 ## Perform a follow-up action
 
 Upscale, variation and other actions refer to the original `taskId` and a specific `customId`. The action ID normally comes from returned button data such as `buttons[].customId`; do not invent it by concatenating a number.
@@ -117,6 +169,28 @@ jq -n --arg task "$TASK_ID" --arg action "$MAXAPI_MJ_ACTION_ID" '{
 ```
 
 The action returns its own submission result. Check its business code, save the new `result` and query the new task. Do not keep querying the original task for a new image. Actions requiring additional input may need a corresponding interaction endpoint.
+
+### Let users choose an available action
+
+Only show actions returned for the current completed task. List the identifiers, then set `MAXAPI_MJ_ACTION_ID` to the one the user selected:
+
+```bash List the current task's action IDs
+jq -r '.buttons[]?.customId // empty' mj-task.json
+```
+
+An empty list does not justify inventing `U1`, `V1` or another action ID. Keep the generated image and confirm whether this channel exposes interactive buttons. Store the relationship between original task ID, selected action ID and new task ID so users can navigate the result history.
+
+## Troubleshoot the workflow
+
+| Symptom | What to check |
+| --- | --- |
+| HTTP 200 with no task ID | Inspect submission `code` and `description`, not HTTP status alone |
+| The original image keeps appearing | Query the new `result` returned by the action instead of the original task |
+| Image succeeded but an action failed | Reload available buttons and ensure `taskId` and `customId` belong to the same task |
+| `SUCCESS` but downloading fails | Check `imageUrl`, download HTTP status and `Content-Type`; query the current URL again |
+| Refreshing creates duplicate tasks | Read the persisted record on page load instead of automatically calling `imagine` |
+| Query cannot find the task | Check ID, channel access and matching submission/query mode prefixes |
+
 
 ## Callbacks and execution modes
 

@@ -6,44 +6,105 @@ sidebarTitle: "Chat completions"
 openapi: "openapi/en.json POST /v1/chat/completions"
 ---
 
-Chat Completions generates the next reply from a message history. Use it for conversations, summaries, translation and code generation. Vision input and tool calling require support from your selected model and channel.
+Chat Completions generates the next reply from a message history for conversations, summaries, translation and code generation. This page shows how to send a request, check whether its answer is complete and carry the result into the next turn. Vision and tool calling require model support.
 
-## Start with a minimal request
+## Send a minimal request
 
-Begin with only `model` and `messages`, then add supported options. Avoid passing both output-length parameters together. A visible model does not necessarily support every field shown in the generated reference.
-
-Set `MAXAPI_API_KEY` and `MAXAPI_MODEL` as described in the [quickstart](/en/quickstart). This cURL example requires `jq`:
+Configure `MAXAPI_API_KEY` and a chat-capable `MAXAPI_MODEL` using the [quickstart](/en/quickstart). This command requires `jq` and saves the response to `chat-response.json` for the next example.
 
 ```bash Create a reply
 jq -n --arg model "$MAXAPI_MODEL" '{
   model: $model,
-  messages: [{role: "user", content: "Explain what an API is in three sentences."}],
-  stream: false
+  messages: [{role: "user", content: "Explain what an API is in three sentences, with an ecommerce example."}]
 }' | curl --fail-with-body https://api.maxapi.ai/v1/chat/completions \
   -H "Authorization: Bearer $MAXAPI_API_KEY" \
   -H "Content-Type: application/json" \
-  --data-binary @-
+  --data-binary @- \
+  --output chat-response.json
 ```
 
-For a multi-turn conversation, send the relevant earlier user and assistant messages again. A previous response `id` alone does not restore history. See [Python](/en/guides/python) or [Node.js](/en/guides/nodejs) for SDK examples.
+Process the result only after the command succeeds. A failed command can leave an error response in this file; follow [troubleshooting](/en/help/errors) first. For complete SDK integrations, see [Python](/en/guides/python) and [Node.js](/en/guides/nodejs).
 
-## Read the result
+## Read the answer and finish reason
 
-Generated text is in `choices[].message.content`; it can be empty when the assistant returns `tool_calls`. Your application executes those tools. Common finish reasons include `stop`, `length` and `tool_calls`.
+This illustrative response explains the structure. Its text and token counts are examples, not a real request or billing record.
 
-When present, `usage` describes returned token usage. Additional details vary by model; use the console for billing information.
+```json Non-streaming response example
+{
+  "id": "chatcmpl-example",
+  "object": "chat.completion",
+  "choices": [{
+    "index": 0,
+    "message": {"role": "assistant", "content": "An API lets software exchange data and use another system's functions."},
+    "finish_reason": "stop"
+  }],
+  "usage": {"prompt_tokens": 30, "completion_tokens": 20, "total_tokens": 50}
+}
+```
 
-## Streaming and multimodal requests
-
-Set `stream: true` to receive SSE text in `choices[].delta.content`. Tool arguments can arrive in fragments and need assembly before JSON parsing. Follow [streaming](/en/guides/streaming), [vision](/en/guides/vision) and [tool calling](/en/guides/tools) for complete examples.
-
-## Troubleshooting
-
-| Symptom | Action |
+| What to inspect | Application behavior |
 | --- | --- |
-| Unsupported parameter | Return to `model` and `messages`, then restore options individually |
-| Missing earlier context | Include relevant history in the current `messages` |
-| Empty content | Inspect tool calls, finish reason and other returned fields |
-| Truncated reply | Check `finish_reason` and a model-supported output limit or reduce context |
+| Answer text | Read `choices[].message.content`; it can be `null` with tool calls |
+| `finish_reason: "stop"` | Generation ended normally; display the returned text |
+| `finish_reason: "length"` | Output reached a limit; check supported output parameters and context before treating it as complete |
+| `finish_reason: "tool_calls"` | Validate the requested tools and continue the application workflow |
+| `usage` | Retain the fields actually returned; consult console records for billing |
+| An unfamiliar finish reason | Preserve its value and record the response rather than assuming normal completion |
 
-See [troubleshooting](/en/help/errors) for authentication, rate and upstream errors.
+```python Read chat-response.json
+import json
+from pathlib import Path
+
+result = json.loads(Path("chat-response.json").read_text(encoding="utf-8"))
+choices = result.get("choices", [])
+if not choices:
+    raise ValueError("No candidate reply; inspect the original response")
+
+choice = choices[0]
+message = choice.get("message", {})
+if message.get("content"):
+    print(message["content"])
+if message.get("tool_calls"):
+    print("Tools requested:", [call["function"]["name"] for call in message["tool_calls"]])
+print("Finish reason:", choice.get("finish_reason"))
+print("Usage:", result.get("usage", {}))
+```
+
+HTTP 200 and nonempty text do not establish application success. For example, JSON or code stopped by `length` may still be incomplete.
+
+## Continue a conversation
+
+Each request must include the history it needs. This is the `messages` portion of a second request; replace the assistant content with the actual previous answer.
+
+```json Example second-turn messages
+[
+  {"role": "user", "content": "Explain what an API is in three sentences, with an ecommerce example."},
+  {"role": "assistant", "content": "An API lets software exchange data and use another system's functions."},
+  {"role": "user", "content": "Rewrite that explanation for a primary-school student."}
+]
+```
+
+Message order matters. The previous response `id` identifies a response and cannot substitute for history. Trim or summarize long conversations in your application while retaining facts needed for the current question.
+
+If an assistant message contains `tool_calls`, preserve the full structure and associate each tool result with its `tool_call_id`. Do not flatten a tool request into ordinary text. Follow [tool calling](/en/guides/tools) for the complete loop.
+
+## Add options incrementally
+
+Verify `model` and `messages` first, then add one option at a time to identify compatibility failures.
+
+- Use either `max_tokens` or `max_completion_tokens` as required by the model, never both together.
+- Usually adjust either `temperature` or `top_p`; supported ranges depend on the model.
+- For image understanding, use an array of text and `image_url` content parts. See [vision](/en/guides/vision).
+- With `stream: true`, parse SSE text in `choices[].delta.content` instead of complete `message.content`. Tool arguments can also arrive in fragments. See [streaming](/en/guides/streaming).
+
+## Diagnose symptoms
+
+| Symptom | Check in order |
+| --- | --- |
+| Model listing works but chat fails | Chat endpoint capability, channel access, then the minimal request |
+| Empty `content` | `tool_calls`, `finish_reason`, then other information in the original response |
+| Missing earlier context | Actual history in this request's `messages`, then message order |
+| Truncated answer | Finish reason, output limit, then input context size |
+| JSON parsing fails during streaming | Whether SSE was treated as one JSON document, event framing, then termination handling |
+
+See [troubleshooting](/en/help/errors) for authentication, throttling, timeout and upstream errors.

@@ -1,87 +1,141 @@
 ---
 title: "流式响应"
-description: "在支持的模型中逐段接收内容，为对话应用提供更及时的反馈。"
-keywords: ["MaxAPI", "流式响应", "streaming"]
+description: "使用 Python、Node.js 或 cURL 接收 MaxAPI SSE 流，拼接增量文本，识别正常结束、输出截断、用户取消与网络中断。"
+keywords: ["MaxAPI", "streaming", "SSE", "流式响应", "delta", "取消生成"]
 ---
 
-流式响应会在生成过程中持续返回数据，适合聊天界面和较长文本的生成。在支持流式输出的模型上，将请求中的 `stream` 设置为 `true` 即可启用。
+流式响应让应用在生成结束前逐段展示文字。对支持流式输出的模型设置 `stream: true`，然后按顺序读取增量内容。一个可靠的界面还需要区分“正在生成”“已完成”和“中断后仅保留了部分内容”。
 
-## Python 示例
+## 开始前
 
-准备好 `MAXAPI_API_KEY` 和 `MAXAPI_MODEL` 环境变量后运行：
+先用同一个模型完成一次[普通文本请求](/zh/quickstart)，再启用流式输出。安装 [Python SDK](/zh/guides/python) 或 [Node.js SDK](/zh/guides/nodejs)，并设置 `MAXAPI_API_KEY`、`MAXAPI_MODEL`。
 
-```python "stream.py"
+| 普通请求 | 流式请求 |
+| --- | --- |
+| 等待后读取完整 JSON | 持续接收 `text/event-stream` 事件 |
+| 文本在 `choices[0].message.content` | 文本片段在 `choices[0].delta.content` |
+| 读取一次 `finish_reason` | 从数据块中记录非空的 `finish_reason` |
+| 失败时通常没有完整回答 | 中途失败前可能已显示部分文字 |
+
+## Python：输出文本并检测中断
+
+保存为 `stream.py`。程序保留接收的片段，只有观察到正常结束原因时才报告完成；在异常或用户按 Ctrl+C 后关闭流。
+
+```python stream.py
 import os
+import sys
+import openai
 from openai import OpenAI
 
-client = OpenAI(
-    api_key=os.environ["MAXAPI_API_KEY"],
-    base_url="https://api.maxapi.ai/v1",
-)
-
-stream = client.chat.completions.create(
-    model=os.environ["MAXAPI_MODEL"],
-    messages=[{"role": "user", "content": "写一段关于探索的短文。"}],
-    stream=True,
-)
+parts = []
+finish_reason = None
+stream = None
 
 try:
-    for chunk in stream:
-        if not chunk.choices:
-            continue
-        text = chunk.choices[0].delta.content
-        if text:
-            print(text, end="", flush=True)
-finally:
-    stream.close()
+    with OpenAI(
+        api_key=os.environ["MAXAPI_API_KEY"],
+        base_url="https://api.maxapi.ai/v1",
+        timeout=60.0,
+        max_retries=0,
+    ) as client:
+        stream = client.chat.completions.create(
+            model=os.environ["MAXAPI_MODEL"],
+            messages=[{"role": "user", "content": "为团队笔记应用写一份简短的上手指南。"}],
+            stream=True,
+        )
+        try:
+            for chunk in stream:
+                if not chunk.choices:
+                    continue
+                choice = chunk.choices[0]
+                if choice.delta.content:
+                    parts.append(choice.delta.content)
+                    print(choice.delta.content, end="", flush=True)
+                if choice.finish_reason:
+                    finish_reason = choice.finish_reason
+        finally:
+            stream.close()
+    if finish_reason != "stop":
+        raise RuntimeError(f"未确认完整回答，结束原因：{finish_reason}")
+    print("\n生成完成。", file=sys.stderr)
+except KeyboardInterrupt:
+    print("\n已取消，当前显示的是部分内容。", file=sys.stderr)
+except (openai.OpenAIError, RuntimeError) as error:
+    print(f"\n流未完成：{type(error).__name__}，结束原因：{finish_reason}", file=sys.stderr)
+    sys.exit(1)
 
-print()
+text_received = "".join(parts)
 ```
 
-## Node.js 示例
+```bash
+python stream.py
+```
 
-```javascript "stream.mjs"
+正常时会逐段打印文本，最后在标准错误中显示“生成完成”。`text_received` 是收到的全部文字；若接入数据库，应结合最终状态决定它是正式回答还是未完成草稿。
+
+## Node.js：支持主动取消
+
+保存为 `stream.mjs`。按 Ctrl+C 会中断本地请求，不会把已显示的片段当成完整回答。
+
+```javascript stream.mjs
 import OpenAI from "openai";
 
 const apiKey = process.env.MAXAPI_API_KEY;
 const model = process.env.MAXAPI_MODEL;
-if (!apiKey || !model) {
-  throw new Error("请设置 MAXAPI_API_KEY 和 MAXAPI_MODEL。");
-}
-
+if (!apiKey || !model) throw new Error("请设置 MAXAPI_API_KEY 和 MAXAPI_MODEL。");
 const client = new OpenAI({
-  apiKey,
-  baseURL: "https://api.maxapi.ai/v1",
+  apiKey, baseURL: "https://api.maxapi.ai/v1", timeout: 60_000, maxRetries: 0,
 });
+const controller = new AbortController();
+const cancel = () => controller.abort();
+process.once("SIGINT", cancel);
+const parts = [];
+let finishReason = null;
 
-const stream = await client.chat.completions.create({
-  model,
-  messages: [{ role: "user", content: "写一段关于探索的短文。" }],
-  stream: true,
-});
+try {
+  const stream = await client.chat.completions.create({
+    model,
+    messages: [{ role: "user", content: "为团队笔记应用写一份简短的上手指南。" }],
+    stream: true,
+  }, { signal: controller.signal });
 
-for await (const chunk of stream) {
-  const text = chunk.choices[0]?.delta.content;
-  if (text) process.stdout.write(text);
+  for await (const chunk of stream) {
+    const choice = chunk.choices[0];
+    if (choice?.delta.content) {
+      parts.push(choice.delta.content);
+      process.stdout.write(choice.delta.content);
+    }
+    if (choice?.finish_reason) finishReason = choice.finish_reason;
+  }
+  if (controller.signal.aborted || finishReason !== "stop") {
+    throw new Error("未确认完整回答。");
+  }
+  console.error("\n生成完成。");
+} catch (error) {
+  console.error("\n", controller.signal.aborted ? "已取消，内容不完整。" : "流未完成。",
+    "结束原因：", finishReason);
+  process.exitCode = 1;
+} finally {
+  controller.abort();
+  process.off("SIGINT", cancel);
 }
-
-process.stdout.write("\n");
+const textReceived = parts.join("");
 ```
 
-## 理解增量内容
+```bash
+node stream.mjs
+```
 
-非流式文本通常读取 `choices[0].message.content`；流式文本则读取每个数据块中的 `choices[0].delta.content`，并按顺序拼接。
+示例中的 60 秒是客户端超时配置，不是整个服务的生成时限。取消会关闭客户端等待，不能据此认定服务端没有处理或不会计费。
 
-并非每个数据块都包含文本。有的数据块只携带角色、结束状态或其他元信息，所以示例会跳过空的 `choices` 和没有文本的增量。
+## 用 cURL 观察原始事件
 
-## 使用原始 HTTP
+`curl -N` 禁用 curl 输出缓冲，`jq` 负责安全构造请求 JSON。
 
-OpenAI 兼容的流式接口使用 Server-Sent Events（SSE）传输数据。使用 `curl -N` 可以关闭 curl 的输出缓冲，便于在终端观察数据逐步到达。
-
-```bash "cURL · 需要 jq"
+```bash cURL · 需要 jq
 jq -n --arg model "$MAXAPI_MODEL" '{
   model: $model,
-  messages: [{role: "user", content: "写一段关于探索的短文。"}],
+  messages: [{role: "user", content: "用三句话解释什么是 API。"}],
   stream: true
 }' | curl -N --fail-with-body https://api.maxapi.ai/v1/chat/completions \
   -H "Authorization: Bearer $MAXAPI_API_KEY" \
@@ -89,13 +143,43 @@ jq -n --arg model "$MAXAPI_MODEL" '{
   --data-binary @-
 ```
 
-自行实现 SSE 客户端时，应按事件边界解析数据。网络读取的一次分块不一定对应一个完整 JSON，也不一定对应一个完整字符。使用 SDK 可以减少这部分处理工作。
+下面是简化的 SSE 事件示意，省略了其他元信息；它不是一次实际调用的记录：
 
-## 接入界面时的建议
+```text
+data: {"choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}
 
-- 在收到第一段内容前显示加载状态，收到内容后按顺序追加文本。
-- 将完成、用户取消和网络中断作为不同状态处理，避免把中断的文本标记为完整回答。
-- 用户离开页面或取消生成时，关闭对应连接。
-- 检查服务端、反向代理和托管平台的响应缓冲及连接超时配置。
+data: {"choices":[{"index":0,"delta":{"content":"API "},"finish_reason":null}]}
 
-流式传输改善的是内容展示时机。模型能力、输出限制和计费应以当前模型及控制台说明为准。
+data: {"choices":[{"index":0,"delta":{"content":"是一种接口。"},"finish_reason":null}]}
+
+data: {"choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+data: [DONE]
+```
+
+事件实际以 `data:` 开头，事件之间用空行分隔。`[DONE]` 是结束标记，不是需要 JSON 解析的对象。SDK 会处理 SSE 封装，你读取的是解析后的数据块。
+
+<Note>
+一次网络读取不等于一个 SSE 事件：一个事件可能拆成多段读取，多个事件也可能合并到一段。自行解析时先进行增量 UTF-8 解码，再按事件边界拆分，不能直接对每个网络分块执行 `JSON.parse`。
+</Note>
+
+## 处理非文本数据块
+
+- 有些数据块只携带角色、结束原因或其他信息，`delta.content` 为空是正常的。
+- `choices` 可能为空，读取前先检查；不要假设每个块都具有候选文本。
+- 不要依赖固定分块大小，也不要假设每块恰好是一个 token 或一个完整单词。
+- `usage` 是否出现及其字段取决于接口与模型。没有返回时不要把它当作零用量。
+- 工具参数可能以 `delta.tool_calls` 片段返回。按候选和调用索引分别累积名称、ID 与参数，等该调用结束后再解析 JSON 和执行工具。完整流程见[工具调用](/zh/guides/tools)。
+
+## 界面状态与故障处理
+
+| 情况 | 应用行为 |
+| --- | --- |
+| 还未收到文本 | 展示等待状态；不要把空的角色块当成空回答 |
+| 持续收到文本 | 按顺序追加，保留当前输出 |
+| 结束原因为 `stop` | 标记生成完成 |
+| 结束原因为 `length` | 标记输出可能被截断，提供明确的重新生成或继续操作 |
+| 用户取消 | 关闭连接并标记取消，保留片段供用户查看 |
+| 网络断开或没有结束原因 | 标记未完成，不要悄悄当成成功保存 |
+
+如果 cURL 能逐段收到内容，但你的网页一次性显示全部结果，检查应用是否先聚合完整响应，以及中间代理是否缓冲输出。断流后直接重试会产生一次新的生成；不要把新回答追加到旧回答后伪装成续传。

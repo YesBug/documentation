@@ -1,97 +1,174 @@
 ---
-title: "Understand images with a vision model"
-description: "Send image URLs or Base64 data URLs with chat messages, compare multiple images, and diagnose image access, encoding and model capability issues."
-keywords: ["MaxAPI", "Understand images with a vision model", "API documentation"]
+title: "Vision and image input"
 sidebarTitle: "Vision"
+description: "Analyze image URLs or local files with MaxAPI, build multimodal messages, run Python and Node.js examples, and troubleshoot image download and encoding errors."
+keywords: ["MaxAPI", "vision", "image input", "Base64", "multimodal", "image_url"]
 ---
 
-A vision-capable MaxAPI model can receive text and images through [Chat Completions](/en/api-reference/chat-completions) to describe images, inspect screenshots or recognize text. Confirm that your model and account channel support image input first.
+Vision models receive images through Chat Completions for image descriptions, screenshot analysis, and text extraction. This page demonstrates direct image links and local files. Results are still conversation text; use the [image generation endpoint](/en/api-reference/images) to create images.
 
-## Build an image message
+## Choose an image input method
 
-Replace the user message's string `content` with an array. Add separate text and image items:
+Set `MAXAPI_MODEL` to an accessible model that supports image input. A model ID appearing in the model list does not establish vision support.
 
-| Field | Type | Requirement | Meaning |
-| --- | --- | --- | --- |
-| `model` | `string` | Required | A vision-capable model ID |
-| `messages` | `array` | Required | Conversation messages |
-| `messages[].role` | `string` | Required | Use `user` in these examples |
-| `messages[].content` | `array` | Required | Text and image items |
-| Text item `type` | `string` | Required | `text` |
-| Text item `text` | `string` | Required | Your question about the image |
-| Image item `type` | `string` | Required | `image_url` |
-| Image item `image_url.url` | `string` | Required | An accessible image URL or complete Base64 data URL |
-| Image item `image_url.detail` | `string` | Optional | Model-supported detail level, such as `auto`, `low` or `high` |
+| Method | When to use it | Preparation |
+| --- | --- | --- |
+| Direct HTTPS image URL | The image is already hosted in accessible storage | Ensure the server can read it without signing in and the link stays valid during processing |
+| Base64 data URL | The image is local or should not have a separate public link | Read its bytes and encode them with the matching MIME type in the request |
 
-Image count, size, format and detail support depend on the model. `image_url` is an object containing `url`, not a plain string. Pasting an image URL into ordinary text does not create an image content item.
+A direct URL reduces image data in the request body but requires a server download. Base64 increases the body size. Supported formats, counts, dimensions, file sizes, and detail levels depend on the model; do not apply one numeric limit to every model.
 
-## Use an image URL
+## Build the image message
 
-Set `MAXAPI_API_KEY`, a vision model in `MAXAPI_MODEL`, and a direct image URL in `MAXAPI_IMAGE_URL`. This example requires `jq`:
+Change the user message's `content` from a string to an array. Give text and each image their own item:
 
-```bash Send an image URL
-jq -n \
-  --arg model "$MAXAPI_MODEL" \
-  --arg image "$MAXAPI_IMAGE_URL" '{
-    model: $model,
-    messages: [{
-      role: "user",
-      content: [
-        {type: "text", text: "Describe this image and list any readable text."},
-        {type: "image_url", image_url: {url: $image}}
-      ]
-    }]
-  }' | curl --fail-with-body https://api.maxapi.ai/v1/chat/completions \
+```json Message structure illustration
+{
+  "role": "user",
+  "content": [
+    {"type": "text", "text": "Describe the main functions in this screenshot and list readable button labels."},
+    {"type": "image_url", "image_url": {"url": "YOUR_IMAGE_URL_OR_DATA_URL"}}
+  ]
+}
+```
+
+`image_url` is an object containing `url`, not a string. Mentioning an image URL in plain text does not replace an image content part. Some models accept `auto`, `low`, or `high` for `image_url.detail`; confirm support before adding it. You can omit it for the first test.
+
+## Send a direct image URL
+
+Set `MAXAPI_API_KEY`, `MAXAPI_MODEL`, and a direct HTTPS image link in `MAXAPI_IMAGE_URL`. This command requires `jq`.
+
+```bash URL image request
+export MAXAPI_IMAGE_URL="YOUR_ACCESSIBLE_HTTPS_IMAGE_URL"
+
+jq -n --arg model "$MAXAPI_MODEL" --arg image "$MAXAPI_IMAGE_URL" '{
+  model: $model,
+  messages: [{
+    role: "user",
+    content: [
+      {type: "text", text: "Describe the main functions in this screenshot and list readable button labels."},
+      {type: "image_url", image_url: {url: $image}}
+    ]
+  }]
+}' | curl --fail-with-body https://api.maxapi.ai/v1/chat/completions \
   -H "Authorization: Bearer $MAXAPI_API_KEY" \
   -H "Content-Type: application/json" \
   --data-binary @-
 ```
 
-The generation service must be able to fetch the image directly. Album pages, login-protected sharing links, `localhost` and local file paths are not direct image URLs.
+Read the analysis from `choices[0].message.content`. Check that it describes the actual image before making the task more complex. Gallery pages, sign-in-protected sharing links, browser `blob:` URLs, `localhost`, and local paths are not substitutes for a server-accessible image link.
 
-## Use a local image
+## Send a local PNG or JPEG
 
-Encode a local image as `data:MIME_TYPE;base64,ENCODED_DATA`. This example reads a real PNG named `image.png`; change the MIME type if you use another image format.
+Install the [Python SDK](/en/guides/python) or [Node.js SDK](/en/guides/nodejs) and place an image in the current directory. The programs take a file path as an argument and demonstrate PNG and JPEG only. Add other formats with their matching MIME types after confirming model support.
 
-```python Read a local PNG
+<CodeGroup>
+```python vision.py
 import base64
 import os
+import sys
 from pathlib import Path
 from openai import OpenAI
 
-client = OpenAI(
+if len(sys.argv) != 2:
+    raise SystemExit("Usage: python vision.py image.png")
+path = Path(sys.argv[1])
+mime = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}.get(path.suffix.lower())
+if not mime:
+    raise SystemExit("This example accepts PNG or JPEG files only.")
+raw = path.read_bytes()
+if not raw:
+    raise SystemExit("The image file is empty.")
+encoded = base64.b64encode(raw).decode("ascii")
+
+with OpenAI(
     api_key=os.environ["MAXAPI_API_KEY"],
     base_url="https://api.maxapi.ai/v1",
-)
-encoded = base64.b64encode(Path("image.png").read_bytes()).decode("ascii")
-response = client.chat.completions.create(
-    model=os.environ["MAXAPI_MODEL"],
-    messages=[{
-        "role": "user",
-        "content": [
-            {"type": "text", "text": "Which action buttons are visible in this screenshot?"},
-            {"type": "image_url", "image_url": {
-                "url": f"data:image/png;base64,{encoded}"
-            }},
-        ],
-    }],
-)
-print(response.choices[0].message.content)
+    timeout=60.0,
+    max_retries=0,
+) as client:
+    response = client.chat.completions.create(
+        model=os.environ["MAXAPI_MODEL"],
+        messages=[{
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "List clearly readable text in this image. Mark unclear sections as unreadable."},
+                {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{encoded}"}},
+            ],
+        }],
+    )
+    if not response.choices:
+        raise RuntimeError("The response contains no choices.")
+    print(response.choices[0].message.content or "")
+    print("finish_reason:", response.choices[0].finish_reason, file=sys.stderr)
 ```
 
-Install `openai` before running it. The text response uses the same `choices[].message.content` field as a text chat.
+```javascript vision.mjs
+import { readFile } from "node:fs/promises";
+import { extname } from "node:path";
+import OpenAI from "openai";
+
+const path = process.argv[2];
+if (!path) throw new Error("Usage: node vision.mjs image.png");
+const mime = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg" }[extname(path).toLowerCase()];
+if (!mime) throw new Error("This example accepts PNG or JPEG files only.");
+const raw = await readFile(path);
+if (!raw.length) throw new Error("The image file is empty.");
+const apiKey = process.env.MAXAPI_API_KEY;
+const model = process.env.MAXAPI_MODEL;
+if (!apiKey || !model) throw new Error("Set MAXAPI_API_KEY and MAXAPI_MODEL.");
+const client = new OpenAI({
+  apiKey, baseURL: "https://api.maxapi.ai/v1", timeout: 60_000, maxRetries: 0,
+});
+const response = await client.chat.completions.create({
+  model,
+  messages: [{
+    role: "user",
+    content: [
+      { type: "text", text: "List clearly readable text in this image. Mark unclear sections as unreadable." },
+      { type: "image_url", image_url: { url: `data:${mime};base64,${raw.toString("base64")}` } },
+    ],
+  }],
+});
+const choice = response.choices[0];
+if (!choice) throw new Error("The response contains no choices.");
+console.log(choice.message.content ?? "");
+console.error("finish_reason:", choice.finish_reason);
+```
+</CodeGroup>
+
+<CodeGroup>
+```bash Run Python
+python vision.py image.png
+```
+
+```bash Run Node.js
+node vision.mjs image.png
+```
+</CodeGroup>
+
+The example chooses a MIME type from the extension but does not validate the actual file format. Renaming an extension does not convert an image; save it in the correct format first. A data URL needs `data:`, the MIME type, `;base64,`, and the complete encoded data.
 
 ## Compare multiple images
 
-If the model supports multiple images, append additional `image_url` items to the same `content` array. Explain which image is first or second in your question. Start with a small set: image count and resolution affect request size, processing time and usage.
+If the model supports multiple images, add more image items to the same `content` array and label their relationships. For example, include “First image: before changes,” the first image, “Second image: after changes,” the second image, and then ask to list only changed buttons and layout.
 
-## Troubleshoot image input
+Validate one image before increasing the count. Avoid resending every historical image on every turn; retain what the current analysis needs. More or larger images affect request size, processing time, and usage.
 
-| Symptom | Check |
+## Make results useful
+
+Ask for a concrete task, such as “List readable invoice items and amounts in a table,” rather than only “What is in the image?” For small text or dense tables, crop the relevant area and keep text clear. Verify important numbers in application code or with a person; vision output is not a guarantee of accurate OCR.
+
+## Troubleshooting
+
+| Symptom | Check in this order |
 | --- | --- |
-| The model cannot see the image | Vision support, content array and `image_url` object structure |
-| Image download fails | Direct-link access, expiration and actual image content; try Base64 if appropriate |
-| Invalid Base64 image | MIME type, `base64,` prefix and complete encoded data |
-| Small text is recognized poorly | Crop the relevant area, improve clarity and use a supported detail level |
+| The model says it cannot see an image | Confirm vision support, then inspect the `content` array and `image_url` object |
+| Image download fails | Check direct-link access, expiry, redirects, and whether the response is actually an image |
+| Local file not found | Run from the file's directory or pass its full path |
+| Invalid Base64 | Check the actual format against MIME type and verify the prefix and complete data |
+| Request too large or slow | Reduce image count, crop, or resize, then check model limits |
+| Small text or numbers are misread | Improve clarity, narrow the area, and ask the model to mark unreadable content |
+| `detail` is rejected | Remove the field, then check model support and accepted values |
 
-To generate or modify an image, use [image generation](/en/api-reference/images) or [image editing](/en/api-reference/images-edits). See [troubleshooting](/en/help/errors) for HTTP failures.
+Finish reasons and conversation context follow [text generation](/en/guides/text-generation). For HTTP errors, see [troubleshooting](/en/help/errors).

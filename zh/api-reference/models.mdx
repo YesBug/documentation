@@ -9,6 +9,39 @@ openapi: "openapi/zh.json GET /v1/models"
 
 该接口使用 Bearer 鉴权，无需请求体。可以先在本页的 **Try it** 调试面板验证密钥与网络，再尝试生成请求。
 
+## 查询并保存模型列表
+
+先按 [身份验证](/zh/authentication) 设置 `MAXAPI_API_KEY`，再执行下面的请求。该操作不需要 `Content-Type` 或 JSON 请求体。
+
+```bash 查询模型
+curl --fail-with-body https://api.maxapi.ai/v1/models \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  --output models.json
+```
+
+命令成功后，打印模型 ID；不要将固定的示例名称当作当前账户一定可用的模型。
+
+```python 读取模型 ID
+import json
+from pathlib import Path
+
+result = json.loads(Path("models.json").read_text(encoding="utf-8"))
+models = result.get("data")
+if not isinstance(models, list):
+    raise ValueError("没有模型数组，请检查原始响应")
+for model in models:
+    print(model["id"])
+```
+
+响应结构示意如下，`YOUR_MODEL_ID` 是占位符，需替换为实际返回的 ID。
+
+```json 模型列表结构
+{
+  "object": "list",
+  "data": [{"id": "YOUR_MODEL_ID", "object": "model"}]
+}
+```
+
 ## 使用模型 ID
 
 将选定的文本对话模型 ID 传入 [创建对话](/zh/api-reference/chat-completions) 接口。模型出现在列表中，不等于它支持所有输入类型或所有可选参数。
@@ -16,3 +49,24 @@ openapi: "openapi/zh.json GET /v1/models"
 如果无法查询列表，先根据 [身份验证](/zh/authentication) 检查密钥。要了解如何评估模型，继续阅读 [模型与能力](/zh/models)。
 
 响应可能包含其他元信息，应用应允许出现额外字段。账户权限和模型状态可能变化，实际结果以当前请求为准。
+
+## 把模型列表用于应用配置
+
+模型列表适合检查密钥可见范围，以及构建由你审核过的模型选择菜单。不要自动把列表中每个模型都接入同一种端点。
+
+| 列表能帮助确认 | 仍需单独确认 |
+| --- | --- |
+| 当前密钥返回了哪些模型 ID | 模型支持聊天、图像、音频还是其他协议 |
+| 调用时准确的 `model` 字符串 | 图片输入、工具调用、输出格式与参数支持 |
+| 此次查询的模型元信息 | 上下文、价格、额度、实时通道状态 |
+
+在应用中显式配置已验证的模型及用途。刷新列表后，若已有模型消失，先显示清晰错误并核实权限，不要无声地换成另一个模型，避免改变输出或用量预期。
+
+## 排查查询结果
+
+- `401`：检查密钥是否存在、是否多写了 `Bearer`、是否已经失效。
+- `404`：确认访问 `https://api.maxapi.ai/v1/models`，不要访问控制台域名或重复 `/v1`。
+- `data` 为空：保留原始响应，核对当前密钥和账户配置；不要擅自补入其他平台的模型 ID。
+- 查询成功而生成失败：继续检查生成端点的模型能力和参数，模型列表并不是生成请求的健康检查。
+
+更多步骤见 [错误排查](/zh/help/errors)。

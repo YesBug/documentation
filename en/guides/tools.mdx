@@ -34,7 +34,7 @@ Tool calling lets a model propose a function name and arguments for your applica
 
 This example uses a local dictionary as demonstration delivery data. Install `openai`, set `MAXAPI_API_KEY`, and choose a tool-capable model in `MAXAPI_MODEL`.
 
-```python Tool calling loop
+```python tools.py
 import json
 import os
 from openai import OpenAI
@@ -42,6 +42,8 @@ from openai import OpenAI
 client = OpenAI(
     api_key=os.environ["MAXAPI_API_KEY"],
     base_url="https://api.maxapi.ai/v1",
+    timeout=60.0,
+    max_retries=0,
 )
 tools = [{
     "type": "function",
@@ -79,8 +81,13 @@ for _ in range(4):
         tools=tools,
         tool_choice="auto",
     )
-    reply = response.choices[0].message
+    if not response.choices:
+        raise RuntimeError("The response contains no choices.")
+    choice = response.choices[0]
+    reply = choice.message
     if not reply.tool_calls:
+        if choice.finish_reason != "stop" or not reply.content:
+            raise RuntimeError("A complete answer was not returned.")
         print(reply.content)
         break
     messages.append(reply.model_dump(exclude_none=True))
@@ -94,7 +101,80 @@ else:
     raise RuntimeError("Tool calling turn limit reached")
 ```
 
+Save the file as `tools.py` and run `python tools.py`. If the model calls the demonstration tool, the application returns `{"days": 2, "source": "demo"}`, then the model uses that result in its answer. `source: "demo"` identifies local example data, not live shipping information. Four turns and 60 seconds are application settings for this example.
+
 With `auto`, the model may answer without a tool call. Check `tool_calls` every turn. If your business flow requires a tool, use an appropriate `tool_choice` policy only when the model explicitly supports it.
+
+## Run the Node.js example
+
+Install `openai`, set the same environment variables, save this as `tools.mjs`, then run `node tools.mjs`. This example also reads only local demonstration data.
+
+```javascript tools.mjs
+import OpenAI from "openai";
+
+const apiKey = process.env.MAXAPI_API_KEY;
+const model = process.env.MAXAPI_MODEL;
+if (!apiKey || !model) throw new Error("Set MAXAPI_API_KEY and MAXAPI_MODEL.");
+const client = new OpenAI({
+  apiKey, baseURL: "https://api.maxapi.ai/v1", timeout: 60_000, maxRetries: 0,
+});
+const tools = [{
+  type: "function",
+  function: {
+    name: "get_delivery_days",
+    description: "Look up demonstration delivery days for the east or west region.",
+    parameters: {
+      type: "object",
+      properties: { region: { type: "string", enum: ["east", "west"] } },
+      required: ["region"],
+      additionalProperties: false,
+    },
+  },
+}];
+
+function runTool(call) {
+  if (call.type !== "function" || call.function.name !== "get_delivery_days") {
+    return { error: "unknown_tool" };
+  }
+  let args;
+  try { args = JSON.parse(call.function.arguments); }
+  catch { return { error: "invalid_json" }; }
+  if (!args || Array.isArray(args) || typeof args !== "object" ||
+      Object.keys(args).length !== 1 || !Object.hasOwn(args, "region")) {
+    return { error: "invalid_arguments" };
+  }
+  if (args.region !== "east" && args.region !== "west") {
+    return { error: "invalid_region" };
+  }
+  return { days: { east: 2, west: 4 }[args.region], source: "demo" };
+}
+
+const messages = [{ role: "user", content: "Use the demo data to check delivery days for the east region." }];
+let completed = false;
+for (let turn = 0; turn < 4; turn++) {
+  const response = await client.chat.completions.create({
+    model, messages, tools, tool_choice: "auto",
+  });
+  const choice = response.choices[0];
+  if (!choice) throw new Error("The response contains no choices.");
+  const reply = choice.message;
+  if (!reply.tool_calls?.length) {
+    if (choice.finish_reason !== "stop" || !reply.content) {
+      throw new Error("A complete answer was not returned.");
+    }
+    console.log(reply.content);
+    completed = true;
+    break;
+  }
+  messages.push({ role: "assistant", content: reply.content, tool_calls: reply.tool_calls });
+  for (const call of reply.tool_calls) {
+    messages.push({
+      role: "tool", tool_call_id: call.id, content: JSON.stringify(runTool(call)),
+    });
+  }
+}
+if (!completed) throw new Error("Tool calling turn limit reached.");
+```
 
 ## Correlate results with calls
 

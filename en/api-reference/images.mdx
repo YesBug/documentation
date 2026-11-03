@@ -27,7 +27,7 @@ Add `size`, `quality`, `n` or `response_format` only after confirming support. S
 
 ## Save the result
 
-Results commonly appear in `data[]`. `b64_json` contains Base64 image data, `url` contains a result link, and some models also return `revised_prompt` or `usage`. The console remains the source for billing.
+Results commonly appear in `data[]`. `b64_json` contains Base64 image data, `url` contains a result link, and some models also return `revised_prompt`. The console remains the source for billing.
 
 This reads the saved response and writes the first Base64 result as raw bytes, or prints a URL:
 
@@ -48,3 +48,54 @@ else:
 ```
 
 Persist assets you need rather than treating generated URLs as permanent storage. On timeout, check execution records before resubmitting and potentially creating duplicate work. See [troubleshooting](/en/help/errors).
+
+## Save a batch of images
+
+After generation succeeds, this script saves every image in `data`. It handles both URL and Base64 output and does not send your MaxAPI key to result URLs. Files use `.bin` until you choose an extension matching their actual encoding.
+
+```python Save URL or Base64 output
+import base64
+import json
+import shutil
+import urllib.request
+from pathlib import Path
+
+result = json.loads(Path("image-response.json").read_text(encoding="utf-8"))
+if not result.get("data"):
+    raise ValueError("No images returned; inspect the original response")
+output = Path("generated-images")
+output.mkdir(exist_ok=True)
+for index, item in enumerate(result["data"]):
+    target = output / f"image-{index + 1}.bin"
+    if item.get("b64_json"):
+        target.write_bytes(base64.b64decode(item["b64_json"], validate=True))
+    elif item.get("url"):
+        request = urllib.request.Request(item["url"])
+        with urllib.request.urlopen(request, timeout=60) as response:
+            with target.open("wb") as file:
+                shutil.copyfileobj(response, file)
+            print("Content type:", response.headers.get("Content-Type"))
+    else:
+        raise ValueError(f"Item {index + 1} has neither url nor b64_json")
+    print("Saved:", target)
+```
+
+The 60-second timeout is a client choice for network operations; adjust it for your download workload. Check that saved files open correctly before storing them in your application. Temporary URLs should not become permanent asset references. Do not infer encoding from a URL suffix.
+
+## Integrate generated assets
+
+1. Retain your own business request identifier and prompt before submitting.
+2. Inspect each result in `data` instead of taking the first and discarding other images.
+3. When `revised_prompt` is present, retain it with the result to explain how the image was generated.
+4. Save files in application storage and return your own asset URLs to the frontend.
+5. Regenerate only when failure is confirmed and retrying is appropriate. A failed download can be retried against the existing result first.
+
+## Resolve output problems
+
+| Symptom | Action |
+| --- | --- |
+| No `url` | Check `b64_json`; some models always return Base64 |
+| Result URL cannot be opened | Check download status, link validity and network access; changing the extension cannot repair an expired link |
+| Decoded bytes will not display | Match the actual image encoding and file type; do not text-encode the decoded bytes again |
+| Unexpected size or count | Check supported `size` and `n` settings, then inspect the actual result count |
+| You need to change an existing image | Use [image editing](/en/api-reference/images-edits) and describe what should stay unchanged |

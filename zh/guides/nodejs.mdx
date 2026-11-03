@@ -1,38 +1,49 @@
 ---
 title: "Node.js SDK"
-description: "使用 JavaScript 或 TypeScript，在服务端接入 MaxAPI。"
-keywords: ["MaxAPI", "Node.js SDK", "nodejs"]
+description: "使用 JavaScript 或 TypeScript 在服务端接入 MaxAPI，运行完整示例，并处理响应、超时、取消和 API 错误。"
+keywords: ["MaxAPI", "Node.js", "JavaScript", "TypeScript", "OpenAI SDK"]
 ---
 
-OpenAI 的 JavaScript / TypeScript SDK 支持自定义 `baseURL`。配置 MaxAPI 地址和密钥后，就可以在 Node.js 服务端发起对话请求。
+OpenAI 的 JavaScript / TypeScript SDK 可以通过自定义 `baseURL` 连接 MaxAPI。本指南提供可直接运行的 Node.js 文件，并说明客户端配置、请求取消和 Web 应用接入方式。
 
-## 安装
+## 1. 安装依赖
 
-在项目目录中安装依赖：
-
-```bash "终端"
-npm install openai
-```
-
-## 设置环境变量
+在应用项目目录中安装 SDK。新项目可以先运行 `npm init -y` 创建 `package.json`。
 
 ```bash
+npm install openai
+npm ls openai
+```
+
+使用 SDK 所支持的 Node.js 版本。以下文件使用 `.mjs` 扩展名，可以直接运行 ES Module 语法，无需额外配置 `type: module`。
+
+## 2. 设置环境变量
+
+在[控制台](https://platform.maxapi.ai)获取密钥，并通过[模型列表](/zh/api-reference/models)确定可用模型 ID。
+
+<CodeGroup>
+```bash macOS / Linux
 export MAXAPI_API_KEY="替换为你的 API Key"
 export MAXAPI_MODEL="替换为模型 ID"
 ```
 
-密钥从 [控制台](https://platform.maxapi.ai) 获取，模型 ID 可通过 [模型列表](/zh/api-reference/models) 查询。示例读取当前进程的环境变量；如果使用 `.env`，请确保运行环境已经加载它。
+```powershell Windows PowerShell
+$env:MAXAPI_API_KEY = "替换为你的 API Key"
+$env:MAXAPI_MODEL = "替换为模型 ID"
+```
+</CodeGroup>
 
-## 创建第一个请求
+示例读取当前进程环境变量，不会自动加载 `.env`。不要将密钥放入浏览器公开变量或提交到版本库。
 
-将以下代码保存为 `main.mjs`。使用 `.mjs` 扩展名可直接运行 ES Module 示例。
+## 3. 发送请求并处理结果
 
-```javascript "main.mjs"
+保存为 `main.mjs`。60 秒超时与关闭自动重试是本示例的客户端选择，不是平台限制。
+
+```javascript main.mjs
 import OpenAI from "openai";
 
 const apiKey = process.env.MAXAPI_API_KEY;
 const model = process.env.MAXAPI_MODEL;
-
 if (!apiKey || !model) {
   throw new Error("请设置 MAXAPI_API_KEY 和 MAXAPI_MODEL。");
 }
@@ -40,51 +51,108 @@ if (!apiKey || !model) {
 const client = new OpenAI({
   apiKey,
   baseURL: "https://api.maxapi.ai/v1",
+  timeout: 60_000,
+  maxRetries: 0,
 });
 
-const completion = await client.chat.completions.create({
-  model,
-  messages: [
-    { role: "user", content: "用三个要点解释什么是 API。" },
-  ],
-});
-
-console.log(completion.choices[0]?.message.content ?? "");
-```
-
-```bash "运行"
-node main.mjs
-```
-
-在 TypeScript 项目中可以使用相同的客户端和调用方式，由 SDK 提供请求参数与响应的类型定义。
-
-## 处理 API 错误
-
-在已有的客户端配置后加入异常处理，向日志记录必要状态，并向应用用户展示可理解的失败提示。
-
-```javascript "异常处理"
 try {
-  const completion = await client.chat.completions.create({
+  const response = await client.chat.completions.create({
     model,
-    messages: [{ role: "user", content: "你好！" }],
+    messages: [{
+      role: "user",
+      content: "为一款团队笔记应用写一段 50 字以内的产品介绍。",
+    }],
   });
-
-  console.log(completion.choices[0]?.message.content ?? "");
+  const choice = response.choices[0];
+  if (!choice) throw new Error("响应中没有候选结果。");
+  if (choice.message.tool_calls?.length) {
+    throw new Error("收到工具调用，请按工具调用流程处理。");
+  }
+  console.log(choice.message.content ?? "");
+  console.error("response_id:", response.id);
+  console.error("finish_reason:", choice.finish_reason);
+  if (response.usage) console.error("usage:", response.usage);
 } catch (error) {
   if (error instanceof OpenAI.APIError) {
-    console.error("请求失败，HTTP 状态码：", error.status ?? "不可用");
+    console.error("请求失败：", error.name, "HTTP", error.status ?? "无响应");
   } else {
-    console.error("请求失败，请检查运行配置与网络连接。");
+    console.error(error instanceof Error ? error.message : "未知错误");
   }
+  process.exitCode = 1;
 }
 ```
 
-处理重试前，先确认 SDK 是否已经自动重试，避免多层重试叠加。具体排查步骤见 [错误排查](/zh/help/errors)。
+```bash 运行
+node main.mjs
+```
 
-## 在 Web 应用中使用
+正常情况下，标准输出中出现生成的产品介绍；响应 ID、结束原因和可用的用量信息写入标准错误。文本位于 `choices[0].message.content`，不要把整个响应对象当作用户回答。
 
-让浏览器请求你自己的后端，再由后端携带 API Key 调用 MaxAPI。生产环境中应在后端校验用户身份，并根据业务需求控制请求频率和输入长度。
+## 4. 配置与 TypeScript
 
-不要将 API Key 放在浏览器端代码中，也不要为了绕过限制启用客户端密钥访问。详细建议见 [身份验证](/zh/authentication)。
+| 配置 | 作用 |
+| --- | --- |
+| `apiKey` | 直接传 MaxAPI 密钥，不附加 `Bearer` 前缀 |
+| `baseURL` | 使用 `https://api.maxapi.ai/v1`，由 SDK 拼接资源路径 |
+| `timeout` | 客户端超时，单位是毫秒；`60_000` 表示 60 秒 |
+| `maxRetries` | SDK 自动重试次数；本例设为 `0`，便于显式处理失败 |
 
-接下来可以添加 [流式响应](/zh/guides/streaming)，或查看 [官方 JavaScript SDK 文档](https://github.com/openai/openai-node) 了解更多客户端选项。
+Python 使用 `base_url` 和 `max_retries`，JavaScript 使用 `baseURL` 和 `maxRetries`。不要混用两种命名，也不要把 `.../v1/chat/completions` 填进 `baseURL`。
+
+TypeScript 使用相同的客户端及方法。定义可复用的消息数组时，可以引用 SDK 类型，避免 `role` 被推断为任意字符串：
+
+```typescript 消息类型
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+
+const messages: ChatCompletionMessageParam[] = [
+  { role: "user", content: "请解释什么是 API。" },
+];
+```
+
+## 5. 超时、重试与取消
+
+SDK 会根据配置重试部分错误。生产程序应选择由 SDK 或应用层统一管理重试，并为整个用户操作设置预算。若服务端提供有效 `Retry-After`，至少等待指定时间；不要对密钥、余额、权限或参数错误无限重发。
+
+支持 `AbortController` 的 Node.js 环境可向单次调用传入 `signal`。以下代码放在前面客户端配置之后，可替换原来的请求部分；它设置的是本例 30 秒应用截止时间。
+
+```javascript 单次请求取消
+const controller = new AbortController();
+const timer = setTimeout(() => controller.abort(), 30_000);
+
+try {
+  const response = await client.chat.completions.create(
+    { model, messages: [{ role: "user", content: "介绍三个 API 设计原则。" }] },
+    { signal: controller.signal },
+  );
+  console.log(response.choices[0]?.message.content ?? "");
+} catch (error) {
+  if (controller.signal.aborted) {
+    console.error("应用已取消等待响应。");
+  } else {
+    throw error;
+  }
+} finally {
+  clearTimeout(timer);
+}
+```
+
+取消会停止客户端等待，不代表服务端尚未处理请求，也不保证撤销生成或费用。收到部分流式内容后中断，不应自动重发并拼接两次生成；具体见[流式响应](/zh/guides/streaming)。
+
+## 6. 接入 Web 应用
+
+浏览器向你的后端发送用户输入，后端验证用户身份后携带密钥请求 MaxAPI，再将文本或流式结果返回浏览器。让后端控制允许的模型、输入长度与并发数量，避免把客户端传入的任意模型和参数原样转发。
+
+API Key 保存在服务端配置中。不要通过公开的前端环境变量或启用浏览器密钥访问的选项绕过隔离。参见[身份验证](/zh/authentication)。
+
+## 常见接入问题
+
+| 现象 | 处理方式 |
+| --- | --- |
+| `Cannot use import statement outside a module` | 保存为 `.mjs`，或正确配置已有项目的模块系统 |
+| `Cannot find package 'openai'` | 在当前项目安装依赖，并从该项目运行文件 |
+| 401 / 403 | 检查密钥、账户状态与模型权限 |
+| 404 | 检查 `baseURL` 拼写、`/v1` 是否重复及模型 ID |
+| `APIConnectionError` / 超时 | 检查网络和代理；区分没有连接与模型响应较慢 |
+| 没有正常文本 | 检查 `choices`、`tool_calls` 与 `finish_reason` |
+
+继续阅读[多轮对话](/zh/guides/text-generation)、[错误排查](/zh/help/errors)和[流式响应](/zh/guides/streaming)。SDK 安装与重试行为参考 [OpenAI SDK 文档](https://developers.openai.com/api/docs/libraries)及[官方重试指南](https://developers.openai.com/api/docs/guides/rate-limits#retrying-with-exponential-backoff)。

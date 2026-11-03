@@ -5,23 +5,95 @@ keywords: ["MaxAPI", "向量嵌入", "embeddings"]
 openapi: "openapi/zh.json POST /v1/embeddings"
 ---
 
-Embeddings 将文本编码为数值向量。可以先为文档片段生成向量并建立索引，再为查询生成向量，检索相关内容用于后续对话。
+Embeddings 将文本编码为数值向量，用于语义检索、相似度匹配和知识库。下面完成一个最小检索流程：为两段文档和一个问题生成向量，再按相似度选出相关文档。请选择支持嵌入的模型。
 
-单条文本长度、批量条数和输出维数由模型决定。提交前去除空文本，按语义拆分长文档，并保留每个片段的来源与位置。
+## 为文档与问题生成向量
 
-## 读取批量结果
+设置 `MAXAPI_API_KEY` 和 `MAXAPI_EMBEDDING_MODEL`。本例依赖 `jq`，显式请求浮点数组，便于计算相似度；所选模型需支持该格式。
 
-使用 `data[].index` 将结果映射回输入。浮点格式的向量位于 `data[].embedding`；若主动请求 Base64 格式，应按对应编码处理。
+```bash 生成三个输入的向量
+jq -n --arg model "$MAXAPI_EMBEDDING_MODEL" '{
+  model: $model,
+  input: [
+    "登录 MaxAPI 控制台后创建 API Key，在服务端通过环境变量读取密钥。",
+    "使用 GET /v1/models 查询当前 API Key 可见的模型标识。",
+    "在哪里获取接入接口的密钥？"
+  ],
+  encoding_format: "float"
+}' | curl --fail-with-body https://api.maxapi.ai/v1/embeddings \
+  -H "Authorization: Bearer $MAXAPI_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @- \
+  --output embeddings-response.json
+```
 
-## 用于知识库
+第三个输入是查询问题，前两个是待检索文档。生产系统通常在文档入库时生成文档向量，收到问题后只生成查询向量；此处放在一批中是为了完整演示。
 
-1. 将文档切分为适合检索的片段，保存原文、来源和向量。
-2. 使用相同模型与维数生成用户问题的向量。
-3. 在向量数据库中检索相关片段。
-4. 将检索到的原文加入 [对话请求](/zh/api-reference/chat-completions)，让模型基于这些内容回答。
+## 映射结果并计算相似度
 
-更换嵌入模型或维数时，应重新生成对应索引。即使向量长度相同，不同模型的向量也不应直接混用。
+命令成功后运行下面的 Python 标准库示例。它通过 `data[].index` 恢复输入顺序，检查数量和维数，然后计算余弦相似度。不要把数组位置当成输入标识。
+
+```python 本地检索示例
+import json
+import math
+from pathlib import Path
+
+documents = [
+    "登录 MaxAPI 控制台后创建 API Key，在服务端通过环境变量读取密钥。",
+    "使用 GET /v1/models 查询当前 API Key 可见的模型标识。",
+]
+result = json.loads(Path("embeddings-response.json").read_text(encoding="utf-8"))
+items = result.get("data", [])
+vectors = {item["index"]: item["embedding"] for item in items}
+if len(items) != 3 or set(vectors) != {0, 1, 2}:
+    raise ValueError("返回的输入索引不完整或存在重复")
+if any(not isinstance(v, list) or not v for v in vectors.values()):
+    raise ValueError("需要非空浮点数组，请检查 encoding_format")
+if len({len(v) for v in vectors.values()}) != 1:
+    raise ValueError("向量维数不一致")
+
+def cosine(a, b):
+    norm = math.sqrt(sum(x * x for x in a) * sum(y * y for y in b))
+    if norm == 0:
+        raise ValueError("不能比较零向量")
+    return sum(x * y for x, y in zip(a, b)) / norm
+
+ranked = sorted(
+    ((cosine(vectors[2], vectors[i]), text) for i, text in enumerate(documents)),
+    reverse=True,
+)
+for score, text in ranked:
+    print(f"{score:.4f}  {text}")
+print("向量维数：", len(vectors[0]))
+print("用量：", result.get("usage", {}))
+```
+
+输出按分数从高到低排列。分数用于比较同一检索配置下的相关性，不是“答案正确率”；不要把示例分数阈值当作所有模型的通用标准。
+
+## 接入知识库
+
+| 阶段 | 保存或处理的内容 |
+| --- | --- |
+| 文档切分 | 按段落或语义边界切分，保留来源、片段 ID 与原文 |
+| 建立索引 | 保存向量、模型 ID、维数和你自己的切分版本 |
+| 查询检索 | 使用相同模型与维数生成问题向量，再执行向量检索 |
+| 生成答案 | 将检索到的原文和问题交给 [对话接口](/zh/api-reference/chat-completions) |
+| 更新文档 | 更新受影响的片段和向量，删除已经失效的旧片段 |
+
+更换嵌入模型或维数时，应重建对应索引。即使长度相同，不同模型的向量也不应直接混用。只返回向量的接口不会自动保存原文或创建知识库。
+
+## 批量处理与输出格式
+
+提交前去除空文本。按模型允许的输入长度和批次数量拆分，给每批保留输入片段 ID，避免请求重试后错配结果。可配置的 `dimensions` 并非每个模型都支持。
+
+若使用 `encoding_format: "base64"`，响应中的 `embedding` 是字符串，不能直接交给数值向量计算。首次接入建议先验证浮点格式；使用编码格式时，应确认模型对应的解码方式。
 
 ## 常见问题
 
-空输入、单条文本过长、批次过大或不支持的 `dimensions` 都可能引发参数错误。先用一条短文本和最小参数验证，再恢复批量处理；遇到限流时降低批次与并发，详见 [错误排查](/zh/help/errors)。
+| 现象 | 检查方式 |
+| --- | --- |
+| 输入参数错误 | 先用单条短文本验证，再检查空文本、批量数量和长度 |
+| 向量库拒绝写入 | 检查返回维数与索引配置，确认拿到的是浮点数组 |
+| 检索效果突然下降 | 检查是否切换模型、维数、预处理方式或片段划分 |
+| 结果对应错原文 | 用 `index` 映射本批输入，再关联业务片段 ID |
+| 批量请求出现 `429` | 降低并发与批次压力，按 [错误排查](/zh/help/errors) 区分限流和额度问题 |

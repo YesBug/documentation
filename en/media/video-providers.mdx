@@ -124,6 +124,97 @@ GET /hailuo/v1/files/retrieve?file_id={file_id}
 
 After successful generation, save `file_id` and retrieve `file.download_url`. A file ID cannot replace the task ID in a progress query.
 
+### Python: resolve a task into a downloadable file
+
+Save `hailuo-submit.json` from the preceding request and run this script. It uses Hailuo's `Queueing`, `Processing`, `Success` and `Failed` states, checks HTTP and business status separately, then resolves the successful `file_id` into file metadata.
+
+```bash Install the dependency
+python -m pip install requests
+```
+
+```python wait_for_hailuo.py
+import json
+import os
+import time
+from pathlib import Path
+
+import requests
+
+
+HEADERS = {"Authorization": f"Bearer {os.environ['MAXAPI_API_KEY']}"}
+BASE_URL = "https://api.maxapi.ai"
+
+
+def get_result(path, params):
+    response = requests.get(
+        BASE_URL + path, params=params, headers=HEADERS, timeout=(10, 30)
+    )
+    response.raise_for_status()
+    payload = response.json()
+    business = payload.get("base_resp") or {}
+    if business.get("status_code") != 0:
+        raise RuntimeError(business.get("status_msg") or "Unexpected Hailuo business response")
+    return payload
+
+
+def wait_for_file(task_id, timeout_seconds=600):
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        task = get_result("/hailuo/v1/query/video_generation", {"task_id": task_id})
+        Path("hailuo-task.json").write_text(
+            json.dumps(task, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        state = task.get("status")
+        print(f"{task_id}: {state}")
+        if state == "Success":
+            file_id = task.get("file_id")
+            if not file_id:
+                raise RuntimeError("Completed task has no file_id")
+            result = get_result("/hailuo/v1/files/retrieve", {"file_id": file_id})
+            if not (result.get("file") or {}).get("download_url"):
+                raise RuntimeError("File response has no download_url")
+            return result
+        if state == "Failed":
+            raise RuntimeError((task.get("error") or {}).get("message") or "Generation failed")
+        if state not in {"Queueing", "Processing"}:
+            raise RuntimeError(f"Unexpected task state: {state!r}")
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            time.sleep(min(5, remaining))
+    raise TimeoutError(f"Retain task ID {task_id} and query it again later")
+
+
+if __name__ == "__main__":
+    submission = json.loads(Path("hailuo-submit.json").read_text(encoding="utf-8"))
+    if (submission.get("base_resp") or {}).get("status_code") != 0:
+        raise RuntimeError("Submission was not accepted; inspect hailuo-submit.json")
+    task_id = submission.get("task_id")
+    if not task_id:
+        raise RuntimeError("Submission has no task_id")
+    file_result = wait_for_file(task_id)
+    Path("hailuo-file.json").write_text(
+        json.dumps(file_result, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    print("File metadata saved to hailuo-file.json")
+```
+
+```bash Wait and retrieve file metadata
+python wait_for_hailuo.py
+```
+
+The interval and waiting budget are example application policies. After a timeout or network failure, rerun with the same `hailuo-submit.json` and original task ID instead of submitting another generation.
+
+```bash Download the video file
+DOWNLOAD_URL="$(jq -er '.file.download_url | select(type == "string" and startswith("https://"))' hailuo-file.json)"
+: "${DOWNLOAD_URL:?File metadata has no HTTPS download URL}"
+curl --fail --location --proto '=https' --proto-redir '=https' \
+  --connect-timeout 10 --max-time 300 \
+  --dump-header hailuo-video.headers \
+  --output hailuo-video.download "$DOWNLOAD_URL"
+```
+
+Inspect `Content-Type` in `hailuo-video.headers` together with `file.bytes` and `file.filename`. Save the confirmed content using its actual format. The download does not send the MaxAPI authentication header. If the link expires, query file metadata again; a download failure does not require a new generation.
+
 ## Luma: user_prompt and generation resources
 
 Luma v2 uses `user_prompt`. Optional fields include `image_url`, `image_end_url`, `expand_prompt` and `notify_hook`; confirm supported modes before using them.
